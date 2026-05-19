@@ -51,13 +51,26 @@ public final class BinauralListener: NSObject {
     private var sessionStartTime: TimeInterval = 0
     private var currentTrackURL: URL?
     private var currentFile: AVAudioFile?
-    private var carrierDerivationTimer: Timer?
     private var derivedCarrier: CarrierProfileSwift?
 
-    // MARK: Downmix buffer (allocated once, reused per tap callback)
+    /// Set to `true` by `stopSession()` so the completion callback on
+    /// AVAudioPlayerNode (which can fire shortly after a manual stop as
+    /// the buffer drains) doesn't post `.binduPlaybackComplete` for what
+    /// was actually a user-initiated stop.
+    private var userStopped: Bool = false
+
+    private let audioSessionID = "BinauralListener"
+
+    // MARK: Downmix buffer
+    //
+    // Pre-allocated once at configure() to a worst-case ceiling. The audio
+    // tap thread reads `monoBuffer` without a lock; reallocation would
+    // race with that read. We size for far more than iOS ever returns
+    // (typical tap buffer is 4800–9600 frames at 48 kHz) and never
+    // re-allocate; if a buffer ever overruns this ceiling we clamp.
+    private static let monoBufferCeiling: Int = 32768
     private var monoBuffer: UnsafeMutablePointer<Float>?
     private var monoBufferCapacity: Int = 0
-    private let monoBufferLock = NSLock()  // only for capacity changes (rare)
 
     // MARK: - Public API
 
@@ -66,11 +79,9 @@ public final class BinauralListener: NSObject {
     @objc public func configure() {
         if isConfigured { return }
 
-        do {
-            try configureAudioSession()
-        } catch {
-            NSLog("[BinauralListener] Failed to configure audio session: \(error)")
-            return
+        // Audio session category is owned by AudioSessionCoordinator.
+        DispatchQueue.main.async {
+            AudioSessionCoordinator.shared.requestPlayback(self.audioSessionID)
         }
 
         // Attach nodes
@@ -99,8 +110,8 @@ public final class BinauralListener: NSObject {
         // Initialize DSP kernel
         dsp.initialize(withSampleRate: Float(sampleRate))
 
-        // Allocate downmix buffer (8192 frames covers any reasonable tap buffer size)
-        allocateMonoBuffer(capacity: 8192)
+        // One-time allocation, never resized — see monoBufferCeiling rationale.
+        allocateMonoBuffer(capacity: BinauralListener.monoBufferCeiling)
 
         // Start the engine
         do {
@@ -141,13 +152,15 @@ public final class BinauralListener: NSObject {
         dsp.reset()
         derivedCarrier = nil
         sessionStartTime = Date().timeIntervalSince1970
+        userStopped = false
 
         // Schedule the file for playback
         playerNode.scheduleFile(file, at: nil, completionCallbackType: .dataPlayedBack) {
             [weak self] _ in
-            // Playback complete — fire JS event if needed
+            // Playback complete — fire only if this wasn't a user-initiated stop.
             DispatchQueue.main.async {
-                self?.handlePlaybackComplete()
+                guard let self, !self.userStopped else { return }
+                self.handlePlaybackComplete()
             }
         }
 
@@ -168,9 +181,11 @@ public final class BinauralListener: NSObject {
     @objc public func stopSession() {
         if !isSessionActive { return }
 
+        // Mark the stop as user-initiated so the scheduleFile completion
+        // callback (which can still fire as the buffer drains) doesn't
+        // raise the Integration Chamber via .binduPlaybackComplete.
+        userStopped = true
         playerNode.stop()
-        carrierDerivationTimer?.invalidate()
-        carrierDerivationTimer = nil
         isSessionActive = false
         currentFile = nil
         currentTrackURL = nil
@@ -179,20 +194,9 @@ public final class BinauralListener: NSObject {
     }
 
     /// Read the most recent BinduFrame from the DSP ring buffer.
-    /// Called by JS bridge at ~100ms intervals.
-    /// Returns nil if no frame is available yet.
+    /// Polled by DSPWireService at ~10 Hz.
     @objc public func readLatestFrame() -> [String: Any]? {
         return dsp.readLatestFrame()
-    }
-
-    /// Get the derived CarrierProfile. Returns nil if derivation hasn't completed yet.
-    @objc public func getCarrierProfile() -> [String: Any]? {
-        guard let carrier = derivedCarrier else { return nil }
-        return [
-            "carrierHz": carrier.carrierHz,
-            "salienceScore": carrier.salienceScore,
-            "derivedFromAudio": carrier.derivedFromAudio
-        ]
     }
 
     /// Check whether a session is currently active.
@@ -200,25 +204,14 @@ public final class BinauralListener: NSObject {
         return isSessionActive
     }
 
-    /// Get diagnostic info — frames produced by DSP so far this session.
-    @objc public func diagnostics() -> [String: Any] {
-        return [
-            "framesProduced": dsp.framesProduced(),
-            "sessionAge": isSessionActive ? (Date().timeIntervalSince1970 - sessionStartTime) : 0,
-            "carrierDerived": derivedCarrier != nil,
-            "engineRunning": engine.isRunning
-        ]
-    }
-
-    // MARK: - Private: Audio session
-
-    private func configureAudioSession() throws {
-        let session = AVAudioSession.sharedInstance()
-        try session.setCategory(
-            .playback,
-            mode: .default
-        )
-        try session.setActive(true)
+    /// Sample-accurate player-node clock. Returns `nil` before the node
+    /// has produced its first sample. Used by `TrackPlaybackService` to
+    /// derive elapsed time from the audio clock instead of wall clock.
+    public func playerTime() -> (sampleTime: AVAudioFramePosition, sampleRate: Double)? {
+        guard let last = playerNode.lastRenderTime,
+              let player = playerNode.playerTime(forNodeTime: last)
+        else { return nil }
+        return (player.sampleTime, player.sampleRate)
     }
 
     // MARK: - Private: Tap installation
@@ -239,20 +232,20 @@ public final class BinauralListener: NSObject {
     private func handleAnalysisTap(buffer: AVAudioPCMBuffer, time: AVAudioTime) {
         guard let channelData = buffer.floatChannelData else { return }
 
-        let frameCount = Int(buffer.frameLength)
+        var frameCount = Int(buffer.frameLength)
         if frameCount <= 0 { return }
 
+        // Clamp to the pre-allocated ceiling. iOS never returns tap blocks
+        // anywhere near 32k frames, but if it ever does we discard the
+        // tail rather than reallocate from under the audio thread.
+        if frameCount > monoBufferCapacity {
+            frameCount = monoBufferCapacity
+        }
+
         // Compute host time in seconds.
-        // mach_absolute_time() → host ticks → seconds via mach_timebase_info.
         let hostTime = hostTimeToSeconds(time.hostTime)
 
         let channelCount = Int(buffer.format.channelCount)
-
-        // Ensure mono buffer is large enough
-        if frameCount > monoBufferCapacity {
-            allocateMonoBuffer(capacity: max(frameCount, monoBufferCapacity * 2))
-        }
-
         guard let mono = monoBuffer else { return }
 
         if channelCount == 1 {
@@ -263,7 +256,6 @@ public final class BinauralListener: NSObject {
             let leftPtr = channelData[0]
             let rightPtr = channelData[1]
 
-            // mono = (L + R) * 0.5
             vDSP_vadd(leftPtr, 1, rightPtr, 1, mono, 1, vDSP_Length(frameCount))
             var scale: Float = 0.5
             vDSP_vsmul(mono, 1, &scale, mono, 1, vDSP_Length(frameCount))
@@ -278,14 +270,12 @@ public final class BinauralListener: NSObject {
     }
 
     // MARK: - Private: Mono buffer management
+    //
+    // Called exactly once from `configure()`. Never resized while the
+    // audio thread is reading — that would race the tap callback.
 
     private func allocateMonoBuffer(capacity: Int) {
-        monoBufferLock.lock()
-        defer { monoBufferLock.unlock() }
-
-        if let existing = monoBuffer {
-            existing.deallocate()
-        }
+        guard monoBuffer == nil else { return }
         monoBuffer = UnsafeMutablePointer<Float>.allocate(capacity: capacity)
         monoBuffer?.initialize(repeating: 0, count: capacity)
         monoBufferCapacity = capacity

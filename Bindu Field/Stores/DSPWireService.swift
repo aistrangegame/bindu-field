@@ -22,8 +22,28 @@ final class DSPWireService {
     private(set) var carrierLocked: Bool = false
     private(set) var isMusicPlaying: Bool = false
 
+    /// Set to true when the music has ended and we're in the drone tail.
+    /// While `isDroning`, presence-slider changes recompute drone gain so
+    /// the user can pull the field down or up after the song stops (B12).
+    private(set) var isDroning: Bool = false
+
+    // G23: diagnostic counters
+    private(set) var framesConsumed: Int = 0
+    private(set) var gainWrites: Int = 0
+
     // User-controlled presence (0.0–1.0, default 0.7)
-    var userPresence: Float = 0.7
+    var userPresence: Float = 0.7 {
+        didSet {
+            // Clamp defensively in case a binding overshoots.
+            if userPresence < 0 { userPresence = 0 }
+            if userPresence > 1 { userPresence = 1 }
+            // B12: while droning, keep the engine gain following the slider.
+            if isDroning {
+                let droneGain = userPresence * 0.2 * SettingsStore.shared.gain
+                BinauralEngine.shared.updateGain(droneGain)
+            }
+        }
+    }
 
     // Binaural on/off (user toggle)
     var binauralEnabled: Bool = true {
@@ -33,6 +53,10 @@ final class DSPWireService {
     private var pollingTimer: Timer?
     private var lastGain: Float = 0
     private let gainChangeThreshold: Float = 0.02
+
+    /// Retained so a rapid second carrier-derived event can cancel the
+    /// previous reset Task and stage its own (B10).
+    private var carrierResetTask: Task<Void, Never>?
 
     // Retained observer tokens — addObserver(forName:queue:using:) returns
     // an opaque protocol object that must be retained for the registration
@@ -46,23 +70,30 @@ final class DSPWireService {
 
     func startPolling() {
         isMusicPlaying = true
+        isDroning = false
         pollingTimer?.invalidate()
-        pollingTimer = Timer.scheduledTimer(withTimeInterval: 0.1, repeats: true) { [weak self] _ in
-            // Timer fires on the main run loop; hop into MainActor isolation
-            // so we can touch DSPWireService state without a Task.
+        let timer = Timer(timeInterval: 0.1, repeats: true) { [weak self] _ in
             MainActor.assumeIsolated {
                 self?.tick()
             }
         }
+        // B11: .common run-loop mode keeps polling active during scroll
+        // tracking. Default mode would freeze the wire whenever the user
+        // touches a scroll view.
+        RunLoop.main.add(timer, forMode: .common)
+        pollingTimer = timer
     }
 
     func stopPolling() {
         pollingTimer?.invalidate()
         pollingTimer = nil
         isMusicPlaying = false
+        isDroning = false
         rms = 0
         hasOnset = false
         lastGain = 0
+        // handleMusicEnded() sets isDroning = true immediately after
+        // calling stopPolling(), so the drone tail still works.
     }
 
     /// Clear the carrier-lock visual flag. Called by TrackPlaybackService
@@ -85,11 +116,13 @@ final class DSPWireService {
 
         rms = newRMS
         hasOnset = onset
+        framesConsumed &+= 1
 
         let targetGain = computeGain(rms: newRMS)
         if abs(targetGain - lastGain) > gainChangeThreshold {
             BinauralEngine.shared.updateGain(targetGain * SettingsStore.shared.gain)
             lastGain = targetGain
+            gainWrites &+= 1
         }
     }
 
@@ -113,14 +146,23 @@ final class DSPWireService {
         ) { [weak self] notification in
             // BinauralListener posts carrierHz as Float.
             guard let hz = notification.userInfo?["carrierHz"] as? Float else { return }
+            //
+            // G13 — Carrier source of truth:
+            //   Airtable `carrierHz` is the initial hint set at play time.
+            //   The DSP-derived carrier (computed from the first ~10s of
+            //   audio) OVERRIDES it here. DSP wins.
+            //
             MainActor.assumeIsolated {
                 BinauralEngine.shared.setCarrier(hz)
                 self?.carrierLocked = true
-            }
-            // Reset the visual flag after a 500ms acknowledgment window.
-            Task { @MainActor [weak self] in
-                try? await Task.sleep(nanoseconds: 500_000_000)
-                self?.carrierLocked = false
+                // B10: cancel any previous in-flight reset before staging
+                // a new one, so two rapid derivation events don't race.
+                self?.carrierResetTask?.cancel()
+                self?.carrierResetTask = Task { @MainActor [weak self] in
+                    try? await Task.sleep(nanoseconds: 500_000_000)
+                    guard !Task.isCancelled else { return }
+                    self?.carrierLocked = false
+                }
             }
         }
 
@@ -141,6 +183,7 @@ final class DSPWireService {
         // Music has ended. Stop polling but leave the binaural engine
         // running at a reduced gain. The field dissipates, it doesn't die.
         stopPolling()
+        isDroning = true
         let droneGain = userPresence * 0.2 * SettingsStore.shared.gain
         BinauralEngine.shared.updateGain(droneGain)
     }

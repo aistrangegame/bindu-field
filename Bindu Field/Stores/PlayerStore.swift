@@ -22,6 +22,11 @@ final class PlayerStore {
     /// cleared by `finalizeCurrentSession`.
     var pendingNote: String? = nil
 
+    /// Most recent track-fetch error message (O21). Surfaced as a banner
+    /// in `PlayerView` so the user knows why music is silent / replaced
+    /// with binaural-only. Cleared on the next successful start.
+    var lastFetchError: String? = nil
+
     private init() {}
 
     func configureEngine() {
@@ -31,6 +36,12 @@ final class PlayerStore {
     /// Play a track: stream/cache the audio file, layer the binaural tone on top,
     /// present the Player modal. Falls back to binaural-only if the download fails.
     func play(_ track: Track) {
+        // O17: ignore a rapid retap of the same track while the first is
+        // still being fetched / starting up. Without this, two parallel
+        // continuations both call TrackPlaybackService.play and the
+        // second tears down the first's audio audibly.
+        if isLoadingTrack, currentTrack?.id == track.id { return }
+
         // Save any in-flight session before swapping tracks
         finalizeCurrentSession(completed: false)
 
@@ -43,8 +54,10 @@ final class PlayerStore {
         isPresentingPlayer = true
         isLoadingTrack = true
 
-        // Stop any prior audio (both engines)
-        BinauralEngine.shared.stop()
+        // Stop any prior audio. TrackPlaybackService.stop() handles both
+        // the music engine (BinauralListener) and the tone engine
+        // (BinauralEngine); calling BinauralEngine.stop() too would be
+        // a redundant fade-out trigger (B5).
         TrackPlaybackService.shared.stop()
 
         let myTrack = track
@@ -67,12 +80,18 @@ final class PlayerStore {
                     verb: myTrack.verb,
                     song: myTrack.song,
                     artist: myTrack.artist,
-                    duration: dur > 0 ? dur : 600
+                    duration: dur > 0 ? dur : 600,
+                    elapsedProvider: { [weak svc = TrackPlaybackService.shared] in
+                        svc?.elapsed ?? 0
+                    }
                 )
             } catch {
-                // Graceful fallback: binaural-only via BinauralEngine.
+                // O21: surface the failure so the user knows why the track
+                // didn't appear, then gracefully fall back to binaural-only.
                 guard currentTrack?.id == myTrack.id else { return }
                 isLoadingTrack = false
+                lastFetchError = (error as? LocalizedError)?.errorDescription
+                    ?? error.localizedDescription
                 BinauralEngine.shared.start(carrierHz: carrier)
                 BinauralEngine.shared.updateBeat(beat)
                 BinauralEngine.shared.updateGain(SettingsStore.shared.gain)
@@ -95,9 +114,8 @@ final class PlayerStore {
     /// (the Integration Chamber close path). User-initiated stops
     /// (lock-screen, stop button, X button) leave the default `false`.
     func stop(completed: Bool = false) {
-        TrackPlaybackService.shared.stop()
+        TrackPlaybackService.shared.stop()  // stops both engines
         finalizeCurrentSession(completed: completed)
-        BinauralEngine.shared.stop()
         isPlaying = false
         isLoadingTrack = false
         currentTrack = nil
@@ -170,5 +188,12 @@ final class PlayerStore {
     func setBeat(_ beat: Float) {
         BinauralEngine.shared.updateBeat(beat)
         currentBeat = beat
+    }
+
+    /// Update carrier frequency on a currently running binaural tone
+    /// (B7). The engine glides to the new value over ~10 s.
+    func setCarrier(_ carrier: Float) {
+        BinauralEngine.shared.setCarrier(carrier)
+        currentCarrier = carrier
     }
 }

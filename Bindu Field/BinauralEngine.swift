@@ -44,6 +44,14 @@ public final class BinauralEngine: NSObject {
     private var sampleRate: Double = 48000.0
     private var isRunning = false
 
+    /// Bumped on every `start()` so a pending fade-out scheduled by an
+    /// earlier `stop()` can be told to stand down. Without this, a quick
+    /// stop→start would let the old 2.5 s delayed stop closure kill the
+    /// engine right after the user restarted it.
+    private var startGeneration: UInt64 = 0
+
+    private let audioSessionID = "BinauralEngine"
+
     // MARK: - Render parameters (read by render callback, written by setters)
     //
     // All marked private(set) where externally read; render callback accesses
@@ -90,11 +98,10 @@ public final class BinauralEngine: NSObject {
     @objc public func configure() {
         if sourceNode != nil { return }
 
-        do {
-            try configureAudioSession()
-        } catch {
-            NSLog("[BinauralEngine] Audio session configuration failed: \(error)")
-            return
+        // Audio session category is owned by AudioSessionCoordinator.
+        // Request playback for the engine's lifetime.
+        DispatchQueue.main.async {
+            AudioSessionCoordinator.shared.requestPlayback(self.audioSessionID)
         }
 
         // Determine sample rate from hardware
@@ -140,6 +147,9 @@ public final class BinauralEngine: NSObject {
         carrierTarget = clampCarrier(carrierHz)
         carrierCurrent = carrierTarget  // start at target, no glide on first start
 
+        // New start invalidates any pending fade-out from a previous stop().
+        startGeneration &+= 1
+
         do {
             try engine.start()
             isRunning = true
@@ -150,19 +160,31 @@ public final class BinauralEngine: NSObject {
     }
 
     /// Stop the engine and fade out gracefully.
+    ///
+    /// The fade is scheduled 2.5s out. If `start()` is called within that
+    /// window, `startGeneration` is bumped and the captured generation
+    /// here will mismatch — the delayed closure becomes a no-op so the
+    /// new playback isn't killed.
     @objc public func stop() {
         if !isRunning { return }
 
         // Fade gain to zero — the render callback will glide it down over ~2s
         gainTarget = 0.0
 
-        // Stop after fade completes
+        let stopGeneration = startGeneration
+
         DispatchQueue.global(qos: .userInitiated).asyncAfter(deadline: .now() + 2.5) {
             [weak self] in
-            guard let self = self, self.isRunning else { return }
-            self.engine.stop()
-            self.isRunning = false
-            NSLog("[BinauralEngine] Stopped")
+            DispatchQueue.main.async {
+                guard let self = self,
+                      self.isRunning,
+                      self.startGeneration == stopGeneration
+                else { return }
+                self.engine.stop()
+                self.isRunning = false
+                AudioSessionCoordinator.shared.release(self.audioSessionID, mode: .playback)
+                NSLog("[BinauralEngine] Stopped")
+            }
         }
     }
 
@@ -208,17 +230,6 @@ public final class BinauralEngine: NSObject {
             "amDepthTarget": amDepthTarget,
             "amDepthCurrent": amDepthCurrent
         ]
-    }
-
-    // MARK: - Private: Audio session
-
-    private func configureAudioSession() throws {
-        let session = AVAudioSession.sharedInstance()
-        try session.setCategory(
-            .playback,
-            mode: .default
-        )
-        try session.setActive(true)
     }
 
     // MARK: - Private: Clamping

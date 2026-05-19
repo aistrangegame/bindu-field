@@ -89,13 +89,15 @@ struct LabView: View {
                         value: $carrier,
                         range: 40...440,
                         format: "%.0f Hz",
-                        onChange: nil,
-                        onCommit: { newCarrier in
+                        onChange: { newCarrier in
+                            // B7: BinauralEngine.start() guards `if isRunning { return }`,
+                            // so re-calling startBinaural mid-play was silently a no-op.
+                            // setCarrier directly updates the running engine's glide target.
                             if isPlaying {
-                                store.startBinaural(carrier: newCarrier, beat: beat)
-                                store.setGain(SettingsStore.shared.gain)
+                                store.setCarrier(newCarrier)
                             }
-                        }
+                        },
+                        onCommit: nil
                     )
 
                     SliderControl(

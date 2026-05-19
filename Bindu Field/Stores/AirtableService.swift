@@ -22,48 +22,69 @@ enum AirtableError: LocalizedError {
 final class AirtableService {
     static let shared = AirtableService()
 
-    private let endpoint = URL(string: "https://api.airtable.com/v0/app248ZTWhYJlvQj2/tblv3WvMZ90Sfhun6?pageSize=100")!
+    private let baseURL = "https://api.airtable.com/v0/app248ZTWhYJlvQj2/tblv3WvMZ90Sfhun6"
+    private let pageSize = 100
 
     private init() {}
 
     func fetchTracks() async throws -> [Track] {
         let token = Secrets.airtableToken
-        guard !token.isEmpty, token != "PASTE_REAL_TOKEN_HERE", token != "YOUR_AIRTABLE_PAT_HERE" else {
+        guard isPlausibleToken(token) else {
             throw AirtableError.noToken
         }
 
-        var request = URLRequest(url: endpoint)
-        request.httpMethod = "GET"
-        request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
+        // B16: walk Airtable's `offset` pagination until all records are
+        // collected. Today's catalog is 22 records but this is what you
+        // do if you ever cross 100.
+        var allRecords: [AirtableRecord] = []
+        var offset: String? = nil
 
-        let (data, response): (Data, URLResponse)
-        do {
-            (data, response) = try await URLSession.shared.data(for: request)
-        } catch {
-            throw AirtableError.networkError(error)
-        }
+        repeat {
+            var components = URLComponents(string: baseURL)!
+            var items = [URLQueryItem(name: "pageSize", value: "\(pageSize)")]
+            if let offset { items.append(URLQueryItem(name: "offset", value: offset)) }
+            components.queryItems = items
+            guard let url = components.url else { throw AirtableError.invalidResponse }
 
-        guard let http = response as? HTTPURLResponse else {
-            throw AirtableError.invalidResponse
-        }
+            var request = URLRequest(url: url)
+            request.httpMethod = "GET"
+            request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
 
-        if http.statusCode != 200 {
-            if let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
-               let err = json["error"] as? [String: Any],
-               let msg = err["message"] as? String {
-                throw AirtableError.apiError(msg)
+            let (data, response): (Data, URLResponse)
+            do {
+                (data, response) = try await URLSession.shared.data(for: request)
+            } catch {
+                throw AirtableError.networkError(error)
             }
-            throw AirtableError.apiError("HTTP \(http.statusCode)")
-        }
 
-        let decoded: AirtableResponse
-        do {
-            decoded = try JSONDecoder().decode(AirtableResponse.self, from: data)
-        } catch {
-            throw AirtableError.parseError
-        }
+            guard let http = response as? HTTPURLResponse else {
+                throw AirtableError.invalidResponse
+            }
 
-        let tracks: [Track] = decoded.records.compactMap { record in
+            if http.statusCode != 200 {
+                if let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
+                   let err = json["error"] as? [String: Any],
+                   let msg = err["message"] as? String {
+                    throw AirtableError.apiError(msg)
+                }
+                throw AirtableError.apiError("HTTP \(http.statusCode)")
+            }
+
+            // Decode on the main actor — catalog is small (22 records),
+            // and the project's actor-isolation default makes hopping
+            // off main require extra plumbing for no measurable win.
+            let decoded: AirtableResponse
+            do {
+                decoded = try JSONDecoder().decode(AirtableResponse.self, from: data)
+            } catch {
+                throw AirtableError.parseError
+            }
+
+            allRecords.append(contentsOf: decoded.records)
+            offset = decoded.offset
+        } while offset != nil
+
+        let tracks: [Track] = allRecords.compactMap { record in
             let f = record.fields
             guard let id = f.trackID,
                   let verb = f.verb,
@@ -101,12 +122,31 @@ final class AirtableService {
 
         return tracks.sorted { $0.id < $1.id }
     }
+
+    // MARK: - Helpers
+
+    /// B17: reject obvious placeholders and shape-fail values. A real
+    /// Airtable PAT begins with `pat`, has a `.` separator, and runs
+    /// 60+ characters total.
+    private func isPlausibleToken(_ token: String) -> Bool {
+        guard !token.isEmpty,
+              token != "PASTE_REAL_TOKEN_HERE",
+              token != "YOUR_AIRTABLE_PAT_HERE"
+        else { return false }
+        guard token.hasPrefix("pat"),
+              token.contains("."),
+              token.count >= 60
+        else { return false }
+        return true
+    }
+
 }
 
 // MARK: - Airtable JSON shape
 
 private struct AirtableResponse: Decodable {
     let records: [AirtableRecord]
+    let offset: String?
 }
 
 private struct AirtableRecord: Decodable {
