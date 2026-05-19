@@ -28,11 +28,15 @@
 import Foundation
 import AVFoundation
 import Accelerate
+import os
 
 // MARK: - BinauralListener
 
 @objc(BinauralListener)
 public final class BinauralListener: NSObject {
+
+    /// G22: structured logging via `os.Logger`.
+    private static let log = Logger(subsystem: "com.bindufield", category: "audio.listener")
 
     // MARK: Singleton
     @objc public static let shared = BinauralListener()
@@ -117,9 +121,9 @@ public final class BinauralListener: NSObject {
         do {
             try engine.start()
             isConfigured = true
-            NSLog("[BinauralListener] Configured at \(sampleRate) Hz")
+            Self.log.info("Configured at \(sampleRate, privacy: .public) Hz")
         } catch {
-            NSLog("[BinauralListener] Failed to start engine: \(error)")
+            Self.log.error("Failed to start engine: \(error.localizedDescription, privacy: .public)")
         }
     }
 
@@ -128,7 +132,7 @@ public final class BinauralListener: NSObject {
     /// - Parameter trackURL: file URL of the audio track to play
     @objc public func startSession(trackURL: URL) -> Bool {
         guard isConfigured else {
-            NSLog("[BinauralListener] startSession called before configure()")
+            Self.log.error("startSession called before configure()")
             return false
         }
 
@@ -142,7 +146,7 @@ public final class BinauralListener: NSObject {
             currentFile = try AVAudioFile(forReading: trackURL)
             currentTrackURL = trackURL
         } catch {
-            NSLog("[BinauralListener] Failed to load track \(trackURL): \(error)")
+            Self.log.error("Failed to load track \(trackURL.lastPathComponent, privacy: .public): \(error.localizedDescription, privacy: .public)")
             return false
         }
 
@@ -173,7 +177,7 @@ public final class BinauralListener: NSObject {
             self?.performCarrierDerivation()
         }
 
-        NSLog("[BinauralListener] Session started for \(trackURL.lastPathComponent)")
+        Self.log.info("Session started for \(trackURL.lastPathComponent, privacy: .public)")
         return true
     }
 
@@ -190,7 +194,7 @@ public final class BinauralListener: NSObject {
         currentFile = nil
         currentTrackURL = nil
 
-        NSLog("[BinauralListener] Session stopped")
+        Self.log.info("Session stopped")
     }
 
     /// Read the most recent BinduFrame from the DSP ring buffer.
@@ -306,7 +310,7 @@ public final class BinauralListener: NSObject {
         guard let carrierHz = profileDict["carrierHz"] as? Float,
               let salience = profileDict["salienceScore"] as? Float,
               let derived = profileDict["derivedFromAudio"] as? Bool else {
-            NSLog("[BinauralListener] Carrier derivation returned invalid data")
+            Self.log.error("Carrier derivation returned invalid data")
             return
         }
 
@@ -316,7 +320,7 @@ public final class BinauralListener: NSObject {
             derivedFromAudio: derived
         )
 
-        NSLog("[BinauralListener] Carrier derived: \(carrierHz) Hz, salience \(salience), fromAudio \(derived)")
+        Self.log.info("Carrier derived: \(carrierHz, privacy: .public) Hz, salience \(salience, privacy: .public), fromAudio \(derived, privacy: .public)")
 
         // Notify JS layer via event emitter (handled in bridge .m file)
         NotificationCenter.default.post(

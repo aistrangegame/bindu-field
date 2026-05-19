@@ -19,6 +19,11 @@ final class DSPWireService {
     // Observable state — VisualizerView reads these
     private(set) var rms: Float = 0
     private(set) var hasOnset: Bool = false
+    /// G10: monotonically-increasing counter incremented on each onset
+    /// *edge* (false→true transition). Consumers can diff against a stored
+    /// value to detect new onsets without re-implementing the debounce
+    /// that `hasOnset` requires.
+    private(set) var onsetCount: Int = 0
     private(set) var carrierLocked: Bool = false
     private(set) var isMusicPlaying: Bool = false
 
@@ -115,6 +120,9 @@ final class DSPWireService {
         let onset = frame["onsetFlag"] as? Bool ?? false
 
         rms = newRMS
+        // G10: increment counter only on the leading edge so two adjacent
+        // polls reading the same "true" don't double-count.
+        if onset && !hasOnset { onsetCount &+= 1 }
         hasOnset = onset
         framesConsumed &+= 1
 

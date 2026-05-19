@@ -5,7 +5,7 @@ struct Chip: View {
     let isSelected: Bool
     let action: () -> Void
 
-    private let theme = ThemeData.void
+    @Environment(\.binduTheme) private var theme
 
     var body: some View {
         Button(action: action) {

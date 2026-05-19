@@ -25,9 +25,15 @@
 
 import Foundation
 import AVFoundation
+import os
 
 @objc(BinauralEngine)
 public final class BinauralEngine: NSObject {
+
+    /// G22: structured logging via `os.Logger`. Subsystem-tagged so
+    /// `log show --predicate 'subsystem == "com.bindufield"'` filters
+    /// cleanly when correlating engine + session behavior on device.
+    private static let log = Logger(subsystem: "com.bindufield", category: "audio.engine")
 
     // MARK: - Singleton
 
@@ -113,7 +119,7 @@ public final class BinauralEngine: NSObject {
             standardFormatWithSampleRate: sampleRate,
             channels: 2
         ) else {
-            NSLog("[BinauralEngine] Failed to create stereo format")
+            Self.log.error("Failed to create stereo format")
             return
         }
 
@@ -133,7 +139,7 @@ public final class BinauralEngine: NSObject {
         engine.connect(source, to: mixerNode, format: stereoFormat)
         engine.connect(mixerNode, to: engine.mainMixerNode, format: stereoFormat)
 
-        NSLog("[BinauralEngine] Configured at \(sampleRate) Hz")
+        Self.log.info("Configured at \(self.sampleRate, privacy: .public) Hz")
     }
 
     // MARK: - Lifecycle
@@ -153,9 +159,9 @@ public final class BinauralEngine: NSObject {
         do {
             try engine.start()
             isRunning = true
-            NSLog("[BinauralEngine] Started at carrier \(carrierTarget) Hz")
+            Self.log.info("Started at carrier \(self.carrierTarget, privacy: .public) Hz")
         } catch {
-            NSLog("[BinauralEngine] Failed to start engine: \(error)")
+            Self.log.error("Failed to start engine: \(error.localizedDescription, privacy: .public)")
         }
     }
 
@@ -183,7 +189,7 @@ public final class BinauralEngine: NSObject {
                 self.engine.stop()
                 self.isRunning = false
                 AudioSessionCoordinator.shared.release(self.audioSessionID, mode: .playback)
-                NSLog("[BinauralEngine] Stopped")
+                Self.log.info("Stopped")
             }
         }
     }
@@ -210,26 +216,15 @@ public final class BinauralEngine: NSObject {
     }
 
     /// Set the AM modulation depth.
-    /// 0.0 = pure binaural. 0.15 = subtle tremolo reinforcement. 0.30 = maximum.
+    ///
+    /// 0.0 = pure binaural. 0.15 = subtle tremolo reinforcement. 0.30 = max.
+    ///
+    /// G19: today nothing in the app calls this — `amDepthTarget` stays at
+    /// the static 0.15 default chosen for the hybrid binaural-plus-monaural
+    /// signature. The setter is retained so a future Lab/Settings control
+    /// can expose it without re-opening this file.
     @objc public func updateAMDepth(_ depth: Float) {
         amDepthTarget = max(0.0, min(0.30, depth))
-    }
-
-    // MARK: - Diagnostics
-
-    @objc public func diagnostics() -> [String: Any] {
-        return [
-            "isRunning": isRunning,
-            "sampleRate": sampleRate,
-            "carrierTarget": carrierTarget,
-            "carrierCurrent": carrierCurrent,
-            "beatTarget": beatTarget,
-            "beatCurrent": beatCurrent,
-            "gainTarget": gainTarget,
-            "gainCurrent": gainCurrent,
-            "amDepthTarget": amDepthTarget,
-            "amDepthCurrent": amDepthCurrent
-        ]
     }
 
     // MARK: - Private: Clamping

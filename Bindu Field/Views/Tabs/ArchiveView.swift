@@ -3,7 +3,7 @@ import SwiftUI
 struct ArchiveView: View {
     @State private var store = SessionStore.shared
     @State private var showingSettings = false
-    private let theme = ThemeData.void
+    @Environment(\.binduTheme) private var theme
 
     var body: some View {
         NavigationStack {
@@ -83,7 +83,7 @@ struct ArchiveView: View {
 
 private struct SessionRow: View {
     let session: Session
-    private let theme = ThemeData.void
+    @Environment(\.binduTheme) private var theme
 
     var body: some View {
         HStack(spacing: 14) {
@@ -101,6 +101,17 @@ private struct SessionRow: View {
                     .font(.system(size: 11))
                     .foregroundColor(theme.muted)
                     .lineLimit(1)
+                // G11 / O16: display the Integration Chamber note as a
+                // third line if the user wrote one. Italic + softer color
+                // distinguishes it from the song/artist line.
+                if let note = session.note, !note.isEmpty {
+                    Text("“\(note)”")
+                        .font(.system(size: 11, design: .serif))
+                        .italic()
+                        .foregroundColor(theme.subtle)
+                        .lineLimit(2)
+                        .padding(.top, 2)
+                }
             }
 
             Spacer()
@@ -128,18 +139,5 @@ private struct SessionRow: View {
     }
 }
 
-private extension DateFormatter {
-    static let archiveDate: DateFormatter = {
-        let df = DateFormatter()
-        df.dateStyle = .full
-        df.timeStyle = .none
-        return df
-    }()
-
-    static let archiveTime: DateFormatter = {
-        let df = DateFormatter()
-        df.dateStyle = .none
-        df.timeStyle = .short
-        return df
-    }()
-}
+// O4: archiveDate / archiveTime moved to Views/Components/DateFormatters.swift
+// so other views (LetterRow timestamps, future session detail) can share them.

@@ -3,6 +3,7 @@ import SwiftUI
 struct RootView: View {
     @State private var nav = NavigationStore.shared
     @State private var store = PlayerStore.shared
+    @State private var session = AudioSessionCoordinator.shared
     @State private var showBirthSequence: Bool = !UserDefaults.standard.bool(forKey: "binduFirstLaunch.seen")
     @State private var showHeadphonesTip: Bool = !UserDefaults.standard.bool(forKey: "binduFirstLaunch.tipSeen")
 
@@ -54,6 +55,20 @@ struct RootView: View {
                 .transition(.opacity.combined(with: .move(edge: .bottom)))
             }
 
+            // O20: audio engine / session failures are no longer silent —
+            // surface a banner the user can dismiss. The coordinator
+            // clears `lastError` on the next successful transition, so
+            // the banner self-heals.
+            if let error = session.lastError, !showBirthSequence {
+                VStack {
+                    AudioErrorBanner(message: error.localizedDescription)
+                        .padding(.top, 60)
+                    Spacer()
+                }
+                .transition(.opacity)
+                .zIndex(50)
+            }
+
             // First-launch Bindu birth sequence — on top of everything
             if showBirthSequence {
                 BinduBirthView(onComplete: {
@@ -68,6 +83,34 @@ struct RootView: View {
         }
         .animation(.easeInOut(duration: 0.4), value: showBirthSequence)
         .animation(.easeInOut(duration: 0.4), value: showHeadphonesTip)
+    }
+}
+
+/// O20: terse error banner surfaced when `AudioSessionCoordinator.lastError`
+/// becomes non-nil. Foreground/background of the engine error reads as
+/// "audio is broken" to a user — saying so is better than silence.
+private struct AudioErrorBanner: View {
+    let message: String
+
+    var body: some View {
+        HStack(spacing: 10) {
+            Image(systemName: "speaker.slash")
+                .font(.system(size: 13, weight: .light))
+                .foregroundColor(Color.orange)
+            Text(message)
+                .font(.system(size: 12, design: .serif))
+                .italic()
+                .foregroundColor(ThemeData.void.text)
+                .lineLimit(2)
+        }
+        .padding(.horizontal, 16)
+        .padding(.vertical, 10)
+        .background(
+            Capsule()
+                .fill(Color.black.opacity(0.92))
+                .overlay(Capsule().stroke(Color.orange.opacity(0.4), lineWidth: 1))
+        )
+        .padding(.horizontal, 32)
     }
 }
 

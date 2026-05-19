@@ -1,5 +1,6 @@
 import Foundation
 import AVFoundation
+import Observation
 import os
 
 /// Single owner of `AVAudioSession` category transitions.
@@ -15,6 +16,7 @@ import os
 /// `AVAudioSession` is documented safe to call from any thread; main-actor
 /// confinement here is purely to serialize requesters.
 @MainActor
+@Observable
 final class AudioSessionCoordinator {
     static let shared = AudioSessionCoordinator()
 
@@ -24,6 +26,10 @@ final class AudioSessionCoordinator {
     }
 
     private(set) var currentMode: Mode = .playback
+
+    /// O20: observable so a `RootView` banner can surface session failures
+    /// instead of swallowing them in logs. `nil` once a subsequent call
+    /// succeeds — the banner is fresh-error-only.
     private(set) var lastError: Error?
 
     /// Reference counts per mode. The active mode is the highest-priority

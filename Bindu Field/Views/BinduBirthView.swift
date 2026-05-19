@@ -8,7 +8,7 @@ struct BinduBirthView: View {
     @State private var binduOpacity: Double = 0
     @State private var blackOpacity: Double = 1
 
-    private let theme = ThemeData.void
+    @Environment(\.binduTheme) private var theme
     private let binduColor = Color(red: 0.898, green: 0.322, blue: 0.306)  // #E5524E
 
     enum Phase {
@@ -50,40 +50,40 @@ struct BinduBirthView: View {
         }
     }
 
+    /// O15: linear Task-based sequence. Easier to reason about than nested
+    /// `DispatchQueue.main.asyncAfter` blocks and gives us cancellation for
+    /// free if a future caller needs it.
     private func runBirthSequence() {
-        // Phase 1: dark (0.5s) — just sit in blackness
-        DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
+        Task { @MainActor in
+            // Phase 1: dark (0.5s) — sit in blackness
+            try? await Task.sleep(nanoseconds: 500_000_000)
             phase = .emerging
             withAnimation(.easeOut(duration: 0.7)) {
                 binduScale = 1.0
                 binduOpacity = 1.0
             }
-        }
 
-        // Phase 2: pulse (1.2s) — Bindu breathes
-        DispatchQueue.main.asyncAfter(deadline: .now() + 1.3) {
+            // Phase 2: pulse — Bindu breathes
+            try? await Task.sleep(nanoseconds: 800_000_000)
             phase = .pulsing
             withAnimation(.easeInOut(duration: 0.6)) {
                 binduScale = 1.5
             }
-            DispatchQueue.main.asyncAfter(deadline: .now() + 0.6) {
-                withAnimation(.easeInOut(duration: 0.6)) {
-                    binduScale = 1.0
-                }
+            try? await Task.sleep(nanoseconds: 600_000_000)
+            withAnimation(.easeInOut(duration: 0.6)) {
+                binduScale = 1.0
             }
-        }
 
-        // Phase 3: dissolve (0.8s) — black fades out revealing the Field beneath
-        DispatchQueue.main.asyncAfter(deadline: .now() + 2.6) {
+            // Phase 3: dissolve — black fades out revealing the Field beneath
+            try? await Task.sleep(nanoseconds: 700_000_000)
             phase = .dissolving
             withAnimation(.easeInOut(duration: 0.8)) {
                 blackOpacity = 0
                 binduOpacity = 0
             }
-        }
 
-        // Phase 4: complete (signal parent to remove)
-        DispatchQueue.main.asyncAfter(deadline: .now() + 3.5) {
+            // Phase 4: signal parent to remove
+            try? await Task.sleep(nanoseconds: 900_000_000)
             phase = .complete
             onComplete()
         }

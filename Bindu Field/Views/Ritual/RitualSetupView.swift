@@ -5,8 +5,13 @@ struct RitualStep: Identifiable {
     let chakraName: ChakraName
     var durationMinutes: Int
 
+    /// O24: defensive lookup. The dictionary is total over the 9 declared
+    /// `ChakraName` cases today, so the only way the bang could trip is
+    /// if a new case is added without a corresponding `ChakraData.all`
+    /// entry. Fall back to Anahata (heart) so the queue can still run
+    /// and the omission is obvious in QA rather than a crash.
     var chakra: ChakraProtocol {
-        ChakraData.all[chakraName]!
+        ChakraData.all[chakraName] ?? ChakraData.all[.anahata]!
     }
 }
 
@@ -15,7 +20,7 @@ struct RitualSetupView: View {
 
     @State private var queue: [RitualStep] = []
 
-    private let theme = ThemeData.void
+    @Environment(\.binduTheme) private var theme
     private let durationOptions = [3, 5, 10, 15]
 
     private var totalMinutes: Int {
@@ -125,7 +130,7 @@ private struct QueueRow: View {
     let step: RitualStep
     let stepNumber: Int
     let onCycleDuration: () -> Void
-    private let theme = ThemeData.void
+    @Environment(\.binduTheme) private var theme
 
     var body: some View {
         HStack(spacing: 12) {
@@ -164,7 +169,7 @@ private struct QueueRow: View {
 
 private struct ChakraAddTile: View {
     let chakra: ChakraProtocol
-    private let theme = ThemeData.void
+    @Environment(\.binduTheme) private var theme
 
     var body: some View {
         VStack(spacing: 4) {

@@ -19,7 +19,7 @@ struct LetterRecordView: View {
     /// the latter being a leak that has to clean up the orphan m4a (B14).
     @State private var didSave: Bool = false
 
-    private let theme = ThemeData.void
+    @Environment(\.binduTheme) private var theme
 
     enum Phase {
         case setup, countdown, recording, review
@@ -187,7 +187,7 @@ struct LetterRecordView: View {
                         .frame(width: 64, height: 64)
                 }
 
-                Text(formatTime(elapsed))
+                Text(elapsed.asPlaybackTime)
                     .font(.system(size: 32, weight: .ultraLight, design: .monospaced))
                     .foregroundColor(theme.text)
                     .padding(.top, 32)
@@ -235,7 +235,7 @@ struct LetterRecordView: View {
                     .font(.system(size: 22, weight: .ultraLight, design: .serif))
                     .italic()
                     .foregroundColor(theme.text)
-                Text("\(stateSelection.rawValue) · \(formatTime(recordedDuration))")
+                Text("\(stateSelection.rawValue) · \(recordedDuration.asPlaybackTime)")
                     .font(.system(size: 12))
                     .foregroundColor(theme.muted)
             }
@@ -326,9 +326,9 @@ struct LetterRecordView: View {
         }
         recordedDuration = duration
 
-        let df = DateFormatter()
-        df.dateFormat = "MMM d · h:mm a"
-        savedTitle = "Letter · \(df.string(from: Date()))"
+        // O4: use shared letter-title formatter instead of allocating
+        // a `DateFormatter` on every stop.
+        savedTitle = "Letter · \(DateFormatter.letterTitle.string(from: Date()))"
 
         phase = .review
     }
@@ -357,9 +357,4 @@ struct LetterRecordView: View {
         dismiss()
     }
 
-    private func formatTime(_ seconds: Double) -> String {
-        let mins = Int(seconds) / 60
-        let secs = Int(seconds) % 60
-        return String(format: "%d:%02d", mins, secs)
-    }
 }

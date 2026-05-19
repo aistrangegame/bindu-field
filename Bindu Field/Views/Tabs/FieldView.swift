@@ -9,7 +9,19 @@ struct FieldView: View {
     @State private var dragStart: CGPoint?
     @State private var stateFilter: BrainwaveState? = nil   // nil = "all"
 
-    private let theme = ThemeData.void
+    /// O22: long-pressing the central Bindu opens the Oracle, but the
+    /// gesture has no visual hint. Show a one-time serif tooltip below
+    /// the Bindu for new users; dismiss on tap or after the gesture is
+    /// invoked.
+    @State private var showOracleHint: Bool = !UserDefaults.standard.bool(forKey: "binduFirstLaunch.oracleHintSeen")
+
+    @Environment(\.binduTheme) private var theme
+
+    private func dismissOracleHint() {
+        guard showOracleHint else { return }
+        UserDefaults.standard.set(true, forKey: "binduFirstLaunch.oracleHintSeen")
+        withAnimation(.easeOut(duration: 0.4)) { showOracleHint = false }
+    }
 
     private var filteredTracks: [Track] {
         guard let filter = stateFilter else { return catalog.tracks }
@@ -162,9 +174,29 @@ struct FieldView: View {
                             // Tap-and-hold → open Oracle
                             let haptic = UIImpactFeedbackGenerator(style: .medium)
                             haptic.impactOccurred()
+                            dismissOracleHint()
                             withAnimation(.easeInOut(duration: 0.3)) {
                                 NavigationStore.shared.selectedTab = 1
                             }
+                        }
+                    }
+                    .overlay(alignment: .center) {
+                        // O22: first-launch tooltip below the central Bindu.
+                        if showOracleHint {
+                            Text("hold for Oracle")
+                                .font(.system(size: 11, design: .serif))
+                                .italic()
+                                .foregroundColor(theme.muted)
+                                .padding(.horizontal, 14)
+                                .padding(.vertical, 6)
+                                .background(
+                                    Capsule()
+                                        .fill(Color.black.opacity(0.72))
+                                        .overlay(Capsule().stroke(theme.muted.opacity(0.25), lineWidth: 1))
+                                )
+                                .offset(y: 70)
+                                .onTapGesture { dismissOracleHint() }
+                                .transition(.opacity)
                         }
                     }
                     .overlay(alignment: .bottom) {

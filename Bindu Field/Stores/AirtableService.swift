@@ -70,12 +70,14 @@ final class AirtableService {
                 throw AirtableError.apiError("HTTP \(http.statusCode)")
             }
 
-            // Decode on the main actor — catalog is small (22 records),
-            // and the project's actor-isolation default makes hopping
-            // off main require extra plumbing for no measurable win.
+            // O6: hop decoding to a detached task so JSON parsing doesn't
+            // pin the main actor. Catalog is small today (~22 records) but
+            // the cost grows linearly; the detach is free insurance.
             let decoded: AirtableResponse
             do {
-                decoded = try JSONDecoder().decode(AirtableResponse.self, from: data)
+                decoded = try await Task.detached(priority: .userInitiated) {
+                    try JSONDecoder().decode(AirtableResponse.self, from: data)
+                }.value
             } catch {
                 throw AirtableError.parseError
             }
@@ -143,17 +145,22 @@ final class AirtableService {
 }
 
 // MARK: - Airtable JSON shape
+//
+// `nonisolated` lets these types participate in decoding from a detached
+// task (O6) under Swift's MainActor-by-default project setting. Without
+// it, the synthesized `Decodable` conformance is MainActor-isolated and
+// Swift 6 rejects the off-actor `JSONDecoder().decode` call.
 
-private struct AirtableResponse: Decodable {
+private nonisolated struct AirtableResponse: Decodable {
     let records: [AirtableRecord]
     let offset: String?
 }
 
-private struct AirtableRecord: Decodable {
+private nonisolated struct AirtableRecord: Decodable {
     let fields: AirtableFields
 }
 
-private struct AirtableFields: Decodable {
+private nonisolated struct AirtableFields: Decodable {
     let trackID: Int?
     let verb: String?
     let songTitle: String?
