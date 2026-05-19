@@ -3,6 +3,7 @@ import UIKit
 
 struct FieldView: View {
     @State private var store = PlayerStore.shared
+    @State private var committedRotY: Double = 0
     @State private var dragRotY: Double = 0
     @State private var dragStart: CGPoint?
     @State private var stateFilter: BrainwaveState? = nil   // nil = "all"
@@ -61,7 +62,7 @@ struct FieldView: View {
                     TimelineView(.animation(minimumInterval: 1.0/60.0)) { timeline in
                         let t = timeline.date.timeIntervalSinceReferenceDate
                         let autoRot = t * 0.08   // slow auto-rotation, radians/sec
-                        let rotY = autoRot + dragRotY
+                        let rotY = autoRot + committedRotY + dragRotY
 
                         Canvas { ctx, size in
                             let positions = computePositions(rotY: rotY, size: size)
@@ -74,7 +75,7 @@ struct FieldView: View {
                                 let baseRadius = 3.5 + 5.5 * proj.scale
                                 let radius = isPlaying ? baseRadius * 1.8 : baseRadius
 
-                                let color = elementColor(proj.track.element)
+                                let color = Color.bindu(element: proj.track.element.rawValue)
                                 let alpha = 0.3 + 0.7 * proj.scale  // depth fading
 
                                 // Active orb pulse
@@ -116,6 +117,8 @@ struct FieldView: View {
                                 dragRotY = Double(dx) * 0.01
                             }
                             .onEnded { _ in
+                                committedRotY += dragRotY
+                                dragRotY = 0
                                 dragStart = nil
                             }
                     )
@@ -212,15 +215,13 @@ struct FieldView: View {
     private func lastRotY(in size: CGSize) -> Double {
         // Approximate current rotation for hit-testing
         let t = Date().timeIntervalSinceReferenceDate
-        return t * 0.08 + dragRotY
+        return t * 0.08 + committedRotY + dragRotY
     }
 
     private func handleTap(at location: CGPoint, rotY: Double, size: CGSize) {
         let positions = computePositions(rotY: rotY, size: size)
-        // Only consider front-facing orbs (depth < 0.3 ish)
-        let candidates = positions.filter { $0.depth < 0.4 }
-        // Find closest within a generous threshold
-        let threshold: CGFloat = 28
+        let candidates = positions.filter { $0.depth < 0.7 }
+        let threshold: CGFloat = 36
         var best: (proj: Projection, dist: CGFloat)? = nil
         for p in candidates {
             let dx = p.screen.x - location.x
@@ -237,20 +238,4 @@ struct FieldView: View {
         }
     }
 
-    // MARK: - Element colors
-
-    private func elementColor(_ el: Element) -> Color {
-        switch el {
-        case .earth:       return Color(hue: 15/360,  saturation: 0.55, brightness: 0.85)
-        case .water:       return Color(hue: 210/360, saturation: 0.50, brightness: 0.90)
-        case .fire:        return Color(hue: 25/360,  saturation: 0.65, brightness: 0.95)
-        case .air:         return Color(hue: 195/360, saturation: 0.40, brightness: 0.92)
-        case .light:       return Color(hue: 50/360,  saturation: 0.50, brightness: 0.95)
-        case .crown:       return Color(hue: 280/360, saturation: 0.45, brightness: 0.90)
-        case .soul:        return Color(hue: 265/360, saturation: 0.50, brightness: 0.85)
-        case .dissolution: return Color(hue: 190/360, saturation: 0.40, brightness: 0.85)
-        case .meditate:    return Color(hue: 0,       saturation: 0.0,  brightness: 0.75)
-        case .family:      return Color(hue: 330/360, saturation: 0.35, brightness: 0.88)
-        }
-    }
 }

@@ -12,18 +12,7 @@ struct PlayerView: View {
     private let theme = ThemeData.void
 
     private var elementColor: Color {
-        switch track.element {
-        case .earth:       return Color(hue: 15/360,  saturation: 0.55, brightness: 0.85)
-        case .water:       return Color(hue: 210/360, saturation: 0.50, brightness: 0.90)
-        case .fire:        return Color(hue: 25/360,  saturation: 0.65, brightness: 0.95)
-        case .air:         return Color(hue: 195/360, saturation: 0.40, brightness: 0.92)
-        case .light:       return Color(hue: 50/360,  saturation: 0.50, brightness: 0.95)
-        case .crown:       return Color(hue: 280/360, saturation: 0.45, brightness: 0.90)
-        case .soul:        return Color(hue: 265/360, saturation: 0.50, brightness: 0.85)
-        case .dissolution: return Color(hue: 190/360, saturation: 0.40, brightness: 0.85)
-        case .meditate:    return Color(hue: 0,       saturation: 0.0,  brightness: 0.75)
-        case .family:      return Color(hue: 330/360, saturation: 0.35, brightness: 0.88)
-        }
+        Color.bindu(element: track.element.rawValue)
     }
 
     var body: some View {
@@ -84,6 +73,25 @@ struct PlayerView: View {
                             .foregroundColor(theme.muted)
                     }
                     .padding(.top, 12)
+
+                    // Persistent stop control — always visible, independent of HUD
+                    Button(action: { store.closePlayer() }) {
+                        HStack(spacing: 8) {
+                            Image(systemName: "stop.fill")
+                                .font(.system(size: 12, weight: .light))
+                            Text("stop")
+                                .font(.system(size: 13, design: .serif))
+                                .italic()
+                        }
+                        .foregroundColor(theme.muted)
+                        .padding(.horizontal, 22)
+                        .padding(.vertical, 8)
+                        .background(
+                            Capsule().stroke(theme.muted.opacity(0.3), lineWidth: 1)
+                        )
+                    }
+                    .buttonStyle(.plain)
+                    .padding(.top, 20)
 
                     Spacer()
 
