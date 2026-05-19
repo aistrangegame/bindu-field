@@ -62,12 +62,17 @@ final class TrackPlaybackService {
         BinauralEngine.shared.updateBeat(beat)
         BinauralEngine.shared.updateGain(gain)
 
+        // === DSPWireService: poll analysis frames and drive engine gain
+        DSPWireService.shared.resetCarrierLock()
+        DSPWireService.shared.startPolling()
+
         isPlaying = true
         startTime = Date()
     }
 
     func stop() {
         guard isPlaying else { return }
+        DSPWireService.shared.stopPolling()
         BinauralListener.shared.stopSession()
         BinauralEngine.shared.stop()
         isPlaying = false
