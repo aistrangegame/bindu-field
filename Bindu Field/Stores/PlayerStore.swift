@@ -30,21 +30,8 @@ final class PlayerStore {
         // Save any in-flight session before swapping tracks
         finalizeCurrentSession(completed: false)
 
-        let carrier: Float
-        let beat: Float
-
-        if let chakraName = track.chakra, let proto = ChakraData.all[chakraName] {
-            carrier = Float(proto.carrier)
-            beat = Float(proto.beat)
-        } else {
-            // Defaults by brainwave state
-            switch track.state {
-            case .delta:       carrier = 136.0; beat = 2.5
-            case .theta:       carrier = 136.0; beat = 5.5
-            case .thetaAlpha:  carrier = 136.0; beat = 7.5
-            case .alpha:       carrier = 136.0; beat = 10.0
-            }
-        }
+        let carrier = Float(track.carrierHz)
+        let beat = Float(track.beatHz)
 
         currentTrack = track
         currentCarrier = carrier

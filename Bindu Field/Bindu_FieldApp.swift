@@ -15,6 +15,7 @@ struct Bindu_FieldApp: App {
                             NowPlayingService.shared.clear()
                         }
                     }
+                    Task { await CatalogStore.shared.refresh() }
                 }
         }
     }

@@ -38,7 +38,7 @@ final class OracleService {
         }
 
         let catalogLines = allTracks.map { t in
-            "id=\(t.id) | verb=\(t.verb) | \(t.song) — \(t.artist) | state=\(t.state.rawValue) | element=\(t.element.rawValue) | seed=\(t.seed)"
+            "id=\(t.id) | verb=\(t.verb) | \(t.song) — \(t.artist) | state=\(t.state.rawValue) | element=\(t.element) | seed=\(t.seed)"
         }.joined(separator: "\n")
 
         let systemPrompt = """

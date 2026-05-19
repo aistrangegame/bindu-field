@@ -12,7 +12,7 @@ struct PlayerView: View {
     private let theme = ThemeData.void
 
     private var elementColor: Color {
-        Color.bindu(element: track.element.rawValue)
+        Color.bindu(element: track.element)
     }
 
     var body: some View {

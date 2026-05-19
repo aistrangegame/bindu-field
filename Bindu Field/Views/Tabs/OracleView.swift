@@ -215,8 +215,7 @@ struct OracleView: View {
         guard !userInput.isEmpty else { return }
         viewState = .loading
 
-        // Track collection lives at TrackData.all in this project.
-        let catalog = TrackData.all
+        let catalog = CatalogStore.shared.tracks
 
         Task {
             do {

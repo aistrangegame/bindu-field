@@ -3,6 +3,7 @@ import UIKit
 
 struct FieldView: View {
     @State private var store = PlayerStore.shared
+    @State private var catalog = CatalogStore.shared
     @State private var committedRotY: Double = 0
     @State private var dragRotY: Double = 0
     @State private var dragStart: CGPoint?
@@ -11,8 +12,8 @@ struct FieldView: View {
     private let theme = ThemeData.void
 
     private var filteredTracks: [Track] {
-        guard let filter = stateFilter else { return TrackData.all }
-        return TrackData.all.filter { $0.state == filter }
+        guard let filter = stateFilter else { return catalog.tracks }
+        return catalog.tracks.filter { $0.state == filter }
     }
 
     var body: some View {
@@ -57,7 +58,7 @@ struct FieldView: View {
                     .padding(.vertical, 12)
                 }
 
-                // Constellation canvas
+                // Constellation canvas (or loading state while catalog is empty)
                 GeometryReader { geo in
                     TimelineView(.animation(minimumInterval: 1.0/60.0)) { timeline in
                         let t = timeline.date.timeIntervalSinceReferenceDate
@@ -75,7 +76,7 @@ struct FieldView: View {
                                 let baseRadius = 3.5 + 5.5 * proj.scale
                                 let radius = isPlaying ? baseRadius * 1.8 : baseRadius
 
-                                let color = Color.bindu(element: proj.track.element.rawValue)
+                                let color = Color.bindu(element: proj.track.element)
                                 let alpha = 0.3 + 0.7 * proj.scale  // depth fading
 
                                 // Active orb pulse
@@ -164,6 +165,26 @@ struct FieldView: View {
                             withAnimation(.easeInOut(duration: 0.3)) {
                                 NavigationStore.shared.selectedTab = 1
                             }
+                        }
+                    }
+                    .overlay(alignment: .bottom) {
+                        if catalog.tracks.isEmpty && catalog.isLoading {
+                            HStack(spacing: 10) {
+                                ProgressView().tint(theme.muted)
+                                Text("loading the field…")
+                                    .font(.system(size: 12, design: .serif))
+                                    .italic()
+                                    .foregroundColor(theme.muted)
+                            }
+                            .padding(.bottom, 24)
+                        } else if catalog.tracks.isEmpty, let err = catalog.loadError {
+                            Text(err)
+                                .font(.system(size: 11, design: .serif))
+                                .italic()
+                                .foregroundColor(theme.muted)
+                                .multilineTextAlignment(.center)
+                                .padding(.horizontal, 32)
+                                .padding(.bottom, 24)
                         }
                     }
                 }
