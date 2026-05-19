@@ -90,9 +90,13 @@ final class PlayerStore {
         currentSessionTrack = track
     }
 
-    func stop() {
+    /// Tear down audio and finalize the in-flight session.
+    /// `completed: true` only when the track ran to its natural end
+    /// (the Integration Chamber close path). User-initiated stops
+    /// (lock-screen, stop button, X button) leave the default `false`.
+    func stop(completed: Bool = false) {
         TrackPlaybackService.shared.stop()
-        finalizeCurrentSession(completed: false)
+        finalizeCurrentSession(completed: completed)
         BinauralEngine.shared.stop()
         isPlaying = false
         isLoadingTrack = false
@@ -129,9 +133,11 @@ final class PlayerStore {
         SessionStore.shared.save(session)
     }
 
-    /// Close the player and stop audio.
-    func closePlayer() {
-        stop()
+    /// Close the player and stop audio. Pass `completed: true` only from
+    /// the natural-end path (Integration Chamber); user-initiated closes
+    /// keep the default `false` so the Archive reflects an early stop.
+    func closePlayer(completed: Bool = false) {
+        stop(completed: completed)
     }
 
     /// Minimize the player (keeps audio playing, just dismisses the modal).

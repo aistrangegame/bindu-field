@@ -393,7 +393,11 @@ struct PlayerView: View {
     }
 
     private func presentIntegration() {
-        guard !showingIntegration else { return }
+        // Only present from a still-open player. If the user has already
+        // initiated a close (stop/X/lock-screen), a late
+        // `.binduPlaybackComplete` from BinauralListener must NOT raise
+        // the chamber on a dismissing view.
+        guard store.isPresentingPlayer, !showingIntegration else { return }
         showingIntegration = true
         integrationText = ""
 
@@ -421,7 +425,10 @@ struct PlayerView: View {
             }
         }
         showingIntegration = false
-        store.closePlayer()
+        // The chamber only opens on natural completion, so this close
+        // always represents a finished session — regardless of whether
+        // the user saved a note or just closed.
+        store.closePlayer(completed: true)
     }
 }
 
