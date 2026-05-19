@@ -57,6 +57,11 @@ public final class BinauralListener: NSObject {
     private var currentFile: AVAudioFile?
     private var derivedCarrier: CarrierProfileSwift?
 
+    /// True while the session is active but the player node is paused.
+    /// Set by `pause()` / `resume()`. `restartIfNeeded()` honors this so a
+    /// mid-pause interruption recovery doesn't silently un-pause playback.
+    @objc public private(set) var isPaused: Bool = false
+
     /// Set to `true` by `stopSession()` so the completion callback on
     /// AVAudioPlayerNode (which can fire shortly after a manual stop as
     /// the buffer drains) doesn't post `.binduPlaybackComplete` for what
@@ -152,20 +157,42 @@ public final class BinauralListener: NSObject {
     /// the underlying AVAudioEngine has been paused (post-interruption).
     /// Scheduled file content resumes from its prior position — Apple's
     /// sample clock is preserved across engine restarts.
+    ///
+    /// While `isPaused` is true the user has chosen a paused state, so
+    /// recovery must restart the engine but leave the player node paused.
     @objc public func restartIfNeeded() {
         guard isSessionActive else { return }
         guard !engine.isRunning else {
-            // Engine is running; nudge the player only if it was paused.
-            if !playerNode.isPlaying { playerNode.play() }
+            if !isPaused, !playerNode.isPlaying { playerNode.play() }
             return
         }
         do {
             try engine.start()
-            if !playerNode.isPlaying { playerNode.play() }
+            if !isPaused, !playerNode.isPlaying { playerNode.play() }
             Self.log.info("Restarted after interruption")
         } catch {
             Self.log.error("Restart failed: \(error.localizedDescription, privacy: .public)")
         }
+    }
+
+    /// Pause the music player. The audio engine + tap stay running so DSP
+    /// can resume cleanly; only the AVAudioPlayerNode pauses, freezing the
+    /// scheduled file's player time at the current sample.
+    @objc public func pause() {
+        guard isSessionActive, !isPaused else { return }
+        playerNode.pause()
+        isPaused = true
+        Self.log.info("Paused")
+    }
+
+    /// Resume from a paused state. AVAudioPlayerNode preserves its
+    /// scheduled position across pause/play, so playback continues from
+    /// the exact sample where it was paused.
+    @objc public func resume() {
+        guard isSessionActive, isPaused else { return }
+        playerNode.play()
+        isPaused = false
+        Self.log.info("Resumed")
     }
 
     /// Begin a new listening session for a track. Resets DSP state, schedules
@@ -198,6 +225,7 @@ public final class BinauralListener: NSObject {
         derivedCarrier = nil
         sessionStartTime = Date().timeIntervalSince1970
         userStopped = false
+        isPaused = false
 
         // Schedule the file for playback
         playerNode.scheduleFile(file, at: nil, completionCallbackType: .dataPlayedBack) {
@@ -232,6 +260,7 @@ public final class BinauralListener: NSObject {
         userStopped = true
         playerNode.stop()
         isSessionActive = false
+        isPaused = false
         currentFile = nil
         currentTrackURL = nil
 

@@ -82,6 +82,13 @@ public final class BinauralEngine: NSObject {
     private var gainCurrent: Float = 0.0
     private let gainGlideAlpha: Float = 0.0010      // ~2s time constant
 
+    /// Gain target cached at `pause()` time so `resume()` can restore the
+    /// exact pre-pause level. Zero when not paused. DSPWireService will
+    /// quickly overwrite this on the first tick after resume, but
+    /// restoring here means there's no audible drop-to-zero if polling
+    /// hasn't ticked yet.
+    private var prePauseGain: Float = 0.0
+
     // AM modulation depth (0 = pure binaural, 0.30 = strong tremolo)
     private var amDepthTarget: Float = 0.15
     private var amDepthCurrent: Float = 0.0         // starts at 0, glides up
@@ -198,6 +205,22 @@ public final class BinauralEngine: NSObject {
         } catch {
             Self.log.error("Failed to start engine: \(error.localizedDescription, privacy: .public)")
         }
+    }
+
+    /// Pause: fade the binaural tone to silence without stopping the engine.
+    /// The render callback keeps running so phases stay coherent; only the
+    /// gain target moves to zero. `resume()` restores the cached gain.
+    @objc public func pause() {
+        guard isRunning else { return }
+        prePauseGain = gainTarget
+        gainTarget = 0.0
+    }
+
+    /// Resume from a paused state by restoring the cached pre-pause gain.
+    @objc public func resume() {
+        guard isRunning else { return }
+        gainTarget = prePauseGain
+        prePauseGain = 0.0
     }
 
     /// Stop the engine and fade out gracefully.

@@ -10,10 +10,6 @@ final class NowPlayingService {
     private var elapsedTimer: Timer?
     private var elapsedSource: (() -> TimeInterval)?
 
-    /// Cached pre-pause gain so the lock-screen play command can restore
-    /// the user's prior level instead of guessing.
-    private var preMuteGain: Float = 0
-
     private init() {}
 
     /// One-time launch hook. Routes through `AudioSessionCoordinator` so
@@ -25,10 +21,11 @@ final class NowPlayingService {
     /// Register lock-screen / control-center remote command handlers.
     /// Idempotent — repeated calls are a no-op so handler stacking can't happen.
     ///
-    /// Command mapping (per the foundation design):
+    /// Command mapping:
     ///   - stop:            full tear-down via the provided `stopHandler`
-    ///   - pause / toggle:  soft mute (BinauralEngine gain → 0); state preserved
-    ///   - play:            restore the gain that was active before the mute
+    ///   - pause / toggle:  TrackPlaybackService.pause / togglePlayPause
+    ///                      (player node pauses, both engines hold, DSP wire stops)
+    ///   - play:            TrackPlaybackService.resume
     func registerRemoteCommands(stopHandler: @escaping @Sendable () -> Void) {
         guard !didRegisterRemoteCommands else { return }
         didRegisterRemoteCommands = true
@@ -43,47 +40,27 @@ final class NowPlayingService {
             stopHandler()
             return .success
         }
-        center.pauseCommand.addTarget { [weak self] _ in
-            self?.softMute()
+        center.pauseCommand.addTarget { _ in
+            TrackPlaybackService.shared.pause()
             return .success
         }
-        center.togglePlayPauseCommand.addTarget { [weak self] _ in
-            self?.toggleSoftMute()
+        center.togglePlayPauseCommand.addTarget { _ in
+            TrackPlaybackService.shared.togglePlayPause()
             return .success
         }
-        center.playCommand.addTarget { [weak self] _ in
-            self?.softRestore()
+        center.playCommand.addTarget { _ in
+            TrackPlaybackService.shared.resume()
             return .success
         }
     }
 
-    // MARK: - Soft mute (pause/play affordance without true seek/resume)
-
-    private var isSoftMuted: Bool { preMuteGain > 0 }
-
-    private func softMute() {
-        let current = SettingsStore.shared.gain
-        if current > 0 {
-            preMuteGain = current
-            BinauralEngine.shared.updateGain(0)
-        }
-    }
-
-    private func softRestore() {
-        if preMuteGain > 0 {
-            BinauralEngine.shared.updateGain(preMuteGain)
-            preMuteGain = 0
-        }
-    }
-
-    private func toggleSoftMute() {
-        if isSoftMuted { softRestore() } else { softMute() }
-    }
-
-    /// Clear the soft-mute memory. Called when a session ends so a
-    /// subsequent play() doesn't restore a stale gain.
-    func clearSoftMuteState() {
-        preMuteGain = 0
+    /// Update the lock-screen playback rate so iOS renders the correct
+    /// play/pause glyph on the now-playing card. Called by
+    /// TrackPlaybackService at pause/resume.
+    func setPaused(_ paused: Bool) {
+        var info = MPNowPlayingInfoCenter.default().nowPlayingInfo ?? [:]
+        info[MPNowPlayingInfoPropertyPlaybackRate] = paused ? 0.0 : 1.0
+        MPNowPlayingInfoCenter.default().nowPlayingInfo = info
     }
 
     /// Set now-playing metadata for a Field track.
@@ -158,7 +135,6 @@ final class NowPlayingService {
     /// Clear all now-playing metadata. Call when audio stops.
     func clear() {
         stopElapsedTicker()
-        clearSoftMuteState()
         MPNowPlayingInfoCenter.default().nowPlayingInfo = nil
     }
 

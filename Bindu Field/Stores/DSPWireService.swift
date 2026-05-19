@@ -97,6 +97,10 @@ final class DSPWireService {
         rms = 0
         hasOnset = false
         lastGain = 0
+        // Safe to call from TrackPlaybackService.pause(): touches only the
+        // poll timer + visualizer-facing values. carrierLocked, onsetCount,
+        // userPresence, and engine/listener state are left alone so a
+        // matching startPolling() resumes cleanly.
         // handleMusicEnded() sets isDroning = true immediately after
         // calling stopPolling(), so the drone tail still works.
     }
