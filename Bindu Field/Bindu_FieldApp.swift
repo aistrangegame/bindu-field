@@ -12,9 +12,11 @@ struct Bindu_FieldApp: App {
                 .onChange(of: scenePhase) { _, phase in
                     // G16: on return to foreground, reconcile the DSP wire
                     // with the actual playback state — if audio is still
-                    // playing, ensure polling is on; otherwise leave alone.
+                    // playing (and not user-paused), ensure polling is on;
+                    // otherwise leave alone.
                     if phase == .active, didLaunch {
                         if TrackPlaybackService.shared.isPlaying,
+                           !TrackPlaybackService.shared.isPaused,
                            !DSPWireService.shared.isMusicPlaying {
                             DSPWireService.shared.startPolling()
                         }

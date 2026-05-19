@@ -78,23 +78,41 @@ struct PlayerView: View {
                             .padding(.top, 18)
                     }
 
-                    // Persistent stop control — always visible, independent of HUD
-                    Button(action: { store.closePlayer() }) {
-                        HStack(spacing: 8) {
-                            Image(systemName: "stop.fill")
-                                .font(.system(size: 12, weight: .light))
-                            Text("stop")
-                                .font(.system(size: 13, design: .serif))
-                                .italic()
+                    // Persistent transport row — play/pause + smaller end-session
+                    // button. Always visible, independent of HUD opacity.
+                    HStack(spacing: 14) {
+                        Button(action: {
+                            TrackPlaybackService.shared.togglePlayPause()
+                        }) {
+                            HStack(spacing: 8) {
+                                Image(systemName: trackPlayer.isPaused ? "play.fill" : "pause.fill")
+                                    .font(.system(size: 12, weight: .light))
+                                Text(trackPlayer.isPaused ? "play" : "pause")
+                                    .font(.system(size: 13, design: .serif))
+                                    .italic()
+                            }
+                            .foregroundColor(theme.muted)
+                            .padding(.horizontal, 22)
+                            .padding(.vertical, 8)
+                            .background(
+                                Capsule().stroke(theme.muted.opacity(0.3), lineWidth: 1)
+                            )
                         }
-                        .foregroundColor(theme.muted)
-                        .padding(.horizontal, 22)
-                        .padding(.vertical, 8)
-                        .background(
-                            Capsule().stroke(theme.muted.opacity(0.3), lineWidth: 1)
-                        )
+                        .buttonStyle(.plain)
+
+                        Button(action: { store.closePlayer() }) {
+                            Text("end")
+                                .font(.system(size: 12, design: .serif))
+                                .italic()
+                                .foregroundColor(theme.subtle)
+                                .padding(.horizontal, 14)
+                                .padding(.vertical, 6)
+                                .background(
+                                    Capsule().stroke(theme.subtle.opacity(0.35), lineWidth: 1)
+                                )
+                        }
+                        .buttonStyle(.plain)
                     }
-                    .buttonStyle(.plain)
                     .padding(.top, 20)
 
                     Spacer()

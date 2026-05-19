@@ -8,6 +8,10 @@ final class TrackPlaybackService {
     static let shared = TrackPlaybackService()
 
     private(set) var isPlaying: Bool = false
+    /// True while a session is active but audio has been paused. Mirrors
+    /// `BinauralListener.shared.isPaused`; kept here as the @Observable
+    /// source of truth for SwiftUI views and the scene-phase reconciler.
+    private(set) var isPaused: Bool = false
     private(set) var duration: TimeInterval = 0
     private var startTime: Date?
     private var startSampleTime: AVAudioFramePosition = 0
@@ -86,6 +90,7 @@ final class TrackPlaybackService {
         DSPWireService.shared.startPolling()
 
         isPlaying = true
+        isPaused = false
         startTime = Date()
         startSampleTime = BinauralListener.shared.playerTime()?.sampleTime ?? 0
     }
@@ -96,7 +101,36 @@ final class TrackPlaybackService {
         BinauralListener.shared.stopSession()
         BinauralEngine.shared.stop()
         isPlaying = false
+        isPaused = false
         duration = 0
         startTime = nil
+    }
+
+    /// Pause both engines and the DSP wire. The session stays "active"
+    /// (isPlaying remains true) — only audio rendering halts. The player
+    /// node's sample clock freezes, so `elapsed` naturally pauses too.
+    func pause() {
+        guard isPlaying, !isPaused else { return }
+        DSPWireService.shared.stopPolling()
+        BinauralListener.shared.pause()
+        BinauralEngine.shared.pause()
+        isPaused = true
+        NowPlayingService.shared.setPaused(true)
+    }
+
+    /// Resume from a paused state. Restores engine gain, un-pauses the
+    /// player node (resumes from the exact sample where it was paused),
+    /// and kicks DSP polling back up.
+    func resume() {
+        guard isPlaying, isPaused else { return }
+        BinauralEngine.shared.resume()
+        BinauralListener.shared.resume()
+        DSPWireService.shared.startPolling()
+        isPaused = false
+        NowPlayingService.shared.setPaused(false)
+    }
+
+    func togglePlayPause() {
+        if isPaused { resume() } else { pause() }
     }
 }
