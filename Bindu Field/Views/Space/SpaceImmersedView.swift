@@ -9,7 +9,7 @@ struct SpaceImmersedView: View {
     @State private var store = PlayerStore.shared
     @State private var sessionStart: Date = Date()
 
-    private let theme = ThemeData.void
+    @Environment(\.binduTheme) private var theme
 
     enum BreathPhase: Equatable {
         case inhale, hold, exhale
@@ -112,7 +112,7 @@ struct SpaceImmersedView: View {
                         .foregroundColor(theme.subtle)
                     Spacer().frame(width: 16)
                 }
-                Text(formatTime(remaining))
+                Text(remaining.asPlaybackTime)
                     .font(.system(size: 13, design: .monospaced))
                     .foregroundColor(theme.muted)
                 Spacer()
@@ -216,9 +216,4 @@ struct SpaceImmersedView: View {
         return chakra.affirmations[index]
     }
 
-    private func formatTime(_ seconds: TimeInterval) -> String {
-        let mins = Int(seconds) / 60
-        let secs = Int(seconds) % 60
-        return String(format: "%d:%02d", mins, secs)
-    }
 }

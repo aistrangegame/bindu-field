@@ -67,12 +67,9 @@ final class OracleService {
         request.setValue("2023-06-01", forHTTPHeaderField: "anthropic-version")
         request.httpBody = try JSONSerialization.data(withJSONObject: body)
 
-        let (data, response): (Data, URLResponse)
-        do {
-            (data, response) = try await URLSession.shared.data(for: request)
-        } catch {
-            throw OracleError.networkError(error)
-        }
+        // O19: retry on transient failures (HTTP 429 + 5xx) with
+        // exponential backoff. Two retries beyond the initial attempt.
+        let (data, response) = try await sendWithRetries(request, maxAttempts: 3)
 
         guard let http = response as? HTTPURLResponse else {
             throw OracleError.invalidResponse
@@ -107,5 +104,36 @@ final class OracleService {
         }
 
         return OracleResponse(trackID: trackID, why: why)
+    }
+
+    /// Send the request with retries on transient errors (O19).
+    /// Retries only on URLSession failure or HTTP 429 / 5xx.
+    private func sendWithRetries(
+        _ request: URLRequest,
+        maxAttempts: Int
+    ) async throws -> (Data, URLResponse) {
+        var attempt = 0
+        var delayNs: UInt64 = 500_000_000  // 0.5s, doubles each retry
+
+        while true {
+            attempt += 1
+            do {
+                let (data, response) = try await URLSession.shared.data(for: request)
+                if let http = response as? HTTPURLResponse,
+                   (http.statusCode == 429 || (500...599).contains(http.statusCode)),
+                   attempt < maxAttempts {
+                    try? await Task.sleep(nanoseconds: delayNs)
+                    delayNs *= 2
+                    continue
+                }
+                return (data, response)
+            } catch {
+                if attempt >= maxAttempts {
+                    throw OracleError.networkError(error)
+                }
+                try? await Task.sleep(nanoseconds: delayNs)
+                delayNs *= 2
+            }
+        }
     }
 }

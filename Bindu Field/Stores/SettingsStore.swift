@@ -12,8 +12,15 @@ final class SettingsStore {
     var gain: Float {
         didSet {
             UserDefaults.standard.set(gain, forKey: gainKey)
-            // Update gain live on any currently playing tone
-            PlayerStore.shared.setGain(gain)
+            // O11: while music is playing, DSPWire is the sole authority
+            // for engine gain — its next tick (≤100 ms away) will multiply
+            // its RMS curve by `settings.gain` anyway. Writing the engine
+            // here would just be overwritten and risks a brief flicker.
+            // For Lab / Letter / Space (no music, no DSPWire polling),
+            // we still need to update the live tone.
+            if !DSPWireService.shared.isMusicPlaying {
+                PlayerStore.shared.setGain(gain)
+            }
         }
     }
 

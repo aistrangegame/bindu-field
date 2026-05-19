@@ -6,7 +6,7 @@ struct LabView: View {
     @State private var beat: Float = 10.0
     @State private var isPlaying: Bool = false
 
-    private let theme = ThemeData.void
+    @Environment(\.binduTheme) private var theme
 
     private var stateLabel: String {
         switch beat {
@@ -89,13 +89,15 @@ struct LabView: View {
                         value: $carrier,
                         range: 40...440,
                         format: "%.0f Hz",
-                        onChange: nil,
-                        onCommit: { newCarrier in
+                        onChange: { newCarrier in
+                            // B7: BinauralEngine.start() guards `if isRunning { return }`,
+                            // so re-calling startBinaural mid-play was silently a no-op.
+                            // setCarrier directly updates the running engine's glide target.
                             if isPlaying {
-                                store.startBinaural(carrier: newCarrier, beat: beat)
-                                store.setGain(SettingsStore.shared.gain)
+                                store.setCarrier(newCarrier)
                             }
-                        }
+                        },
+                        onCommit: nil
                     )
 
                     SliderControl(
@@ -143,10 +145,15 @@ struct LabView: View {
         } else {
             store.startBinaural(carrier: carrier, beat: beat)
             store.setGain(SettingsStore.shared.gain)
+            // G6: Lab is open-ended in spirit, but if the user has set a
+            // `defaultSessionDuration` we surface it on the lock screen so
+            // the progress bar reflects their intended sit length.
+            let duration = SettingsStore.shared.defaultSessionDuration
             NowPlayingService.shared.updateForLab(
                 stateLabel: stateLabel,
                 carrier: carrier,
-                beat: beat
+                beat: beat,
+                duration: duration > 0 ? duration : nil
             )
             isPlaying = true
         }
@@ -161,7 +168,7 @@ private struct SliderControl: View {
     let onChange: ((Float) -> Void)?
     let onCommit: ((Float) -> Void)?
 
-    private let theme = ThemeData.void
+    @Environment(\.binduTheme) private var theme
 
     var body: some View {
         VStack(spacing: 8) {

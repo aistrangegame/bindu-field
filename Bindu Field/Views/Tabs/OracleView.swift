@@ -8,7 +8,7 @@ struct OracleView: View {
     @State private var showingSettings = false
     @FocusState private var inputFocused: Bool
 
-    private let theme = ThemeData.void
+    @Environment(\.binduTheme) private var theme
 
     enum ViewState {
         case idle

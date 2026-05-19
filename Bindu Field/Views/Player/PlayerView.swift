@@ -20,7 +20,7 @@ struct PlayerView: View {
     @State private var integrationText: String = ""
     @State private var integrationDismissTask: Task<Void, Never>?
 
-    private let theme = ThemeData.void
+    @Environment(\.binduTheme) private var theme
 
     private var elementColor: Color {
         Color.bindu(element: track.element)
@@ -170,7 +170,7 @@ struct PlayerView: View {
                     .frame(width: 44, height: 44)
             }
             Spacer()
-            Text(formatPlayerTime(trackPlayer.elapsed))
+            Text(trackPlayer.elapsed.asPlaybackTime)
                 .font(.system(size: 13, design: .monospaced))
                 .foregroundColor(theme.muted)
                 .opacity(trackPlayer.isPlaying ? 1 : 0)
@@ -186,7 +186,9 @@ struct PlayerView: View {
 
     /// Read-only progress display. Tap-to-seek is intentionally not wired —
     /// seeking music requires repositioning BinauralListener's player node,
-    /// which is out of scope for this session.
+    /// which is out of scope. G18: the bar is intentionally slim (2 pt) and
+    /// captioned "flowing" in serif italic so users don't mistake it for an
+    /// interactive scrubber.
     private var trackProgressView: some View {
         let elapsed = trackPlayer.elapsed
         let duration = max(trackPlayer.duration, 0.1)
@@ -197,18 +199,23 @@ struct PlayerView: View {
                 ZStack(alignment: .leading) {
                     Capsule()
                         .fill(theme.muted.opacity(0.20))
-                        .frame(height: 3)
+                        .frame(height: 2)
                     Capsule()
                         .fill(elementColor)
-                        .frame(width: geo.size.width * progress, height: 3)
+                        .frame(width: geo.size.width * progress, height: 2)
                 }
             }
-            .frame(height: 3)
+            .frame(height: 2)
 
             HStack {
-                Text(formatPlayerTime(elapsed))
+                Text(elapsed.asPlaybackTime)
                 Spacer()
-                Text("-\(formatPlayerTime(max(0, duration - elapsed)))")
+                Text("flowing")
+                    .font(.system(size: 10, design: .serif))
+                    .italic()
+                    .foregroundColor(theme.subtle)
+                Spacer()
+                Text("-\(max(0.0, duration - elapsed).asPlaybackTime)")
             }
             .font(.system(size: 11, design: .monospaced))
             .foregroundColor(theme.muted)
@@ -237,12 +244,6 @@ struct PlayerView: View {
                 await MainActor.run { hudVisible = false }
             }
         }
-    }
-
-    private func formatPlayerTime(_ seconds: TimeInterval) -> String {
-        let mins = Int(seconds) / 60
-        let secs = Int(seconds) % 60
-        return String(format: "%d:%02d", mins, secs)
     }
 
     // MARK: - 4D: Binaural presence pill
@@ -302,6 +303,21 @@ struct PlayerView: View {
                             set: { wire.userPresence = Float($0) }
                         ), in: 0.0...1.0)
                         .tint(theme.accent)
+                    }
+
+                    // G20: surface the derived-carrier event in text so
+                    // users not watching the visualizer still know the
+                    // engine has locked onto the song's fundamental.
+                    if wire.carrierLocked {
+                        HStack(spacing: 6) {
+                            Image(systemName: "scope")
+                                .font(.system(size: 9))
+                            Text("carrier · derived")
+                                .font(.system(size: 10, design: .serif))
+                                .italic()
+                        }
+                        .foregroundColor(theme.accent)
+                        .transition(.opacity)
                     }
                 }
                 .padding(.horizontal, 16)
@@ -436,7 +452,7 @@ struct PlayerView: View {
 private struct InfoChip: View {
     let label: String
     let value: String
-    private let theme = ThemeData.void
+    @Environment(\.binduTheme) private var theme
 
     var body: some View {
         VStack(spacing: 2) {

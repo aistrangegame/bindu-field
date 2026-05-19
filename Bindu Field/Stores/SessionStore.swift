@@ -7,29 +7,19 @@ final class SessionStore {
     static let shared = SessionStore()
 
     private(set) var sessions: [Session] = []
-    private let key = "binduSessions.v1"
+    private let storage = UserDefaultsCodable<[Session]>(key: "binduSessions.v1")
 
-    private init() { load() }
+    private init() {
+        sessions = storage.load() ?? []
+    }
 
     func save(_ session: Session) {
         sessions.insert(session, at: 0)  // newest first
-        persist()
+        storage.save(sessions)
     }
 
     func clearAll() {
         sessions = []
-        persist()
-    }
-
-    private func persist() {
-        if let data = try? JSONEncoder().encode(sessions) {
-            UserDefaults.standard.set(data, forKey: key)
-        }
-    }
-
-    private func load() {
-        guard let data = UserDefaults.standard.data(forKey: key),
-              let decoded = try? JSONDecoder().decode([Session].self, from: data) else { return }
-        sessions = decoded
+        storage.save(sessions)
     }
 }

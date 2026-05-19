@@ -20,9 +20,18 @@ struct SpaceSetupView: View {
     let onBegin: (ChakraProtocol, Int) -> Void  // chakra, durationMinutes
 
     @State private var selectedChakra: ChakraName = .anahata
-    @State private var durationMinutes: Int = 5
 
-    private let theme = ThemeData.void
+    /// G6: initial duration follows `SettingsStore.defaultSessionDuration`.
+    /// Clamp to the available chip values (3 / 5 / 10 / 15) so we always
+    /// have a selected chip; fall back to 5 if the configured default
+    /// doesn't land on one of them.
+    @State private var durationMinutes: Int = {
+        let chips = [3, 5, 10, 15]
+        let configured = Int(SettingsStore.shared.defaultSessionDuration / 60)
+        return chips.contains(configured) ? configured : 5
+    }()
+
+    @Environment(\.binduTheme) private var theme
 
     var body: some View {
         ZStack {
@@ -98,7 +107,7 @@ struct SpaceSetupView: View {
 private struct ChakraTile: View {
     let chakra: ChakraProtocol
     let isSelected: Bool
-    private let theme = ThemeData.void
+    @Environment(\.binduTheme) private var theme
 
     var body: some View {
         VStack(spacing: 6) {

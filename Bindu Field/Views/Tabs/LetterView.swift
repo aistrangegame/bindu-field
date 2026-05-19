@@ -5,7 +5,7 @@ struct LetterView: View {
     @State private var showingRecorder = false
     @State private var playingLetter: Letter? = nil
 
-    private let theme = ThemeData.void
+    @Environment(\.binduTheme) private var theme
 
     var body: some View {
         NavigationStack {
@@ -77,7 +77,7 @@ struct LetterView: View {
 
 private struct LetterRow: View {
     let letter: Letter
-    private let theme = ThemeData.void
+    @Environment(\.binduTheme) private var theme
 
     var body: some View {
         HStack(spacing: 14) {

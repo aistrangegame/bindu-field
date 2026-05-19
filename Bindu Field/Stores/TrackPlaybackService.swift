@@ -10,14 +10,33 @@ final class TrackPlaybackService {
     private(set) var isPlaying: Bool = false
     private(set) var duration: TimeInterval = 0
     private var startTime: Date?
+    private var startSampleTime: AVAudioFramePosition = 0
 
+    /// Elapsed time. Prefers the audio clock (sample-accurate, immune to
+    /// background-suspension drift); falls back to wall-clock only before
+    /// the player node has produced its first sample.
     var elapsed: TimeInterval {
-        guard isPlaying, let start = startTime else { return 0 }
-        return min(Date().timeIntervalSince(start), duration)
+        guard isPlaying else { return 0 }
+        if let audioClock = audioClockElapsed() {
+            return min(audioClock, duration)
+        }
+        if let start = startTime {
+            return min(Date().timeIntervalSince(start), duration)
+        }
+        return 0
     }
 
     var hasCompleted: Bool {
         isPlaying && duration > 0 && elapsed >= duration
+    }
+
+    private func audioClockElapsed() -> TimeInterval? {
+        // BinauralListener owns the AVAudioPlayerNode; we read its
+        // lastRenderTime / playerTime through a small accessor.
+        guard let info = BinauralListener.shared.playerTime() else { return nil }
+        let frames = info.sampleTime - startSampleTime
+        guard info.sampleRate > 0 else { return nil }
+        return max(0, Double(frames) / info.sampleRate)
     }
 
     private init() {}
@@ -68,6 +87,7 @@ final class TrackPlaybackService {
 
         isPlaying = true
         startTime = Date()
+        startSampleTime = BinauralListener.shared.playerTime()?.sampleTime ?? 0
     }
 
     func stop() {

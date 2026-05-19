@@ -21,9 +21,7 @@ final class RecorderService: NSObject {
         let filename = "\(UUID().uuidString).m4a"
         let url = Letter.lettersDirectory.appendingPathComponent(filename)
 
-        let session = AVAudioSession.sharedInstance()
-        try session.setCategory(.playAndRecord, mode: .default, options: [.defaultToSpeaker, .allowBluetoothHFP])
-        try session.setActive(true)
+        AudioSessionCoordinator.shared.requestRecording("RecorderService")
 
         let settings: [String: Any] = [
             AVFormatIDKey: kAudioFormatMPEG4AAC,
@@ -45,9 +43,7 @@ final class RecorderService: NSObject {
         recorder?.stop()
         recorder = nil
         startTime = nil
-        let session = AVAudioSession.sharedInstance()
-        try? session.setCategory(.playback, mode: .default)
-        try? session.setActive(true)
+        AudioSessionCoordinator.shared.release("RecorderService", mode: .playAndRecord)
         return duration
     }
 
@@ -58,9 +54,7 @@ final class RecorderService: NSObject {
         }
         recorder = nil
         startTime = nil
-        let session = AVAudioSession.sharedInstance()
-        try? session.setCategory(.playback, mode: .default)
-        try? session.setActive(true)
+        AudioSessionCoordinator.shared.release("RecorderService", mode: .playAndRecord)
     }
 
     func peakLevel() -> Float {

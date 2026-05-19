@@ -15,6 +15,10 @@ enum KeychainHelper {
         SecItemDelete(query as CFDictionary)
         var attrs = query
         attrs[kSecValueData as String] = data
+        // O25: AfterFirstUnlockThisDeviceOnly lets background launches
+        // (post-reboot, after the user unlocks once) still read the key.
+        // ThisDeviceOnly keeps it off iCloud Keychain backups.
+        attrs[kSecAttrAccessible as String] = kSecAttrAccessibleAfterFirstUnlockThisDeviceOnly
         SecItemAdd(attrs as CFDictionary, nil)
     }
 

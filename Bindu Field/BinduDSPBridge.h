@@ -54,6 +54,10 @@ NS_ASSUME_NONNULL_BEGIN
 /// Get a one-shot snapshot of the current magnitude spectrum.
 /// Heavier than readLatestFrame — only call when needed (e.g., visualization).
 ///
+/// G1: no Swift caller today. Intentionally retained for a future richer
+/// visualizer rendering (frequency-binned glow / harmonic ribbons). Drop
+/// only if a follow-up confirms the visualizer will stay RMS-only.
+///
 /// @return Array of 512 NSNumber floats, or nil if no frame available.
 - (nullable NSArray<NSNumber *> *)spectrumSnapshot;
 

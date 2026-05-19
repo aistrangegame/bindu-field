@@ -14,12 +14,16 @@ struct Letter: Identifiable, Codable {
         Letter.lettersDirectory.appendingPathComponent(filename)
     }
 
-    static var lettersDirectory: URL {
-        let docs = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask).first!
+    /// Memoized — every `LetterRow` reads `letter.audioURL`, which used
+    /// to re-stat the directory on every render (O10).
+    static let lettersDirectory: URL = {
+        guard let docs = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask).first else {
+            fatalError("Documents directory unavailable — sandbox is malformed")
+        }
         let dir = docs.appendingPathComponent("Letters", isDirectory: true)
         if !FileManager.default.fileExists(atPath: dir.path) {
             try? FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
         }
         return dir
-    }
+    }()
 }

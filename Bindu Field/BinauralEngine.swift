@@ -25,9 +25,15 @@
 
 import Foundation
 import AVFoundation
+import os
 
 @objc(BinauralEngine)
 public final class BinauralEngine: NSObject {
+
+    /// G22: structured logging via `os.Logger`. Subsystem-tagged so
+    /// `log show --predicate 'subsystem == "com.bindufield"'` filters
+    /// cleanly when correlating engine + session behavior on device.
+    private static let log = Logger(subsystem: "com.bindufield", category: "audio.engine")
 
     // MARK: - Singleton
 
@@ -43,6 +49,14 @@ public final class BinauralEngine: NSObject {
 
     private var sampleRate: Double = 48000.0
     private var isRunning = false
+
+    /// Bumped on every `start()` so a pending fade-out scheduled by an
+    /// earlier `stop()` can be told to stand down. Without this, a quick
+    /// stop→start would let the old 2.5 s delayed stop closure kill the
+    /// engine right after the user restarted it.
+    private var startGeneration: UInt64 = 0
+
+    private let audioSessionID = "BinauralEngine"
 
     // MARK: - Render parameters (read by render callback, written by setters)
     //
@@ -90,11 +104,10 @@ public final class BinauralEngine: NSObject {
     @objc public func configure() {
         if sourceNode != nil { return }
 
-        do {
-            try configureAudioSession()
-        } catch {
-            NSLog("[BinauralEngine] Audio session configuration failed: \(error)")
-            return
+        // Audio session category is owned by AudioSessionCoordinator.
+        // Request playback for the engine's lifetime.
+        DispatchQueue.main.async {
+            AudioSessionCoordinator.shared.requestPlayback(self.audioSessionID)
         }
 
         // Determine sample rate from hardware
@@ -106,7 +119,7 @@ public final class BinauralEngine: NSObject {
             standardFormatWithSampleRate: sampleRate,
             channels: 2
         ) else {
-            NSLog("[BinauralEngine] Failed to create stereo format")
+            Self.log.error("Failed to create stereo format")
             return
         }
 
@@ -126,7 +139,7 @@ public final class BinauralEngine: NSObject {
         engine.connect(source, to: mixerNode, format: stereoFormat)
         engine.connect(mixerNode, to: engine.mainMixerNode, format: stereoFormat)
 
-        NSLog("[BinauralEngine] Configured at \(sampleRate) Hz")
+        Self.log.info("Configured at \(self.sampleRate, privacy: .public) Hz")
     }
 
     // MARK: - Lifecycle
@@ -140,29 +153,44 @@ public final class BinauralEngine: NSObject {
         carrierTarget = clampCarrier(carrierHz)
         carrierCurrent = carrierTarget  // start at target, no glide on first start
 
+        // New start invalidates any pending fade-out from a previous stop().
+        startGeneration &+= 1
+
         do {
             try engine.start()
             isRunning = true
-            NSLog("[BinauralEngine] Started at carrier \(carrierTarget) Hz")
+            Self.log.info("Started at carrier \(self.carrierTarget, privacy: .public) Hz")
         } catch {
-            NSLog("[BinauralEngine] Failed to start engine: \(error)")
+            Self.log.error("Failed to start engine: \(error.localizedDescription, privacy: .public)")
         }
     }
 
     /// Stop the engine and fade out gracefully.
+    ///
+    /// The fade is scheduled 2.5s out. If `start()` is called within that
+    /// window, `startGeneration` is bumped and the captured generation
+    /// here will mismatch — the delayed closure becomes a no-op so the
+    /// new playback isn't killed.
     @objc public func stop() {
         if !isRunning { return }
 
         // Fade gain to zero — the render callback will glide it down over ~2s
         gainTarget = 0.0
 
-        // Stop after fade completes
+        let stopGeneration = startGeneration
+
         DispatchQueue.global(qos: .userInitiated).asyncAfter(deadline: .now() + 2.5) {
             [weak self] in
-            guard let self = self, self.isRunning else { return }
-            self.engine.stop()
-            self.isRunning = false
-            NSLog("[BinauralEngine] Stopped")
+            DispatchQueue.main.async {
+                guard let self = self,
+                      self.isRunning,
+                      self.startGeneration == stopGeneration
+                else { return }
+                self.engine.stop()
+                self.isRunning = false
+                AudioSessionCoordinator.shared.release(self.audioSessionID, mode: .playback)
+                Self.log.info("Stopped")
+            }
         }
     }
 
@@ -188,37 +216,15 @@ public final class BinauralEngine: NSObject {
     }
 
     /// Set the AM modulation depth.
-    /// 0.0 = pure binaural. 0.15 = subtle tremolo reinforcement. 0.30 = maximum.
+    ///
+    /// 0.0 = pure binaural. 0.15 = subtle tremolo reinforcement. 0.30 = max.
+    ///
+    /// G19: today nothing in the app calls this — `amDepthTarget` stays at
+    /// the static 0.15 default chosen for the hybrid binaural-plus-monaural
+    /// signature. The setter is retained so a future Lab/Settings control
+    /// can expose it without re-opening this file.
     @objc public func updateAMDepth(_ depth: Float) {
         amDepthTarget = max(0.0, min(0.30, depth))
-    }
-
-    // MARK: - Diagnostics
-
-    @objc public func diagnostics() -> [String: Any] {
-        return [
-            "isRunning": isRunning,
-            "sampleRate": sampleRate,
-            "carrierTarget": carrierTarget,
-            "carrierCurrent": carrierCurrent,
-            "beatTarget": beatTarget,
-            "beatCurrent": beatCurrent,
-            "gainTarget": gainTarget,
-            "gainCurrent": gainCurrent,
-            "amDepthTarget": amDepthTarget,
-            "amDepthCurrent": amDepthCurrent
-        ]
-    }
-
-    // MARK: - Private: Audio session
-
-    private func configureAudioSession() throws {
-        let session = AVAudioSession.sharedInstance()
-        try session.setCategory(
-            .playback,
-            mode: .default
-        )
-        try session.setActive(true)
     }
 
     // MARK: - Private: Clamping

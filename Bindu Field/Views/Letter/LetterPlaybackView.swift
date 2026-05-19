@@ -9,7 +9,7 @@ struct LetterPlaybackView: View {
     @State private var isPlaying = false
     @State private var elapsed: Double = 0
 
-    private let theme = ThemeData.void
+    @Environment(\.binduTheme) private var theme
 
     var body: some View {
         ZStack {
@@ -57,7 +57,7 @@ struct LetterPlaybackView: View {
                     ProgressView(value: elapsed, total: max(letter.durationSec, 0.1))
                         .tint(theme.accent)
                         .padding(.horizontal, 60)
-                    Text("\(formatTime(elapsed)) / \(formatTime(letter.durationSec))")
+                    Text("\(elapsed.asPlaybackTime) / \(letter.durationSec.asPlaybackTime)")
                         .font(.system(size: 11, design: .monospaced))
                         .foregroundColor(theme.muted)
                 }
@@ -141,9 +141,4 @@ struct LetterPlaybackView: View {
         elapsed = 0
     }
 
-    private func formatTime(_ seconds: Double) -> String {
-        let mins = Int(seconds) / 60
-        let secs = Int(seconds) % 60
-        return String(format: "%d:%02d", mins, secs)
-    }
 }

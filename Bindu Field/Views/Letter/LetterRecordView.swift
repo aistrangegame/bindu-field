@@ -14,7 +14,12 @@ struct LetterRecordView: View {
     @State private var permissionDenied = false
     @State private var meterLevel: Float = 0
 
-    private let theme = ThemeData.void
+    /// True after the user explicitly saves the letter. Used by .onDisappear
+    /// to distinguish "user finished" from "user swiped away in review",
+    /// the latter being a leak that has to clean up the orphan m4a (B14).
+    @State private var didSave: Bool = false
+
+    @Environment(\.binduTheme) private var theme
 
     enum Phase {
         case setup, countdown, recording, review
@@ -58,6 +63,14 @@ struct LetterRecordView: View {
             Button("Cancel", role: .cancel) { dismiss() }
         } message: {
             Text("Enable microphone access in iOS Settings → Bindu Field to record letters.")
+        }
+        .onDisappear {
+            // B14: if the user swipes away while in the review phase, the
+            // m4a in Documents/Letters/ was never linked from LetterStore.
+            // Clean it up so it doesn't accumulate as an orphan.
+            if !didSave, let url = recordedURL {
+                try? FileManager.default.removeItem(at: url)
+            }
         }
     }
 
@@ -174,7 +187,7 @@ struct LetterRecordView: View {
                         .frame(width: 64, height: 64)
                 }
 
-                Text(formatTime(elapsed))
+                Text(elapsed.asPlaybackTime)
                     .font(.system(size: 32, weight: .ultraLight, design: .monospaced))
                     .foregroundColor(theme.text)
                     .padding(.top, 32)
@@ -222,7 +235,7 @@ struct LetterRecordView: View {
                     .font(.system(size: 22, weight: .ultraLight, design: .serif))
                     .italic()
                     .foregroundColor(theme.text)
-                Text("\(stateSelection.rawValue) · \(formatTime(recordedDuration))")
+                Text("\(stateSelection.rawValue) · \(recordedDuration.asPlaybackTime)")
                     .font(.system(size: 12))
                     .foregroundColor(theme.muted)
             }
@@ -313,9 +326,9 @@ struct LetterRecordView: View {
         }
         recordedDuration = duration
 
-        let df = DateFormatter()
-        df.dateFormat = "MMM d · h:mm a"
-        savedTitle = "Letter · \(df.string(from: Date()))"
+        // O4: use shared letter-title formatter instead of allocating
+        // a `DateFormatter` on every stop.
+        savedTitle = "Letter · \(DateFormatter.letterTitle.string(from: Date()))"
 
         phase = .review
     }
@@ -333,6 +346,7 @@ struct LetterRecordView: View {
             beat: stateSelection.beat
         )
         LetterStore.shared.save(letter)
+        didSave = true
         dismiss()
     }
 
@@ -343,9 +357,4 @@ struct LetterRecordView: View {
         dismiss()
     }
 
-    private func formatTime(_ seconds: Double) -> String {
-        let mins = Int(seconds) / 60
-        let secs = Int(seconds) % 60
-        return String(format: "%d:%02d", mins, secs)
-    }
 }
