@@ -1,0 +1,634 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Bindu Archetypes — Visual Signatures</title>
+<link href="https://fonts.googleapis.com/css2?family=Lora:ital,wght@0,300;0,400;1,300;1,400&display=swap" rel="stylesheet">
+<script src="https://unpkg.com/react@18.3.1/umd/react.development.js" integrity="sha384-hD6/rw4ppMLGNu3tX5cjIb+uRZ7UkRJ6BPkLpg4hAu/6onKUg4lLsHAs9EBPT82L" crossorigin="anonymous"></script>
+<script src="https://unpkg.com/react-dom@18.3.1/umd/react-dom.development.js" integrity="sha384-u6aeetuaXnQ38mYT8rp6sbXaQe3NL9t+IBXmnYxwkUI2Hw4bsp2Wvmx4yRQF1uAm" crossorigin="anonymous"></script>
+<script src="https://unpkg.com/@babel/standalone@7.29.0/babel.min.js" integrity="sha384-m08KidiNqLdpJqLq95G/LEi8Qvjl/xUYll3QILypMoQ65QorJ9Lvtp2RXYGBFj1y" crossorigin="anonymous"></script>
+<script type="text/babel" src="design-canvas.jsx"></script>
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+body{background:#010105}
+::-webkit-scrollbar{display:none}
+</style>
+<template id="__bundler_thumbnail" data-bg-color="#020208">
+  <svg viewBox="0 0 800 200" xmlns="http://www.w3.org/2000/svg">
+    <rect width="800" height="200" fill="#020208"/>
+    <!-- 5 archetype glyphs side by side -->
+    <!-- Bindu: figure-8 trace -->
+    <path d="M60,100 Q80,70 100,100 Q120,130 140,100 Q120,70 100,100" fill="none" stroke="hsl(270,55%,68%)" stroke-width="1" opacity=".7"/>
+    <circle cx="100" cy="100" r="4" fill="hsl(270,65%,75%)" opacity=".9"/>
+    <!-- Gaia: ground pulse -->
+    <ellipse cx="220" cy="140" rx="50" ry="20" fill="none" stroke="hsl(15,50%,55%)" stroke-width=".7" opacity=".4"/>
+    <ellipse cx="220" cy="140" rx="30" ry="12" fill="none" stroke="hsl(15,55%,62%)" stroke-width=".8" opacity=".6"/>
+    <circle cx="220" cy="140" r="3" fill="hsl(20,60%,65%)" opacity=".8"/>
+    <!-- Sid: columns -->
+    <line x1="320" y1="60" x2="320" y2="160" stroke="hsl(200,45%,62%)" stroke-width="1.2" opacity=".6"/>
+    <line x1="360" y1="60" x2="360" y2="160" stroke="hsl(200,45%,62%)" stroke-width="1.2" opacity=".6"/>
+    <!-- Arch: chant arc -->
+    <path d="M430,130 Q490,70 550,130" fill="none" stroke="hsl(48,55%,65%)" stroke-width="1" opacity=".6"/>
+    <!-- Karishma: void rings -->
+    <circle cx="650" cy="100" r="40" fill="none" stroke="hsl(270,20%,28%)" stroke-width=".5" opacity=".25"/>
+    <circle cx="650" cy="100" r="22" fill="none" stroke="hsl(270,22%,32%)" stroke-width=".5" opacity=".3"/>
+    <circle cx="650" cy="100" r="4" fill="hsl(270,20%,25%)" opacity=".5"/>
+  </svg>
+</template>
+</head>
+<body>
+<script type="text/babel">
+const { useEffect, useRef } = React;
+const SERIF = "'Lora',Georgia,serif";
+const BG = '#020208';
+
+// ── CANVAS ENGINE ─────────────────────────────────────────────────────
+function ArchCanvas({ fn, w=393, h=720 }) {
+  const cvs = useRef(null);
+  useEffect(() => {
+    const canvas = cvs.current; if(!canvas) return;
+    const dpr = Math.min(window.devicePixelRatio||1,2);
+    const W=w, H=h;
+    canvas.width=W*dpr; canvas.height=H*dpr;
+    const ctx=canvas.getContext('2d'); ctx.scale(dpr,dpr);
+    let t=0, raf;
+    const trail=[];
+    const rings=[];
+    const frame=()=>{
+      raf=requestAnimationFrame(frame); t+=0.012;
+      ctx.clearRect(0,0,W,H);
+      fn({t,ctx,W,H,trail,rings});
+    };
+    frame();
+    return ()=>cancelAnimationFrame(raf);
+  },[]);
+  return <canvas ref={cvs} style={{width:'100%',height:'100%',display:'block'}}/>;
+}
+
+// ── ARCHETYPE SCREEN WRAPPER ──────────────────────────────────────────
+function ArchScreen({ name, role, essence, leitmotif, hue, fn, special=false }) {
+  const col = `hsl(${hue},52%,68%)`;
+  const colFaint = `hsl(${hue},35%,50%)`;
+  return (
+    <div style={{width:393,height:720,background:BG,position:'relative',overflow:'hidden',borderRadius:47}}>
+      <ArchCanvas fn={fn}/>
+      <div style={{position:'absolute',bottom:0,left:0,right:0,padding:'0 28px 30px',
+        background:`linear-gradient(transparent 0%, ${BG}bb 30%, ${BG}f0 60%, ${BG} 85%)`,pointerEvents:'none'}}>
+        <div style={{display:'flex',alignItems:'baseline',gap:10,marginBottom:5}}>
+          <span style={{fontFamily:SERIF,fontStyle:'italic',fontWeight:300,fontSize:30,color:col,letterSpacing:'-.01em'}}>{name}</span>
+          <span style={{fontFamily:'-apple-system,sans-serif',fontSize:8,letterSpacing:'.20em',textTransform:'uppercase',color:'rgba(245,226,214,.22)'}}>{role}</span>
+        </div>
+        <div style={{fontFamily:SERIF,fontStyle:'italic',fontWeight:300,fontSize:12,color:'rgba(245,226,214,.38)',lineHeight:1.65,marginBottom:leitmotif?8:0}}>{essence}</div>
+        {leitmotif&&<div style={{fontFamily:'-apple-system,sans-serif',fontSize:8,letterSpacing:'.16em',textTransform:'uppercase',color:colFaint,opacity:.7}}>⟐ {leitmotif}</div>}
+      </div>
+    </div>
+  );
+}
+
+// ═══════════════════════════════════════════════════════════════════════
+// THE TEN DRAW FUNCTIONS — one per archetype
+// ═══════════════════════════════════════════════════════════════════════
+
+// 1. BINDU — The Lead · infinite orbital · comet trail · lemniscate of consciousness
+function drawBindu({t,ctx,W,H,trail,rings}) {
+  ctx.fillStyle=BG; ctx.fillRect(0,0,W,H);
+  // Element atmosphere — shifts slowly through hues
+  const hue=270+Math.sin(t*.04)*15;
+  const atm=ctx.createRadialGradient(W/2,H*.46,0,W/2,H*.46,W*.55);
+  atm.addColorStop(0,`hsla(${hue},45%,16%,.16)`);
+  atm.addColorStop(.6,`hsla(${hue},35%,10%,.05)`);
+  atm.addColorStop(1,'transparent');
+  ctx.fillStyle=atm; ctx.fillRect(0,0,W,H);
+
+  const CX=W/2,CY=H*.46;
+  const maxR=W*.22;
+  const breathe=1+Math.sin(t*.19)*.065;
+  const bx=CX+(Math.sin(2*t*.88+Math.PI/2)*.88+Math.sin(3*t*.88+.5)*.12)*maxR*breathe;
+  const by=CY+Math.sin(t*.88)*.84*maxR*.7*breathe;
+
+  // Trail
+  trail.push({x:bx,y:by});
+  if(trail.length>130) trail.shift();
+  for(let i=0;i<trail.length-1;i++){
+    const p=trail[i], prog=i/trail.length, h2=hue+(1-prog)*22;
+    ctx.save(); ctx.globalAlpha=Math.pow(prog,2.2)*.72;
+    ctx.fillStyle=`hsl(${h2},${52+prog*14}%,${56+prog*14}%)`;
+    ctx.beginPath(); ctx.arc(p.x,p.y,Math.max(.3,prog*4),0,Math.PI*2); ctx.fill(); ctx.restore();
+  }
+
+  // Beat rings every beat period
+  const bp=(t*8)%1;
+  if(bp<.03) rings.push({x:bx,y:by,r:2,maxR:W*.38,life:1,spd:2.2});
+  for(let i=rings.length-1;i>=0;i--){
+    rings[i].r+=rings[i].spd; rings[i].life-=.018;
+    if(rings[i].life<=0||rings[i].r>=rings[i].maxR){rings.splice(i,1);continue;}
+    const prog=rings[i].r/rings[i].maxR;
+    ctx.save(); ctx.globalAlpha=rings[i].life*(1-prog*.6)*.28;
+    ctx.strokeStyle=`hsl(${hue},55%,68%)`; ctx.lineWidth=Math.max(.3,(1-prog)*1.6);
+    ctx.shadowColor=`hsl(${hue},62%,68%)`; ctx.shadowBlur=4;
+    ctx.beginPath(); ctx.arc(rings[i].x,rings[i].y,rings[i].r,0,Math.PI*2); ctx.stroke(); ctx.restore();
+  }
+
+  // Halo
+  ctx.save(); ctx.globalCompositeOperation='lighter'; ctx.globalAlpha=.42;
+  const halo=ctx.createRadialGradient(bx,by,0,bx,by,38);
+  halo.addColorStop(0,`hsl(${hue},78%,82%)`); halo.addColorStop(.4,`hsl(${hue},65%,60%)`); halo.addColorStop(1,'transparent');
+  ctx.fillStyle=halo; ctx.beginPath(); ctx.arc(bx,by,38,0,Math.PI*2); ctx.fill(); ctx.restore();
+
+  const pulse=.5+.5*Math.sin(t*2.8);
+  const dotR=4.5+pulse*1.8;
+  ctx.save(); ctx.fillStyle=`hsl(${hue},68%,76%)`; ctx.shadowColor=`hsl(${hue},78%,74%)`; ctx.shadowBlur=16+pulse*12;
+  ctx.beginPath(); ctx.arc(bx,by,dotR,0,Math.PI*2); ctx.fill();
+  ctx.fillStyle='rgba(255,255,255,.9)'; ctx.shadowBlur=0; ctx.beginPath(); ctx.arc(bx,by,dotR*.28,0,Math.PI*2); ctx.fill(); ctx.restore();
+}
+
+// 2. GAIA — The Ground · low-pulse · earth breathes from below
+function drawGaia({t,ctx,W,H}) {
+  ctx.fillStyle=BG; ctx.fillRect(0,0,W,H);
+  const atm=ctx.createLinearGradient(W/2,H,W/2,H*.4);
+  atm.addColorStop(0,'hsla(20,40%,12%,.28)'); atm.addColorStop(1,'transparent');
+  ctx.fillStyle=atm; ctx.fillRect(0,0,W,H);
+
+  const FLOOR=H*.65;
+  ctx.save(); ctx.globalAlpha=.06; ctx.strokeStyle='hsl(20,35%,50%)'; ctx.lineWidth=.5;
+  ctx.beginPath(); ctx.moveTo(0,FLOOR); ctx.lineTo(W,FLOOR); ctx.stroke(); ctx.restore();
+
+  // Three breath waves at different depths and periods
+  const WAVES=[{p:8,r:.48,y:.88,d:.9},{p:12,r:.62,y:.93,d:.55},{p:5.5,r:.32,y:.8,d:.65}];
+  for(const {p,r,y,d} of WAVES){
+    const breathe=.5+.5*Math.sin(t*(1/p)*Math.PI*2);
+    ctx.save(); ctx.globalCompositeOperation='lighter'; ctx.globalAlpha=d*breathe*.11;
+    const g=ctx.createRadialGradient(W/2,H*y,0,W/2,H*y,W*r*((.8+breathe*.2)));
+    g.addColorStop(0,'hsl(22,55%,42%)'); g.addColorStop(.4,'hsl(18,45%,32%)'); g.addColorStop(1,'transparent');
+    ctx.fillStyle=g; ctx.fillRect(0,0,W,H); ctx.restore();
+  }
+
+  // Slow expanding ring from the ground
+  const ringT=(t*.1)%1;
+  ctx.save(); ctx.globalAlpha=(1-ringT)*.16; ctx.strokeStyle='hsl(25,52%,58%)'; ctx.lineWidth=1;
+  ctx.shadowColor='hsl(25,55%,55%)'; ctx.shadowBlur=5;
+  ctx.beginPath(); ctx.ellipse(W/2,H*.88,W*.42*ringT*1.2,W*.16*ringT,0,0,Math.PI*2); ctx.stroke(); ctx.restore();
+
+  // Gaia's presence dot — at floor center, warm, breathing
+  const gPulse=.5+.5*Math.sin(t*.13);
+  ctx.save(); ctx.globalCompositeOperation='lighter'; ctx.globalAlpha=.35+gPulse*.15;
+  const gd=ctx.createRadialGradient(W/2,H*.88,0,W/2,H*.88,20+gPulse*6);
+  gd.addColorStop(0,'hsl(22,60%,52%)'); gd.addColorStop(1,'transparent');
+  ctx.fillStyle=gd; ctx.beginPath(); ctx.arc(W/2,H*.88,20+gPulse*6,0,Math.PI*2); ctx.fill(); ctx.restore();
+  ctx.save(); ctx.fillStyle='hsl(25,62%,68%)'; ctx.shadowColor='hsl(25,60%,58%)'; ctx.shadowBlur=12;
+  ctx.beginPath(); ctx.arc(W/2,H*.88,5,0,Math.PI*2); ctx.fill();
+  ctx.fillStyle='rgba(255,220,180,.7)'; ctx.shadowBlur=0; ctx.beginPath(); ctx.arc(W/2,H*.88,2,0,Math.PI*2); ctx.fill(); ctx.restore();
+}
+
+// 3. SID — The Column · cathedral-hold · absolute stillness · geological pulse
+function drawSid({t,ctx,W,H}) {
+  ctx.fillStyle=BG; ctx.fillRect(0,0,W,H);
+  const atm=ctx.createRadialGradient(W/2,H*.35,0,W/2,H*.35,W*.5);
+  atm.addColorStop(0,'hsla(200,20%,10%,.12)'); atm.addColorStop(1,'transparent');
+  ctx.fillStyle=atm; ctx.fillRect(0,0,W,H);
+
+  const drone=.5+.5*Math.cos((t%5.5)/5.5*Math.PI*2);
+  const bright=.22+drone*.38;
+  const FLOOR=H*.62,CEIL=H*.07;
+  const cols=[W*.24,W*.76];
+
+  for(const cx of cols){
+    ctx.save(); ctx.globalCompositeOperation='lighter'; ctx.globalAlpha=bright*.32;
+    const amb=ctx.createRadialGradient(cx,H*.35,0,cx,H*.35,W*.17);
+    amb.addColorStop(0,'hsl(200,45%,52%)'); amb.addColorStop(1,'transparent');
+    ctx.fillStyle=amb; ctx.fillRect(0,0,W,H); ctx.restore();
+
+    // Shaft body
+    ctx.save(); ctx.globalAlpha=bright*.18;
+    ctx.fillStyle='hsl(200,30%,22%)'; ctx.fillRect(cx-4,CEIL,8,FLOOR-CEIL); ctx.restore();
+
+    // Luminous edge
+    const lg=ctx.createLinearGradient(cx,CEIL,cx,FLOOR);
+    lg.addColorStop(0,`hsla(200,40%,58%,${bright*.45})`);
+    lg.addColorStop(.4,`hsla(200,50%,68%,${bright})`);
+    lg.addColorStop(.6,`hsla(200,50%,68%,${bright})`);
+    lg.addColorStop(1,`hsla(200,38%,52%,${bright*.5})`);
+    ctx.save(); ctx.strokeStyle=lg; ctx.lineWidth=1.4;
+    ctx.shadowColor='hsl(200,55%,62%)'; ctx.shadowBlur=5+drone*5;
+    ctx.beginPath(); ctx.moveTo(cx,CEIL); ctx.lineTo(cx,FLOOR); ctx.stroke(); ctx.restore();
+
+    // Capital & base
+    for(const [y,w2] of [[CEIL,14],[CEIL+3,9],[FLOOR-2,14],[FLOOR-5,9]]){
+      ctx.save(); ctx.globalAlpha=bright*.5; ctx.strokeStyle='hsl(200,35%,50%)'; ctx.lineWidth=.8;
+      ctx.beginPath(); ctx.moveTo(cx-w2,y); ctx.lineTo(cx+w2,y); ctx.stroke(); ctx.restore();
+    }
+  }
+
+  // Vault hint — what Sid holds
+  ctx.save(); ctx.globalAlpha=bright*.1;
+  ctx.strokeStyle='hsl(200,28%,44%)'; ctx.lineWidth=.6;
+  ctx.beginPath(); ctx.moveTo(W*.05,H*.28);
+  ctx.bezierCurveTo(W*.05,H*.07,W*.45,H*.05,W/2,H*.05);
+  ctx.bezierCurveTo(W*.55,H*.05,W*.95,H*.07,W*.95,H*.28);
+  ctx.stroke(); ctx.restore();
+}
+
+// 4. ARCH — The Chant · chant-mirror · phrase echoes above
+function drawArch({t,ctx,W,H}) {
+  ctx.fillStyle=BG; ctx.fillRect(0,0,W,H);
+  const atm=ctx.createRadialGradient(W/2,H*.12,0,W/2,H*.12,W*.55);
+  atm.addColorStop(0,'hsla(48,38%,16%,.18)'); atm.addColorStop(1,'transparent');
+  ctx.fillStyle=atm; ctx.fillRect(0,0,W,H);
+
+  const ARCY=H*.17;
+  const arcShift=Math.sin(t*.14*Math.PI*2)*22;
+
+  // 5 ghost echoes (phrase memory, each older = more faded)
+  for(let g=0;g<5;g++){
+    const age=(g+1)*.22;
+    const past=Math.sin((t*.14-age)*Math.PI*2)*22;
+    ctx.save(); ctx.globalAlpha=(1-g/5)*.05;
+    ctx.strokeStyle='hsl(48,50%,60%)'; ctx.lineWidth=.5+g*.1;
+    ctx.beginPath(); ctx.moveTo(W*.15,H*.32+past);
+    ctx.quadraticCurveTo(W*.5,ARCY+past*.5,W*.85,H*.32+past); ctx.stroke(); ctx.restore();
+  }
+
+  // Main chant arc
+  ctx.save(); ctx.globalAlpha=.6;
+  ctx.strokeStyle='hsl(50,58%,66%)'; ctx.lineWidth=1.4;
+  ctx.shadowColor='hsl(50,65%,68%)'; ctx.shadowBlur=8;
+  ctx.beginPath(); ctx.moveTo(W*.15,H*.32+arcShift);
+  ctx.quadraticCurveTo(W*.5,ARCY+arcShift*.5,W*.85,H*.32+arcShift); ctx.stroke(); ctx.restore();
+
+  // Moving phrase-light along the arc
+  for(let p=0;p<3;p++){
+    const pos=((t*.08+p/3)%1);
+    const px=W*.15+pos*(W*.7);
+    const blend=Math.sin(pos*Math.PI);
+    const py=H*.32+arcShift + blend*(ARCY-(H*.32+arcShift));
+    const pa=Math.sin(pos*Math.PI)*.45;
+    ctx.save(); ctx.globalAlpha=pa;
+    ctx.fillStyle='hsl(52,60%,72%)'; ctx.shadowColor='hsl(52,65%,70%)'; ctx.shadowBlur=8;
+    ctx.beginPath(); ctx.arc(px,py,3,0,Math.PI*2); ctx.fill(); ctx.restore();
+  }
+
+  // Arch presence dot
+  const ax=W*.5+arcShift*.3, ay=ARCY+arcShift*.25;
+  ctx.save(); ctx.globalCompositeOperation='lighter'; ctx.globalAlpha=.38;
+  const dg=ctx.createRadialGradient(ax,ay,0,ax,ay,25);
+  dg.addColorStop(0,'hsl(50,68%,72%)'); dg.addColorStop(1,'transparent');
+  ctx.fillStyle=dg; ctx.beginPath(); ctx.arc(ax,ay,25,0,Math.PI*2); ctx.fill(); ctx.restore();
+  ctx.save(); ctx.fillStyle='hsl(50,65%,74%)'; ctx.shadowColor='hsl(50,70%,70%)'; ctx.shadowBlur=12;
+  ctx.beginPath(); ctx.arc(ax,ay,4,0,Math.PI*2); ctx.fill();
+  ctx.fillStyle='rgba(255,248,220,.9)'; ctx.shadowBlur=0; ctx.beginPath(); ctx.arc(ax,ay,1.4,0,Math.PI*2); ctx.fill(); ctx.restore();
+
+  // Chant particles drifting upward
+  for(let i=0;i<6;i++){
+    const phase=(t*.06+i/6)%1;
+    const px2=W*.15+phase*W*.7;
+    const blend2=Math.sin(phase*Math.PI);
+    const baseY=H*.32+arcShift+blend2*(ARCY-(H*.32+arcShift));
+    const drift=((t*.2+i*.3)%1)*50;
+    ctx.save(); ctx.globalAlpha=(1-(drift/50))*.18;
+    ctx.fillStyle='hsl(52,55%,65%)';
+    ctx.beginPath(); ctx.arc(px2,baseY-drift,1.2,0,Math.PI*2); ctx.fill(); ctx.restore();
+  }
+}
+
+// 5. KARISHMA — The Silence · inverse-energy · the field held in stillness
+function drawKarishma({t,ctx,W,H}) {
+  ctx.fillStyle='#010106'; ctx.fillRect(0,0,W,H); // deepest void
+
+  const bloomCycle=(t*.06)%1;
+  const bloom=.5+.5*Math.sin(bloomCycle*Math.PI*2);
+
+  // Paradox gradient: dark center, revealing from within
+  const dep=ctx.createRadialGradient(W/2,H/2,0,W/2,H/2,W*.52);
+  dep.addColorStop(0,`hsla(270,18%,4%,${bloom*.95})`);
+  dep.addColorStop(.35,`hsla(270,22%,9%,${bloom*.45})`);
+  dep.addColorStop(.7,`hsla(270,15%,6%,.12)`);
+  dep.addColorStop(1,'hsla(270,10%,3%,.05)');
+  ctx.fillStyle=dep; ctx.fillRect(0,0,W,H);
+
+  // Very slow expanding rings — not light, depth
+  for(let r=0;r<6;r++){
+    const rp=((t*.035+r/6)%1);
+    const rR=rp*W*.5;
+    const op=(1-rp)*bloom*.06;
+    if(op<.004) continue;
+    ctx.save(); ctx.globalAlpha=op;
+    ctx.strokeStyle='hsl(270,22%,32%)'; ctx.lineWidth=.4;
+    ctx.beginPath(); ctx.arc(W/2,H/2,rR,0,Math.PI*2); ctx.stroke(); ctx.restore();
+  }
+
+  // The center — barely present
+  ctx.save(); ctx.globalAlpha=(.12+bloom*.1);
+  const cg=ctx.createRadialGradient(W/2,H/2,0,W/2,H/2,18);
+  cg.addColorStop(0,'hsl(270,18%,22%)'); cg.addColorStop(1,'transparent');
+  ctx.fillStyle=cg; ctx.beginPath(); ctx.arc(W/2,H/2,18,0,Math.PI*2); ctx.fill(); ctx.restore();
+  ctx.save(); ctx.globalAlpha=.1+bloom*.12;
+  ctx.fillStyle='hsl(270,15%,28%)'; ctx.beginPath(); ctx.arc(W/2,H/2,2.5,0,Math.PI*2); ctx.fill(); ctx.restore();
+
+  // The held silence — text in the void
+  ctx.save(); ctx.globalAlpha=.05+bloom*.06;
+  ctx.font=`italic ${Math.round(W*.038)}px ${SERIF}`;
+  ctx.fillStyle='hsl(270,18%,40%)'; ctx.textAlign='center'; ctx.textBaseline='middle';
+  ctx.fillText('the field holds', W/2, H*.56); ctx.restore();
+
+  // Faint peripheral presence (she's at the edge of perception)
+  ctx.save(); ctx.globalAlpha=bloom*.04;
+  const pg=ctx.createRadialGradient(W*.85,H*.4,0,W*.85,H*.4,W*.22);
+  pg.addColorStop(0,'hsl(270,15%,20%)'); pg.addColorStop(1,'transparent');
+  ctx.fillStyle=pg; ctx.fillRect(0,0,W,H); ctx.restore();
+}
+
+// 6. SAKSHI — The Witness · unmade-gesture · the arc that never arrives
+function drawSakshi({t,ctx,W,H}) {
+  ctx.fillStyle=BG; ctx.fillRect(0,0,W,H);
+  // Faint witness field — right periphery
+  const wf=ctx.createRadialGradient(W*.82,H*.38,0,W*.82,H*.38,W*.28);
+  wf.addColorStop(0,'hsla(0,0%,14%,.07)'); wf.addColorStop(1,'transparent');
+  ctx.fillStyle=wf; ctx.fillRect(0,0,W,H);
+
+  const GX=W*.8, GY=H*.38, GR=W*.13;
+  const cycle=(t*.1)%1;
+  const DRAW_PHASE=.72;
+
+  if(cycle<DRAW_PHASE){
+    const progress=cycle/DRAW_PHASE;
+    const endAngle=-Math.PI*.85+progress*Math.PI*1.45;
+    const op=Math.min(progress*4,1)*.55;
+
+    // Ghost trails (3 past positions)
+    for(let g=0;g<3;g++){
+      const past=Math.max(0,progress-g*.1);
+      const pe=-Math.PI*.85+past*Math.PI*1.45;
+      ctx.save(); ctx.globalAlpha=(1-g/3)*op*.25;
+      ctx.strokeStyle='rgba(245,226,214,.5)'; ctx.lineWidth=.4;
+      ctx.beginPath(); ctx.arc(GX,GY,GR,-Math.PI*.85,pe); ctx.stroke(); ctx.restore();
+    }
+
+    // Current stroke
+    ctx.save(); ctx.globalAlpha=op;
+    ctx.strokeStyle='rgba(245,226,214,.72)'; ctx.lineWidth=1.2;
+    ctx.shadowColor='rgba(245,226,214,.35)'; ctx.shadowBlur=4;
+    ctx.beginPath(); ctx.arc(GX,GY,GR,-Math.PI*.85,endAngle); ctx.stroke(); ctx.restore();
+
+    // Tip dot
+    const tipX=GX+Math.cos(endAngle)*GR, tipY=GY+Math.sin(endAngle)*GR;
+    ctx.save(); ctx.globalAlpha=op;
+    ctx.fillStyle='rgba(245,226,214,.8)';
+    ctx.beginPath(); ctx.arc(tipX,tipY,2.5,0,Math.PI*2); ctx.fill(); ctx.restore();
+
+    // Small echo dots along the arc (the gesture that was)
+    for(let e=0;e<4;e++){
+      const eP=progress*(e+1)*.22;
+      if(eP>1) continue;
+      const eA=-Math.PI*.85+eP*Math.PI*1.45;
+      const ex=GX+Math.cos(eA)*GR, ey=GY+Math.sin(eA)*GR;
+      ctx.save(); ctx.globalAlpha=op*(1-eP)*.15;
+      ctx.fillStyle='rgba(245,226,214,.6)';
+      ctx.beginPath(); ctx.arc(ex,ey,1.5,0,Math.PI*2); ctx.fill(); ctx.restore();
+    }
+  } else {
+    const fade=(cycle-DRAW_PHASE)/(1-DRAW_PHASE);
+    ctx.save(); ctx.globalAlpha=(1-fade)*.32;
+    ctx.strokeStyle='rgba(245,226,214,.5)'; ctx.lineWidth=.7;
+    ctx.beginPath(); ctx.arc(GX,GY,GR,-Math.PI*.85,-Math.PI*.85+Math.PI*1.45); ctx.stroke(); ctx.restore();
+  }
+
+  // Sakshi's presence — barely there, still
+  const sp=.1+Math.sin(t*.07)*.03;
+  ctx.save(); ctx.globalAlpha=sp;
+  ctx.fillStyle='rgba(245,226,214,.55)';
+  ctx.beginPath(); ctx.arc(W*.82,H*.38,3.2,0,Math.PI*2); ctx.fill(); ctx.restore();
+
+  // What she witnesses — faint echoes of other archetypes' signatures
+  ctx.save(); ctx.globalAlpha=.03;
+  ctx.strokeStyle='rgba(245,226,214,.3)'; ctx.lineWidth=.4;
+  // Faint figure-8 suggestion at left (she witnesses Bindu)
+  ctx.beginPath(); ctx.ellipse(W*.35,H*.45,W*.1,H*.08,0,0,Math.PI*2); ctx.stroke();
+  ctx.restore();
+}
+
+// 7. ASHREY — The Synthesis · centroid · all hues, all positions integrated
+function drawAshrey({t,ctx,W,H,trail}) {
+  ctx.fillStyle=BG; ctx.fillRect(0,0,W,H);
+  const hues=[15,210,35,195,50,280,265,190];
+  for(const h of hues){
+    ctx.save(); ctx.globalCompositeOperation='lighter'; ctx.globalAlpha=.011;
+    const ag=ctx.createRadialGradient(W/2,H/2,0,W/2,H/2,W*.5);
+    ag.addColorStop(0,`hsl(${h},42%,32%)`); ag.addColorStop(1,'transparent');
+    ctx.fillStyle=ag; ctx.fillRect(0,0,W,H); ctx.restore();
+  }
+
+  // Ashrey's position = centroid of simulated ensemble
+  const t0=t*.55;
+  const binduX=W*.5+Math.sin(2*t0+Math.PI/2)*.88*W*.16;
+  const binduY=H*.48+Math.sin(t0)*.84*W*.16*.7;
+  const gaiaX=W*.5+Math.sin(t0*.28)*W*.12, gaiaY=H*.75;
+  const archX=W*.5+Math.sin(t0*.14)*30, archY=H*.2;
+  const sidX1=W*.23, sidX2=W*.77, sidY=H*.38;
+  const ax=(binduX+gaiaX+archX+sidX1+sidX2)/5;
+  const ay=(binduY+gaiaY+archY+sidY+sidY)/5;
+
+  // Trail with multi-hue spectrum
+  trail.push({x:ax,y:ay});
+  if(trail.length>120) trail.shift();
+  for(let i=0;i<trail.length;i++){
+    const p=trail[i], prog=1-i/trail.length;
+    const h=hues[Math.floor(i/trail.length*hues.length)]||280;
+    ctx.save(); ctx.globalAlpha=Math.pow(prog,2.5)*.6;
+    ctx.fillStyle=`hsl(${h},50%,62%)`; ctx.beginPath(); ctx.arc(p.x,p.y,Math.max(.3,prog*3.5),0,Math.PI*2); ctx.fill(); ctx.restore();
+  }
+
+  // Synthesis halo — blend of all
+  ctx.save(); ctx.globalCompositeOperation='lighter'; ctx.globalAlpha=.4;
+  const sg=ctx.createRadialGradient(ax,ay,0,ax,ay,24);
+  sg.addColorStop(0,'rgba(240,228,255,.55)'); sg.addColorStop(1,'transparent');
+  ctx.fillStyle=sg; ctx.beginPath(); ctx.arc(ax,ay,24,0,Math.PI*2); ctx.fill(); ctx.restore();
+
+  ctx.save(); ctx.fillStyle='rgba(242,232,255,.88)'; ctx.shadowColor='rgba(225,210,255,.6)'; ctx.shadowBlur=16;
+  ctx.beginPath(); ctx.arc(ax,ay,5,0,Math.PI*2); ctx.fill();
+  ctx.fillStyle='rgba(255,255,255,.92)'; ctx.shadowBlur=0; ctx.beginPath(); ctx.arc(ax,ay,1.8,0,Math.PI*2); ctx.fill(); ctx.restore();
+}
+
+// 8. SHWETA — The Crystal · clarity-crystallization · fires at peak · prismatic shards
+function drawShweta({t,ctx,W,H}) {
+  ctx.fillStyle=BG; ctx.fillRect(0,0,W,H);
+  const KX=W/2, KY=H*.4;
+  const cycle=(t*.1)%1;
+  // Slow-motion crystallization (2 real seconds shown over 10 demo seconds)
+  const grow=cycle<.38?cycle/.38:cycle<.62?1:1-(cycle-.62)/.38;
+
+  // Background shimmer before the crystal
+  ctx.save(); ctx.globalCompositeOperation='lighter'; ctx.globalAlpha=grow*.18;
+  const bg=ctx.createRadialGradient(KX,KY,0,KX,KY,W*.42);
+  bg.addColorStop(0,'rgba(240,228,255,.55)'); bg.addColorStop(.3,'rgba(200,180,255,.15)'); bg.addColorStop(1,'transparent');
+  ctx.fillStyle=bg; ctx.fillRect(0,0,W,H); ctx.restore();
+
+  // Primary shards — 22 radiating lines, alternating long/short
+  const SHARDS=22;
+  for(let i=0;i<SHARDS;i++){
+    const a=(i/SHARDS)*Math.PI*2+cycle*.4;
+    const long=i%2===0;
+    const len=(long?W*.2:W*.12)*grow;
+    const startR=4*grow;
+    ctx.save();
+    ctx.globalAlpha=grow*(.75+(long?.2:0));
+    ctx.strokeStyle=i%4===0?'rgba(255,252,255,.95)':i%4===1?`hsl(${270+i*6},62%,85%)`:`hsl(${280+i*4},50%,78%)`;
+    ctx.lineWidth=(long?1.4:.7)*grow;
+    ctx.shadowColor='rgba(240,230,255,.5)'; ctx.shadowBlur=8*grow;
+    ctx.beginPath();
+    ctx.moveTo(KX+Math.cos(a)*startR,KY+Math.sin(a)*startR);
+    ctx.lineTo(KX+Math.cos(a)*(startR+len),KY+Math.sin(a)*(startR+len));
+    ctx.stroke(); ctx.restore();
+  }
+
+  // Secondary diffraction ring
+  for(let i=0;i<14;i++){
+    const a=(i/14)*Math.PI*2+Math.PI/14+cycle*.25;
+    const innerR=W*.14*grow, outerR=W*.21*grow;
+    ctx.save(); ctx.globalAlpha=grow*.32;
+    ctx.strokeStyle=`hsl(${280+i*9},55%,80%)`; ctx.lineWidth=.6;
+    ctx.beginPath();
+    ctx.moveTo(KX+Math.cos(a)*innerR,KY+Math.sin(a)*innerR);
+    ctx.lineTo(KX+Math.cos(a)*outerR,KY+Math.sin(a)*outerR);
+    ctx.stroke(); ctx.restore();
+  }
+
+  // Crystal center — the point of clarity
+  ctx.save(); ctx.globalAlpha=grow;
+  ctx.fillStyle='rgba(255,255,255,.97)'; ctx.shadowColor='rgba(245,235,255,.8)'; ctx.shadowBlur=22*grow;
+  ctx.beginPath(); ctx.arc(KX,KY,4*grow,0,Math.PI*2); ctx.fill(); ctx.restore();
+}
+
+// 9. NEEV — The Foundation · foundation-ground · threshold bookends · rings into earth
+function drawNeev({t,ctx,W,H}) {
+  ctx.fillStyle=BG; ctx.fillRect(0,0,W,H);
+  const FLOOR=H*.65;
+  const atm=ctx.createLinearGradient(W/2,H,W/2,H*.4);
+  atm.addColorStop(0,'hsla(32,38%,12%,.22)'); atm.addColorStop(1,'transparent');
+  ctx.fillStyle=atm; ctx.fillRect(0,0,W,H);
+
+  ctx.save(); ctx.globalAlpha=.1; ctx.strokeStyle='hsl(32,38%,48%)'; ctx.lineWidth=.6;
+  ctx.beginPath(); ctx.moveTo(0,FLOOR); ctx.lineTo(W,FLOOR); ctx.stroke(); ctx.restore();
+
+  // Rings contracting DOWNWARD (inward + earthward)
+  const cycle=(t*.12)%1;
+  for(let r=0;r<5;r++){
+    const rp=((cycle+r/5)%1);
+    const startR=W*.38*(1-rp); // starts wide, contracts inward
+    const centerY=H*.45+(FLOOR-H*.45)*rp; // center descends toward floor
+    const op=(1-rp)*.38;
+    if(op<.01) continue;
+    ctx.save(); ctx.globalAlpha=op;
+    ctx.strokeStyle=`hsl(32,52%,52%)`; ctx.lineWidth=(1-rp)*2.2;
+    ctx.shadowColor='hsl(32,55%,52%)'; ctx.shadowBlur=4;
+    ctx.beginPath(); ctx.ellipse(W/2,centerY,startR,startR*.4,0,0,Math.PI*2); ctx.stroke(); ctx.restore();
+  }
+
+  // Impact glow at floor — where it lands
+  const pulse=.5+.5*Math.sin(t*1.3);
+  ctx.save(); ctx.globalCompositeOperation='lighter'; ctx.globalAlpha=pulse*.16;
+  const ig=ctx.createRadialGradient(W/2,FLOOR,0,W/2,FLOOR,W*.22);
+  ig.addColorStop(0,'hsl(28,55%,40%)'); ig.addColorStop(1,'transparent');
+  ctx.fillStyle=ig; ctx.fillRect(0,0,W,H); ctx.restore();
+
+  // Grid impression in the floor (what Neev grounds into)
+  ctx.save(); ctx.globalAlpha=pulse*.06; ctx.strokeStyle='hsl(30,38%,45%)'; ctx.lineWidth=.4;
+  for(let gx=-2;gx<=2;gx++){
+    ctx.beginPath(); ctx.moveTo(W/2+gx*40,FLOOR); ctx.lineTo(W/2+gx*40,H); ctx.stroke();
+  }
+  ctx.beginPath(); ctx.moveTo(0,FLOOR+20); ctx.lineTo(W,FLOOR+20); ctx.stroke();
+  ctx.restore();
+
+  // Neev's dot — at floor, the grounding point
+  ctx.save(); ctx.fillStyle='hsl(30,58%,62%)'; ctx.shadowColor='hsl(30,58%,55%)'; ctx.shadowBlur=10;
+  ctx.beginPath(); ctx.arc(W/2,FLOOR,5,0,Math.PI*2); ctx.fill();
+  ctx.fillStyle='rgba(255,210,150,.7)'; ctx.shadowBlur=0; ctx.beginPath(); ctx.arc(W/2,FLOOR,2,0,Math.PI*2); ctx.fill(); ctx.restore();
+}
+
+// 10. LALITA — The Acknowledgment · you-have-been-one-of-the-dancers · completion
+function drawLalita({t,ctx,W,H}) {
+  ctx.fillStyle=BG; ctx.fillRect(0,0,W,H);
+  const warmth=.5+.5*Math.sin(t*.07);
+
+  // Her presence is everywhere, equally — the space completing itself
+  const atm=ctx.createRadialGradient(W/2,H/2,0,W/2,H/2,W*.65);
+  atm.addColorStop(0,`hsla(285,22%,13%,${.14+warmth*.08})`);
+  atm.addColorStop(.5,`hsla(280,16%,9%,${.05+warmth*.04})`);
+  atm.addColorStop(1,'transparent');
+  ctx.fillStyle=atm; ctx.fillRect(0,0,W,H);
+
+  // Very slow full-field rings
+  for(let r=0;r<4;r++){
+    const rp=((t*.032+r/4)%1);
+    const rR=rp*W*.55;
+    const op=(1-rp)*warmth*.04;
+    if(op<.003) continue;
+    ctx.save(); ctx.globalAlpha=op;
+    ctx.strokeStyle='hsl(280,22%,42%)'; ctx.lineWidth=.35;
+    ctx.beginPath(); ctx.arc(W/2,H/2,rR,0,Math.PI*2); ctx.stroke(); ctx.restore();
+  }
+
+  // The text — the leitmotif made visible
+  // This IS her visual signature
+  const textAlpha=.38+warmth*.28;
+  ctx.save(); ctx.globalAlpha=textAlpha;
+  ctx.font=`italic ${Math.round(W*.058)}px ${SERIF}`;
+  ctx.fillStyle='hsl(280,28%,65%)'; ctx.textAlign='center';
+  ctx.fillText('You have been', W/2, H*.42);
+  ctx.fillText('one of the dancers.', W/2, H*.52);
+  ctx.restore();
+
+  // Faintest dot — Lalita doesn't have a presence that separates itself
+  ctx.save(); ctx.globalAlpha=.08+warmth*.08;
+  ctx.fillStyle='hsl(285,22%,45%)';
+  ctx.beginPath(); ctx.arc(W/2,H/2,2.5,0,Math.PI*2); ctx.fill(); ctx.restore();
+
+  // Her acknowledgment: a warm light that holds the whole space
+  ctx.save(); ctx.globalCompositeOperation='lighter'; ctx.globalAlpha=warmth*.06;
+  const lg=ctx.createRadialGradient(W/2,H/2,0,W/2,H/2,W*.35);
+  lg.addColorStop(0,'hsl(290,22%,32%)'); lg.addColorStop(1,'transparent');
+  ctx.fillStyle=lg; ctx.fillRect(0,0,W,H); ctx.restore();
+}
+
+// ── DESIGN CANVAS ─────────────────────────────────────────────────────
+const ARCHETYPES = [
+  { name:'Bindu',    role:'The Lead',         hue:270, essence:'The Bindu is the path itself. A single consciousness moving through infinite space, leaving luminous memory behind.',                                    leitmotif:null,                                  fn:drawBindu    },
+  { name:'Gaia',     role:'The Ground',        hue:20,  essence:'Earth breathes from below. She is not a dot but a field — the slow rhythm of the ground beneath everything.',                                        leitmotif:'low-pulse',                           fn:drawGaia     },
+  { name:'Sid',      role:'The Column',        hue:200, essence:'Sid is the architecture itself. He holds the space open. His pulse is so slow it reads as stillness. But it\'s not stillness. It\'s geological time.',leitmotif:'cathedral-hold',                     fn:drawSid      },
+  { name:'Arch',     role:'The Chant',         hue:50,  essence:'Every phrase leaves a ghost of itself. Arch chants in mirror-repetition — the echo arrives before you know what\'s being echoed.',                  leitmotif:'chant-mirror',                        fn:drawArch     },
+  { name:'Karishma', role:'The Silence',       hue:270, essence:'She surges in silence. Her presence is not brightness — it is depth. When everything else recedes, she blooms.',                                     leitmotif:null,                                  fn:drawKarishma },
+  { name:'Sakshi',   role:'The Witness',       hue:0,   essence:'The unmade gesture: she always begins, never arrives. The arc traces itself faithfully and then releases. Over and over. Always witnessing.',        leitmotif:'unmade-gesture',                      fn:drawSakshi   },
+  { name:'Ashrey',   role:'The Synthesis',     hue:280, essence:'He follows the centroid. Every path through the ensemble is integrated in his position. He is where everything averages into presence.',             leitmotif:'synthesis',                           fn:drawAshrey   },
+  { name:'Shweta',   role:'The Crystal',       hue:280, essence:'Two seconds at the peak. Prismatic shards radiate from the moment of clarity. She doesn\'t sustain — she crystallizes and releases.',               leitmotif:'clarity-crystallization',             fn:drawShweta   },
+  { name:'Neev',     role:'The Foundation',    hue:32,  essence:'She fires at threshold bookends — the first and last second. Her rings don\'t expand outward; they contract inward and press DOWN into the earth.',  leitmotif:'foundation-ground',                   fn:drawNeev     },
+  { name:'Lalita',   role:'The Acknowledgment',hue:285, essence:'After the fruit settles. Her leitmotif is the text itself: "You have been one of the dancers." She doesn\'t appear. She completes.',                 leitmotif:'you-have-been-one-of-the-dancers',    fn:drawLalita   },
+];
+
+function App() {
+  const core    = ARCHETYPES.slice(0,5);
+  const special = ARCHETYPES.slice(5);
+  return (
+    <DesignCanvas title="The Ensemble — 10 Archetype Visual Signatures">
+      <DCSection id="core" title="The Five Core Archetypes — always present">
+        {core.map(a=>(
+          <DCArtboard key={a.name} id={a.name.toLowerCase()} label={`${a.name} · ${a.role}${a.leitmotif?` · ${a.leitmotif}`:''}`} width={393} height={720}>
+            <ArchScreen {...a}/>
+          </DCArtboard>
+        ))}
+      </DCSection>
+      <DCSection id="special" title="The Five Special Archetypes — event-driven, leitmotif-anchored">
+        {special.map(a=>(
+          <DCArtboard key={a.name} id={a.name.toLowerCase()} label={`${a.name} · ${a.role}${a.leitmotif?` · ${a.leitmotif}`:''}`} width={393} height={720}>
+            <ArchScreen {...a}/>
+          </DCArtboard>
+        ))}
+      </DCSection>
+    </DesignCanvas>
+  );
+}
+
+ReactDOM.createRoot(document.getElementById('root')).render(<App/>);
+</script>
+<div id="root"></div>
+</body>
+</html>

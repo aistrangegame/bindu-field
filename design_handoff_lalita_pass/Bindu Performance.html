@@ -1,0 +1,707 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Bindu Performance — Cross</title>
+<link href="https://fonts.googleapis.com/css2?family=Lora:ital,wght@0,300;0,400;1,300;1,400&family=DM+Mono:wght@300;400&display=swap" rel="stylesheet">
+<script src="https://unpkg.com/react@18.3.1/umd/react.development.js" integrity="sha384-hD6/rw4ppMLGNu3tX5cjIb+uRZ7UkRJ6BPkLpg4hAu/6onKUg4lLsHAs9EBPT82L" crossorigin="anonymous"></script>
+<script src="https://unpkg.com/react-dom@18.3.1/umd/react-dom.development.js" integrity="sha384-u6aeetuaXnQ38mYT8rp6sbXaQe3NL9t+IBXmnYxwkUI2Hw4bsp2Wvmx4yRQF1uAm" crossorigin="anonymous"></script>
+<script src="https://unpkg.com/@babel/standalone@7.29.0/babel.min.js" integrity="sha384-m08KidiNqLdpJqLq95G/LEi8Qvjl/xUYll3QILypMoQ65QorJ9Lvtp2RXYGBFj1y" crossorigin="anonymous"></script>
+<script src="bindu-performance-engine.js"></script>
+<script type="text/babel" src="tweaks-panel.jsx"></script>
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+html,body{width:100%;height:100%;overflow:hidden;background:#000}
+#root{width:100%;height:100%;position:relative}
+canvas{position:absolute;inset:0;width:100%;height:100%}
+.overlay{position:absolute;inset:0;pointer-events:none;display:flex;flex-direction:column;align-items:center;justify-content:center}
+@keyframes fadeInUp{from{opacity:0;transform:translateY(12px)}to{opacity:1;transform:translateY(0)}}
+@keyframes fadeIn{from{opacity:0}to{opacity:1}}
+@keyframes mirrorFlash{0%{opacity:0;transform:scale(0.88)}15%{opacity:1;transform:scale(1)}80%{opacity:1}100%{opacity:0;transform:scale(1.04)}}
+@keyframes breathePre{0%,100%{transform:scale(1);opacity:.5}50%{transform:scale(1.18);opacity:.85}}
+@keyframes peakWord{0%{opacity:0;transform:scale(0.7)}20%{opacity:1;transform:scale(1.06)}35%{transform:scale(1)}85%{opacity:1}100%{opacity:0}}
+@keyframes darkFlash{0%{opacity:0}10%{opacity:.55}90%{opacity:.55}100%{opacity:0}}
+@keyframes fruitLine{from{opacity:0;transform:translateY(6px)}to{opacity:.88;transform:translateY(0)}}
+</style>
+<template id="__bundler_thumbnail" data-bg-color="#020208">
+  <svg viewBox="0 0 1920 1080" xmlns="http://www.w3.org/2000/svg">
+    <rect width="1920" height="1080" fill="#020208"/>
+    <radialGradient id="cg" cx="50%" cy="50%" r="45%"><stop offset="0%" stop-color="hsl(270,45%,22%)" stop-opacity=".35"/><stop offset="100%" stop-color="#020208" stop-opacity="0"/></radialGradient>
+    <rect width="1920" height="1080" fill="url(#cg)"/>
+    <line x1="960" y1="200" x2="200" y2="900" stroke="hsl(270,45%,50%)" stroke-width=".8" opacity=".18"/>
+    <line x1="960" y1="200" x2="1720" y2="900" stroke="hsl(270,45%,50%)" stroke-width=".8" opacity=".18"/>
+    <line x1="960" y1="140" x2="960" y2="900" stroke="hsl(270,45%,55%)" stroke-width=".6" opacity=".12"/>
+    <circle cx="960" cy="540" r="8" fill="hsl(270,70%,78%)" opacity=".9"/>
+    <circle cx="960" cy="538" r="2.5" fill="white" opacity=".9"/>
+    <text x="960" y="760" text-anchor="middle" font-family="serif" font-style="italic" font-weight="300" font-size="120" fill="hsl(270,55%,72%)" opacity=".85">cross</text>
+  </svg>
+</template>
+</head>
+<body>
+<div id="root"></div>
+<script type="text/babel">
+const {useState,useEffect,useRef,useCallback} = React;
+
+const HUE = 270; // Crown violet — Cross dance
+const SERIF = "'Lora',Georgia,serif";
+const MONO  = "'DM Mono','SF Mono',monospace";
+
+// ── PARTICLE SYSTEM ───────────────────────────────────────────────────
+function makeParticles(W, H, n) {
+  return Array.from({length:n}, () => ({
+    x: Math.random()*W, y: Math.random()*H,
+    vx: (Math.random()-.5)*.3, vy: -(0.08+Math.random()*.35),
+    r: .4+Math.random()*1.4, life: Math.random(), decay: .003+Math.random()*.005,
+    h: HUE + Math.random()*30-15,
+  }));
+}
+function tickParticles(parts, W, H, targetN, perf) {
+  for (const p of parts) {
+    p.x += p.vx; p.y += p.vy;
+    p.life -= p.decay * (perf.inSilence ? .3 : 1);
+    if (p.life <= 0 || p.y < -4) {
+      p.x=Math.random()*W; p.y=H+4;
+      p.vx=(Math.random()-.5)*.3; p.vy=-(0.08+Math.random()*.35);
+      p.life=.2+Math.random()*.5; p.r=.4+Math.random()*1.4;
+    }
+  }
+}
+
+// ── DRAWING: BACKGROUND + ATMOSPHERE ─────────────────────────────────
+function drawBackground(ctx,W,H,perf) {
+  const {phase,modulator,energy,inSilence} = perf;
+  const [h,s,l] = phase.bg;
+  const lAdjusted = l + modulator * 8 + energy * 4;
+  ctx.fillStyle = `hsl(${h},${s}%,${lAdjusted}%)`;
+  ctx.fillRect(0,0,W,H);
+  // Central radial atmosphere
+  const atm = ctx.createRadialGradient(W/2,H*.55,0,W/2,H*.55,W*.6);
+  atm.addColorStop(0, `hsla(${h},${s+20}%,${lAdjusted+12}%,${.08+modulator*.18})`);
+  atm.addColorStop(1,'transparent');
+  ctx.fillStyle=atm; ctx.fillRect(0,0,W,H);
+  // Karishma bloom in silence
+  if(inSilence) {
+    const bloom = ctx.createRadialGradient(W/2,H/2,0,W/2,H/2,W*.8);
+    bloom.addColorStop(0,`hsla(${HUE},35%,22%,.12)`);
+    bloom.addColorStop(1,'transparent');
+    ctx.fillStyle=bloom; ctx.fillRect(0,0,W,H);
+  }
+}
+
+// ── DRAWING: CATHEDRAL FLOOR ──────────────────────────────────────────
+function drawFloor(ctx,W,H,perf) {
+  const {beatPulse,modulator,energy} = perf;
+  const FLOOR_Y=H*.58, VPX=W/2, VPY=H*.58;
+  const base = .03+modulator*.08+beatPulse*.025;
+  ctx.save(); ctx.strokeStyle=`hsl(${HUE},35%,50%)`; ctx.lineWidth=.5;
+  // Horizontal lines
+  for(let i=0;i<=10;i++){
+    const y=FLOOR_Y+(H-FLOOR_Y)*(i/10);
+    const persp=(y-FLOOR_Y)/(H-FLOOR_Y);
+    ctx.globalAlpha=base*persp*2.5;
+    ctx.beginPath();ctx.moveTo(0,y);ctx.lineTo(W,y);ctx.stroke();
+  }
+  // Perspective verticals
+  for(let j=-8;j<=8;j++){
+    const fx=W/2+j*(W/16);
+    ctx.globalAlpha=base*1.2;
+    ctx.beginPath();ctx.moveTo(VPX,VPY);ctx.lineTo(fx,H);ctx.stroke();
+  }
+  // Beat pulse wave across floor
+  if(beatPulse>.6){
+    ctx.globalAlpha=(beatPulse-.6)*2*.12*(1+modulator);
+    ctx.strokeStyle=`hsl(${HUE},55%,65%)`;ctx.lineWidth=1;
+    ctx.beginPath();ctx.moveTo(0,FLOOR_Y);ctx.lineTo(W,FLOOR_Y);ctx.stroke();
+  }
+  ctx.restore();
+}
+
+// ── DRAWING: SID COLUMNS ──────────────────────────────────────────────
+function drawColumns(ctx,W,H,perf) {
+  const {t,modulator,energy,sid} = perf;
+  if(sid<.05) return;
+  const drone = .5+.5*Math.cos((t%5.5)/5.5*Math.PI*2);
+  const bright = (.2+drone*.3+modulator*.4)*sid;
+  const FLOOR_Y=H*.58, CEIL_Y=H*.06;
+  const cols=[W*.18,W*.82];
+  for(const cx of cols){
+    ctx.save();
+    ctx.globalCompositeOperation='lighter';
+    ctx.globalAlpha=bright*.4;
+    const amb=ctx.createRadialGradient(cx,H*.32,0,cx,H*.32,W*.14);
+    amb.addColorStop(0,`hsl(${HUE},50%,55%)`);amb.addColorStop(1,'transparent');
+    ctx.fillStyle=amb;ctx.fillRect(0,0,W,H);
+    ctx.restore();
+    // Column line
+    const lg=ctx.createLinearGradient(cx,CEIL_Y,cx,FLOOR_Y);
+    lg.addColorStop(0,`hsla(${HUE},45%,62%,${bright*.5})`);
+    lg.addColorStop(.5,`hsla(${HUE},55%,70%,${bright})`);
+    lg.addColorStop(1,`hsla(${HUE},40%,55%,${bright*.6})`);
+    ctx.save();ctx.strokeStyle=lg;ctx.lineWidth=1.5;
+    ctx.shadowColor=`hsl(${HUE},65%,65%)`;ctx.shadowBlur=6+drone*4;
+    ctx.beginPath();ctx.moveTo(cx,CEIL_Y);ctx.lineTo(cx,FLOOR_Y);ctx.stroke();
+    ctx.restore();
+  }
+}
+
+// ── DRAWING: VAULT CEILING ────────────────────────────────────────────
+function drawVault(ctx,W,H,perf) {
+  const {energy,modulator} = perf;
+  const op = Math.min(.38, energy*.22+modulator*.4);
+  if(op<.01) return;
+  ctx.save();
+  for(let i=0;i<4;i++){
+    const oy=i*6;
+    ctx.globalAlpha=op*(1-i*.22);
+    ctx.strokeStyle=`hsl(${HUE},38%,52%)`;ctx.lineWidth=.8;
+    ctx.shadowColor=`hsl(${HUE},48%,58%)`;ctx.shadowBlur=5+modulator*8;
+    ctx.beginPath();
+    const ax=W/2,ay=H*.04+oy;
+    const lx=W*.04,ly=H*.28+oy;
+    const rx=W*.96,ry=H*.28+oy;
+    ctx.moveTo(lx,ly);
+    ctx.bezierCurveTo(lx,ay,ax-W*.14,ay,ax,ay);
+    ctx.bezierCurveTo(ax+W*.14,ay,rx,ay,rx,ry);
+    ctx.stroke();
+  }
+  ctx.restore();
+}
+
+// ── DRAWING: ATMOSPHERIC GRAIN ────────────────────────────────────────
+function drawGrain(ctx,W,H,parts,perf) {
+  const {energy,inSilence,modulator} = perf;
+  const maxAlpha = inSilence?.015 : .06+energy*.08+modulator*.06;
+  for(const p of parts){
+    ctx.save();
+    ctx.globalAlpha=p.life*maxAlpha;
+    ctx.fillStyle=`hsl(${p.h},45%,65%)`;
+    if(modulator>.3){ctx.shadowColor=`hsl(${p.h},55%,65%)`;ctx.shadowBlur=3;}
+    ctx.beginPath();ctx.arc(p.x,p.y,p.r*(1+modulator*.4),0,Math.PI*2);ctx.fill();
+    ctx.restore();
+  }
+}
+
+// ── DRAWING: ARCH ARC (Arch archetype) ───────────────────────────────
+function drawArchArc(ctx,W,H,perf) {
+  const {arch,t,modulator,energy} = perf;
+  if(arch<.05) return;
+  const op = arch*.15*(1+modulator*.5);
+  ctx.save();ctx.globalAlpha=op;
+  ctx.strokeStyle=`hsl(${HUE},40%,58%)`;ctx.lineWidth=1;
+  ctx.shadowColor=`hsl(${HUE},50%,60%)`;ctx.shadowBlur=4;
+  // Mirror-phrase echo arc (chant-mirror leitmotif)
+  const phase=(t*.3)%1;
+  ctx.beginPath();
+  const y=H*.16+Math.sin(phase*Math.PI)*8;
+  ctx.moveTo(W*.25,H*.3);
+  ctx.quadraticCurveTo(W*.5,y,W*.75,H*.3);
+  ctx.stroke();ctx.restore();
+}
+
+// ── DRAWING: GAIA GROUND ─────────────────────────────────────────────
+function drawGaia(ctx,W,H,perf) {
+  const {gaia,t,beatPulse} = perf;
+  if(gaia<.05) return;
+  const breathe=.5+.5*Math.sin(t*.12);
+  const op=gaia*(.04+breathe*.08);
+  ctx.save();ctx.globalCompositeOperation='lighter';ctx.globalAlpha=op;
+  const g=ctx.createRadialGradient(W/2,H*.85,0,W/2,H*.85,W*.45);
+  g.addColorStop(0,`hsl(${HUE-15},45%,40%)`);g.addColorStop(1,'transparent');
+  ctx.fillStyle=g;ctx.fillRect(0,0,W,H);ctx.restore();
+}
+
+// ── DRAWING: SAKSHI UNMADE GESTURE ────────────────────────────────────
+function drawSakshi(ctx,W,H,perf) {
+  const {sakshi,t} = perf;
+  if(sakshi<.05) return;
+  const phase=(t*.18)%1;
+  if(phase>.7) return; // never completes
+  ctx.save();
+  ctx.globalAlpha=sakshi*(1-phase/.7)*.08;
+  ctx.strokeStyle=`hsl(${HUE},20%,55%)`;ctx.lineWidth=.6;
+  const cx=W*.88,cy=H*.42;
+  const r=W*.05;
+  ctx.beginPath();
+  ctx.arc(cx,cy,r,0,phase/.7*Math.PI*1.6);
+  ctx.stroke();ctx.restore();
+}
+
+// ── DRAWING: RISING ARCHES (Crescendo tier t≥145) ────────────────────
+function drawRisingArches(ctx,W,H,perf) {
+  const {t,modulator,energy} = perf;
+  if(t<145||modulator<.01) return;
+  const progress=Math.min(1,(t-145)/15);
+  const KX=W/2,KY=H*.14;
+  const N=7;
+  for(let i=0;i<N;i++){
+    const ap=Math.max(0,Math.min(1,(progress*N-i)/1.8));
+    if(ap<=0) continue;
+    const side=(i%2===0)?-1:1;
+    const fx=side<0?W*.12:W*.88;
+    const fy=H*.62-i*H*.018;
+    const op=ap*(.2+modulator*.45);
+    ctx.save();
+    ctx.globalAlpha=op;
+    ctx.strokeStyle=`hsl(${HUE},55%,65%)`;
+    ctx.lineWidth=.8+ap*modulator;
+    ctx.shadowColor=`hsl(${HUE},65%,70%)`;ctx.shadowBlur=4+modulator*10;
+    ctx.beginPath();
+    ctx.moveTo(fx,fy);
+    ctx.quadraticCurveTo(
+      side<0?W*.32:W*.68, H*.28*ap,
+      KX, KY+(1-ap)*H*.28
+    );
+    ctx.stroke();ctx.restore();
+  }
+}
+
+// ── DRAWING: CONVERGENCE LINES ────────────────────────────────────────
+function drawConvergenceLines(ctx,W,H,perf) {
+  const {t,modulator} = perf;
+  if(modulator<.05) return;
+  const KX=W/2,KY=H*.14;
+  const origins=[[0,0],[W,0],[0,H],[W,H],[W/2,H],[W*.15,H*.6],[W*.85,H*.6]];
+  ctx.save();ctx.globalCompositeOperation='lighter';
+  for(const [ox,oy] of origins){
+    ctx.globalAlpha=modulator*.04;
+    ctx.strokeStyle=`hsl(${HUE},50%,60%)`;ctx.lineWidth=.5;
+    ctx.beginPath();ctx.moveTo(ox,oy);ctx.lineTo(KX,KY);ctx.stroke();
+  }
+  ctx.restore();
+}
+
+// ── DRAWING: KEYSTONE CASCADE (Climax) ───────────────────────────────
+function drawKeystone(ctx,W,H,perf) {
+  const {modulator,t,beatPulse} = perf;
+  if(modulator<.25) return;
+  const str=(modulator-.25)/.55;
+  const KX=W/2,KY=H*.14;
+  // Keystone glow
+  ctx.save();ctx.globalCompositeOperation='lighter';
+  ctx.globalAlpha=str*(.5+beatPulse*.3);
+  const kg=ctx.createRadialGradient(KX,KY,0,KX,KY,W*.28);
+  kg.addColorStop(0,`hsl(${HUE},88%,90%)`);
+  kg.addColorStop(.25,`hsl(${HUE},70%,68%)`);
+  kg.addColorStop(1,'transparent');
+  ctx.fillStyle=kg;ctx.beginPath();ctx.arc(KX,KY,W*.28,0,Math.PI*2);ctx.fill();
+  ctx.restore();
+  // Cascade rings
+  const cycle=(t%0.42)/0.42;
+  for(let r=0;r<4;r++){
+    const rp=((cycle+r/4)%1);
+    const rR=rp*W*.5;
+    const rOp=(1-rp)*str*.45;
+    if(rOp<.01) continue;
+    ctx.save();ctx.globalAlpha=rOp;
+    ctx.strokeStyle=`hsl(${HUE},72%,78%)`;
+    ctx.lineWidth=(1-rp)*2.5;
+    ctx.shadowColor=`hsl(${HUE},72%,78%)`;ctx.shadowBlur=8;
+    ctx.beginPath();ctx.arc(KX,KY,rR,0,Math.PI*2);ctx.stroke();ctx.restore();
+  }
+  // Earth rising (Schumann window t=161-166)
+  if(t>=161&&t<=166){
+    const ep=Math.min(1,(t-161)/1)*Math.min(1,(166-t)/1);
+    ctx.save();ctx.globalAlpha=ep*.25;
+    ctx.globalCompositeOperation='lighter';
+    const eg=ctx.createLinearGradient(W/2,H,W/2,H*.5);
+    eg.addColorStop(0,`hsl(${HUE-15},60%,55%)`);eg.addColorStop(1,'transparent');
+    ctx.fillStyle=eg;ctx.fillRect(0,H*.5,W,H*.5);ctx.restore();
+  }
+}
+
+// ── DRAWING: SHWETA CRYSTALLIZATION ──────────────────────────────────
+function drawShweta(ctx,W,H,perf) {
+  const {shweta} = perf;
+  if(shweta<.01) return;
+  const KX=W/2,KY=H*.4;
+  const SHARDS=16;
+  ctx.save();ctx.globalCompositeOperation='lighter';
+  for(let i=0;i<SHARDS;i++){
+    const a=(i/SHARDS)*Math.PI*2;
+    const len=(W*.06+Math.random()*.04)*shweta;
+    ctx.globalAlpha=shweta*(.6+Math.random()*.4);
+    ctx.strokeStyle=`hsl(${HUE+30},80%,92%)`;ctx.lineWidth=.8;
+    ctx.shadowColor='rgba(240,220,255,.8)';ctx.shadowBlur=12;
+    ctx.beginPath();
+    ctx.moveTo(KX+Math.cos(a)*5,KY+Math.sin(a)*5);
+    ctx.lineTo(KX+Math.cos(a)*len,KY+Math.sin(a)*len);
+    ctx.stroke();
+  }
+  ctx.restore();
+}
+
+// ── DRAWING: BINDU ────────────────────────────────────────────────────
+function drawBindu(ctx,W,H,perf,trailRef) {
+  const {t,energy,modulator,beatPulse,inSilence} = perf;
+  const CX=W/2, CY=H*.5;
+  const maxR=(W*.12+modulator*W*.10)*(0.75+energy*.25);
+  const breathe=1+Math.sin(t*.19)*.065;
+  const bx=CX+(Math.sin(2*t*.88+Math.PI/2)*.88+Math.sin(3*t*.88+.5)*.12)*maxR*breathe;
+  const by=CY+Math.sin(t*.88)*.84*maxR*.70*breathe;
+  // Trail
+  const trail=trailRef.current;
+  trail.push({x:bx,y:by});
+  if(trail.length>120) trail.shift();
+  // Draw trail
+  for(let i=0;i<trail.length-1;i++){
+    const p=trail[i];
+    const prog=i/trail.length;
+    ctx.save();
+    ctx.globalAlpha=Math.pow(prog,2.2)*(.65+modulator*.2)*(inSilence?.3:1);
+    ctx.fillStyle=`hsl(${HUE+(1-prog)*20},${55+prog*15}%,${58+prog*14}%)`;
+    ctx.beginPath();ctx.arc(p.x,p.y,Math.max(.3,prog*3.8+modulator*2),0,Math.PI*2);ctx.fill();
+    ctx.restore();
+  }
+  // Halo
+  ctx.save();ctx.globalCompositeOperation='lighter';
+  ctx.globalAlpha=.45+modulator*.35;
+  const halo=ctx.createRadialGradient(bx,by,0,bx,by,28+modulator*20);
+  halo.addColorStop(0,`hsl(${HUE},78%,82%)`);
+  halo.addColorStop(.4,`hsl(${HUE},65%,60%)`);halo.addColorStop(1,'transparent');
+  ctx.fillStyle=halo;ctx.beginPath();ctx.arc(bx,by,28+modulator*20,0,Math.PI*2);ctx.fill();ctx.restore();
+  // Beat rings
+  // (managed externally via ringRef)
+  // The dot
+  const pulse=.5+.5*Math.sin(t*2.8);
+  const dotR=4.5+pulse*1.8+modulator*3;
+  ctx.save();
+  ctx.fillStyle=`hsl(${HUE},68%,76%)`;
+  ctx.shadowColor=`hsl(${HUE},78%,74%)`;ctx.shadowBlur=16+pulse*12+modulator*15;
+  ctx.beginPath();ctx.arc(bx,by,dotR,0,Math.PI*2);ctx.fill();
+  ctx.fillStyle='rgba(255,255,255,.90)';ctx.shadowBlur=0;
+  ctx.beginPath();ctx.arc(bx,by,dotR*.28,0,Math.PI*2);ctx.fill();
+  ctx.restore();
+  return {bx,by};
+}
+
+// ── DRAWING: BEAT RINGS ───────────────────────────────────────────────
+function updateRings(rings,bx,by,perf,lastBeatT) {
+  const {t,beatHz,modulator,energy} = perf;
+  const period=Math.max(.25,1/beatHz);
+  if(t-lastBeatT.current>period){
+    lastBeatT.current=t;
+    rings.push({x:bx,y:by,r:2,maxR:120+modulator*180,life:1,spd:2+modulator*3});
+  }
+  for(let i=rings.length-1;i>=0;i--){
+    rings[i].r+=rings[i].spd;rings[i].life-=.02;
+    if(rings[i].life<=0||rings[i].r>=rings[i].maxR) rings.splice(i,1);
+  }
+}
+function drawRings(ctx,rings,perf) {
+  const {modulator} = perf;
+  for(const r of rings){
+    const prog=r.r/r.maxR;
+    ctx.save();
+    ctx.globalAlpha=r.life*(1-prog*.6)*(.28+modulator*.2);
+    ctx.strokeStyle=`hsl(${HUE},55%,68%)`;
+    ctx.lineWidth=Math.max(.3,(1-prog)*1.8);
+    ctx.shadowColor=`hsl(${HUE},62%,68%)`;ctx.shadowBlur=4;
+    ctx.beginPath();ctx.arc(r.x,r.y,r.r,0,Math.PI*2);ctx.stroke();ctx.restore();
+  }
+}
+
+// ── NEEV FOUNDATION PULSE ─────────────────────────────────────────────
+function drawNeev(ctx,W,H,perf) {
+  const {neev} = perf;
+  if(neev<.01) return;
+  ctx.save();ctx.globalAlpha=neev*.3;
+  const g=ctx.createRadialGradient(W/2,H*.95,0,W/2,H*.95,W*.4);
+  g.addColorStop(0,`hsl(${HUE-10},45%,45%)`);g.addColorStop(1,'transparent');
+  ctx.fillStyle=g;ctx.fillRect(0,0,W,H);ctx.restore();
+}
+
+// ─────────────────────────────────────────────────────────────────────
+// CONSCIOUSNESS LOOP OVERLAY
+// ─────────────────────────────────────────────────────────────────────
+function ConsciousnessLoop({perf, word, setWord, loopState}) {
+  const {t, modulator, isPeak, lalita, phase} = perf;
+
+  const TEXT = '#F5E2D6';
+  const COL  = `hsl(${HUE},55%,72%)`;
+  const MUTED = 'rgba(245,226,214,0.5)';
+
+  const getFruit = (w) => {
+    const core = SCORE.fruit.core.replace(/\{w\}/g, w||'cross');
+    const w1 = 'You were still.';
+    const w2 = 'This is your first crossing.';
+    return `${core}\n\n${w1} ${w2}`;
+  };
+
+  return (
+    <div className="overlay" style={{pointerEvents: loopState==='word'?'auto':'none'}}>
+
+      {/* Seed + word offering */}
+      {(loopState==='seed'||loopState==='word') && (
+        <div style={{
+          position:'absolute', bottom:'24%', left:0, right:0,
+          display:'flex',flexDirection:'column',alignItems:'center',gap:16,
+          animation:'fadeInUp .8s ease',
+          pointerEvents: loopState==='word'?'auto':'none',
+        }}>
+          <div style={{fontFamily:SERIF,fontStyle:'italic',fontWeight:300,fontSize:'clamp(16px,2.2vw,28px)',color:MUTED,textAlign:'center',letterSpacing:'.02em',lineHeight:1.5}}>
+            What is asking to be crossed in you?
+          </div>
+          {loopState==='word' && (
+            <input
+              autoFocus
+              value={word}
+              onChange={e=>setWord(e.target.value)}
+              placeholder="offer a word…"
+              style={{
+                background:'none',border:'none',borderBottom:`1px solid ${COL}`,
+                outline:'none',fontFamily:SERIF,fontStyle:'italic',fontWeight:300,
+                fontSize:'clamp(18px,2.8vw,36px)',color:TEXT,textAlign:'center',
+                width:'clamp(180px,30vw,380px)',paddingBottom:8,letterSpacing:'.04em',
+                pointerEvents:'auto',
+              }}
+            />
+          )}
+        </div>
+      )}
+
+      {/* Mirror flash */}
+      {loopState==='mirrorFlash' && (
+        <div style={{
+          position:'absolute',inset:0,background:'rgba(0,0,0,.45)',
+          animation:'darkFlash .4s ease forwards',display:'flex',alignItems:'center',justifyContent:'center',
+          zIndex:10,
+        }}>
+          <span style={{fontFamily:SERIF,fontStyle:'italic',fontWeight:300,fontSize:'clamp(36px,6vw,96px)',color:COL,animation:'mirrorFlash 1.8s ease forwards',letterSpacing:'-.01em'}}>
+            {word ? word.split('').filter(c=>/[bcdfghjklmnpqrstvwxyz]/i.test(c)).join('').slice(0,2)||word.slice(0,2) : 'cross'}
+          </span>
+        </div>
+      )}
+
+      {/* Peak word reveal */}
+      {loopState==='peak' && (
+        <div style={{
+          position:'absolute',inset:0,display:'flex',alignItems:'center',justifyContent:'center',
+          zIndex:5,
+        }}>
+          <span style={{
+            fontFamily:SERIF,fontStyle:'italic',fontWeight:300,
+            fontSize:`clamp(64px,${10+modulator*8}vw,220px)`,
+            color:COL,animation:'peakWord 6s ease forwards',
+            textShadow:`0 0 80px ${COL}, 0 0 160px hsl(${HUE},55%,72%,.3)`,
+            letterSpacing:'-.02em',lineHeight:1,
+            transition:'font-size .3s ease',
+          }}>
+            {word||'cross'}
+          </span>
+        </div>
+      )}
+
+      {/* Fruit text */}
+      {loopState==='fruit' && (
+        <div style={{
+          position:'absolute',bottom:'8%',left:'50%',transform:'translateX(-50%)',
+          width:'min(680px,82vw)',display:'flex',flexDirection:'column',gap:12,
+          animation:'fadeInUp .8s ease',
+        }}>
+          {getFruit(word||'cross').split('\n\n').map((para,i)=>(
+            <p key={i} style={{
+              fontFamily:SERIF,fontStyle:'italic',fontWeight:300,
+              fontSize:'clamp(13px,1.45vw,20px)',color:i===0?MUTED:TEXT,
+              lineHeight:1.82,textAlign:'center',opacity:.88,
+              animation:`fruitLine .6s ${i*.4}s ease both`,
+            }}>{para}</p>
+          ))}
+        </div>
+      )}
+
+      {/* Lalita acknowledgment */}
+      {loopState==='lalita' && (
+        <div style={{
+          position:'absolute',bottom:'12%',left:0,right:0,textAlign:'center',
+          animation:'fadeIn 3s ease',
+        }}>
+          <span style={{fontFamily:SERIF,fontStyle:'italic',fontWeight:300,fontSize:'clamp(14px,1.6vw,22px)',color:COL,letterSpacing:'.04em',opacity:lalita}}>
+            You have been one of the dancers.
+          </span>
+        </div>
+      )}
+
+      {/* Phase label (bottom-left) */}
+      <div style={{position:'absolute',bottom:'3.5%',left:'3%',fontFamily:'-apple-system,sans-serif',fontSize:'clamp(8px,1vw,11px)',letterSpacing:'.18em',textTransform:'uppercase',color:'rgba(245,226,214,.22)'}}>
+        {phase.name}
+      </div>
+
+      {/* Beat + carrier (bottom-right) */}
+      <div style={{position:'absolute',bottom:'3.5%',right:'3%',fontFamily:MONO,fontSize:'clamp(9px,1vw,12px)',color:'rgba(245,226,214,.18)',letterSpacing:'.08em',textAlign:'right'}}>
+        {perf.beatHz.toFixed(2)} Hz · 110 Hz
+      </div>
+    </div>
+  );
+}
+
+// ─────────────────────────────────────────────────────────────────────
+// MAIN APP
+// ─────────────────────────────────────────────────────────────────────
+const TWEAK_DEFAULTS = /*EDITMODE-BEGIN*/{
+  "speed": 1.0,
+  "showTiers": false,
+  "jumpTo": "Opening"
+}/*EDITMODE-END*/;
+
+function App() {
+  const [t, setT]         = useTweaks(TWEAK_DEFAULTS);
+  const canvasRef          = useRef(null);
+  const simRef             = useRef(0);
+  const rafRef             = useRef(null);
+  const particlesRef       = useRef(null);
+  const trailRef           = useRef([]);
+  const ringsRef           = useRef([]);
+  const lastBeatTRef       = useRef(-99);
+  const bindRef            = useRef({bx:0,by:0});
+  const [playing, setPlaying]   = useState(false);
+  const [loopState, setLoopState] = useState('seed');
+  const [word, setWord]   = useState('');
+  const [simTime, setSimTime]   = useState(0);
+
+  const jumpPhase = useCallback((name) => {
+    const ph = SCORE.phases.find(p=>p.name===name);
+    if(ph){ simRef.current = ph.start; setSimTime(ph.start); }
+  }, []);
+
+  // Handle loop state transitions
+  useEffect(()=>{
+    const s = simTime;
+    if(s>=0&&s<4&&loopState==='seed') {}
+    else if(s>=4&&s<12&&loopState==='seed') setLoopState('word');
+    else if(s>=12&&loopState==='word') setLoopState('dancing');
+    // Mirror flashes handled via interval below
+    else if(s>=160&&s<166&&loopState!=='peak'&&loopState!=='mirrorFlash') setLoopState('peak');
+    else if(s>=178&&s<200&&loopState==='peak') setLoopState('fruit');
+    else if(s>=204&&loopState==='fruit') setLoopState('lalita');
+  },[simTime]);
+
+  // Main animation loop
+  useEffect(()=>{
+    const canvas=canvasRef.current;
+    if(!canvas) return;
+    const dpr=Math.min(window.devicePixelRatio||1,2);
+    let W=0,H=0,ctx;
+    function resize(){
+      const nW=Math.round(window.innerWidth),nH=Math.round(window.innerHeight);
+      if(nW===W&&nH===H) return;
+      W=nW;H=nH;
+      canvas.width=W*dpr;canvas.height=H*dpr;
+      ctx=canvas.getContext('2d');ctx.scale(dpr,dpr);
+      if(!particlesRef.current) particlesRef.current=makeParticles(W,H,80);
+    }
+    resize();
+    window.addEventListener('resize',resize);
+
+    let last=0;
+    const frame=(ts)=>{
+      rafRef.current=requestAnimationFrame(frame);
+      resize();
+      const dt=Math.min(.05,(ts-(last||ts))/1000);last=ts;
+      if(playing){ simRef.current=Math.min(SCORE.duration,simRef.current+dt*t.speed); }
+      const ST=simRef.current;
+      setSimTime(ST);
+
+      const perf=buildPerformer(ST);
+      tickParticles(particlesRef.current,W,H,80,perf);
+
+      ctx.clearRect(0,0,W,H);
+      drawBackground(ctx,W,H,perf);
+      drawFloor(ctx,W,H,perf);
+      drawColumns(ctx,W,H,perf);
+      drawVault(ctx,W,H,perf);
+      drawGrain(ctx,W,H,particlesRef.current,perf);
+      drawGaia(ctx,W,H,perf);
+      drawArchArc(ctx,W,H,perf);
+      drawSakshi(ctx,W,H,perf);
+      drawRisingArches(ctx,W,H,perf);
+      drawConvergenceLines(ctx,W,H,perf);
+      drawKeystone(ctx,W,H,perf);
+      drawShweta(ctx,W,H,perf);
+      drawNeev(ctx,W,H,perf);
+      const {bx,by}=drawBindu(ctx,W,H,perf,trailRef);
+      bindRef.current={bx,by};
+      updateRings(ringsRef.current,bx,by,perf,lastBeatTRef);
+      drawRings(ctx,ringsRef.current,perf);
+
+      // Tier label overlay (if enabled)
+      if(t.showTiers){
+        ctx.save();ctx.font=`9px -apple-system,sans-serif`;ctx.fillStyle='rgba(245,226,214,.2)';
+        ctx.letterSpacing='2px';ctx.textTransform='uppercase';
+        const tiers=[
+          [W*.02,H*.18,'TIER 1 · CONTINUOUS'],
+          [W*.02,H*.38,'TIER 2 · ENSEMBLE'],
+          [W*.02,H*.55,'TIER 3 · CRESCENDO'],
+          [W*.02,H*.18,'TIER 4 · CLIMAX'],
+        ];
+        if(perf.t>145) ctx.fillText('TIER 3 · CRESCENDO',W*.02,H*.55);
+        if(perf.modulator>.3) ctx.fillText('TIER 4 · CLIMAX',W*.02,H*.18);
+        ctx.restore();
+      }
+
+      // Modulator debug bar
+      if(perf.modulator>.01){
+        ctx.save();
+        ctx.fillStyle=`hsl(${HUE},55%,68%)`;
+        ctx.globalAlpha=.15;
+        ctx.fillRect(0,0,W*perf.modulator,2);
+        ctx.restore();
+      }
+    };
+    rafRef.current=requestAnimationFrame(frame);
+    return ()=>{
+      cancelAnimationFrame(rafRef.current);
+      window.removeEventListener('resize',resize);
+    };
+  },[playing,t.speed,t.showTiers]);
+
+  const perf = buildPerformer(simTime);
+
+  return (
+    <div style={{width:'100%',height:'100%',background:'#000',overflow:'hidden',cursor:'pointer'}}
+      onClick={()=>{ if(loopState==='word'&&word) setLoopState('dancing'); }}>
+      <canvas ref={canvasRef}/>
+      <ConsciousnessLoop perf={perf} word={word} setWord={setWord} loopState={loopState}/>
+
+      {/* Play button */}
+      {!playing && (
+        <div onClick={e=>{e.stopPropagation();setPlaying(true);if(loopState==='seed')setLoopState('word');}}
+          style={{position:'absolute',bottom:'8%',left:'50%',transform:'translateX(-50%)',
+            padding:'14px 36px',borderRadius:28,cursor:'pointer',zIndex:20,
+            background:'rgba(245,226,214,.06)',border:'1px solid rgba(245,226,214,.18)',
+            fontFamily:SERIF,fontStyle:'italic',fontSize:'clamp(13px,1.6vw,18px)',
+            color:'rgba(245,226,214,.6)',letterSpacing:'.04em',
+            display:loopState!=='seed'&&loopState!=='word'?'block':'none',
+          }}>
+          begin
+        </div>
+      )}
+
+      {/* Timeline scrubber */}
+      <div style={{position:'absolute',bottom:'1.5%',left:'50%',transform:'translateX(-50%)',width:'min(560px,70%)',zIndex:20}}>
+        <input type="range" min={0} max={SCORE.duration} step={0.5}
+          value={simTime}
+          onChange={e=>{simRef.current=parseFloat(e.target.value);setSimTime(parseFloat(e.target.value));}}
+          style={{width:'100%',accentColor:`hsl(${HUE},55%,68%)`,opacity:.2,cursor:'pointer'}}
+        />
+      </div>
+
+      <TweaksPanel>
+        <TweakSection label="Playback"/>
+        <TweakToggle label="Playing" value={playing} onChange={setPlaying}/>
+        <TweakSlider label="Speed" value={t.speed} min={.25} max={4} step={.25} unit="×" onChange={v=>setT('speed',v)}/>
+        <TweakSection label="Jump to Phase"/>
+        <TweakSelect label="Phase" value={perf.phase.name}
+          options={SCORE.phases.map(p=>p.name)}
+          onChange={v=>jumpPhase(v)}/>
+        <TweakSection label="Debug"/>
+        <TweakToggle label="Show Tier Labels" value={t.showTiers} onChange={v=>setT('showTiers',v)}/>
+      </TweaksPanel>
+    </div>
+  );
+}
+
+ReactDOM.createRoot(document.getElementById('root')).render(<App/>);
+</script>
+</body>
+</html>

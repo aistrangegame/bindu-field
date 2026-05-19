@@ -1,0 +1,491 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Lalita — The Player Enters</title>
+<link href="https://fonts.googleapis.com/css2?family=Lora:ital,wght@0,300;0,400;1,300;1,400&display=swap" rel="stylesheet">
+<script src="https://unpkg.com/react@18.3.1/umd/react.development.js" integrity="sha384-hD6/rw4ppMLGNu3tX5cjIb+uRZ7UkRJ6BPkLpg4hAu/6onKUg4lLsHAs9EBPT82L" crossorigin="anonymous"></script>
+<script src="https://unpkg.com/react-dom@18.3.1/umd/react-dom.development.js" integrity="sha384-u6aeetuaXnQ38mYT8rp6sbXaQe3NL9t+IBXmnYxwkUI2Hw4bsp2Wvmx4yRQF1uAm" crossorigin="anonymous"></script>
+<script src="https://unpkg.com/@babel/standalone@7.29.0/babel.min.js" integrity="sha384-m08KidiNqLdpJqLq95G/LEi8Qvjl/xUYll3QILypMoQ65QorJ9Lvtp2RXYGBFj1y" crossorigin="anonymous"></script>
+<script type="text/babel" src="tweaks-panel.jsx"></script>
+<style>
+  *{box-sizing:border-box;margin:0;padding:0}
+  html,body{width:100%;height:100%;overflow:hidden;background:#020208}
+  #root{width:100%;height:100%}
+  canvas{position:absolute;inset:0;width:100%;height:100%}
+  @keyframes fadeIn{from{opacity:0}to{opacity:1}}
+  @keyframes summonPulse{0%,100%{opacity:.45;transform:scale(1)}50%{opacity:.8;transform:scale(1.06)}}
+</style>
+<template id="__bundler_thumbnail" data-bg-color="#020208">
+  <svg viewBox="0 0 800 450" xmlns="http://www.w3.org/2000/svg">
+    <rect width="800" height="450" fill="#F8F3EE"/>
+    <path d="M400,225 Q350,180 320,225 Q300,260 400,300 Q500,260 480,225 Q450,180 400,225" fill="none" stroke="hsl(270,50%,40%)" stroke-width="2" opacity=".7"/>
+    <circle cx="400" cy="300" r="6" fill="hsl(270,55%,38%)" opacity=".9"/>
+  </svg>
+</template>
+</head>
+<body>
+<div id="root"></div>
+<script type="text/babel">
+const { useState, useEffect, useRef, useCallback } = React;
+
+const SERIF = "'Lora',Georgia,serif";
+const VOID  = [2, 2, 8];        // #020208
+const LIGHT = [248, 243, 238];  // #F8F3EE — warm cream
+
+// ── MATH FUNCTIONS (from maya-sleep.html, adapted) ────────────────────
+const smoothstep = t => t*t*(3-2*t);
+const clamp = (v,a,b) => Math.max(a,Math.min(b,v));
+const lerp = (a,b,t) => a+(b-a)*t;
+
+function lemniscateXY(t, r) {
+  const s=Math.sin(t), c=Math.cos(t), d=1+s*s;
+  return [r*c/d, r*s*c/d];
+}
+function heartXY(t, r) {
+  const s=r/17, st=Math.sin(t);
+  const x=16*s*st*st*st;
+  const raw=13*Math.cos(t)-5*Math.cos(2*t)-2*Math.cos(3*t)-Math.cos(4*t);
+  return [x, -s*(raw+8)];
+}
+function morphXY(t, r, m) {
+  const [lx,ly]=lemniscateXY(t,r), [hx,hy]=heartXY(t,r), p=smoothstep(m);
+  return [lx+(hx-lx)*p, ly+(hy-ly)*p];
+}
+function roseXY(t, k, r) {
+  const rr=r*Math.cos(k*t);
+  return [rr*Math.cos(t), rr*Math.sin(t)];
+}
+function hypotrochoidXY(t, R, ri, d) {
+  const diff=R-ri;
+  return [diff*Math.cos(t)+d*Math.cos(diff*t/ri), diff*Math.sin(t)-d*Math.sin(diff*t/ri)];
+}
+function butterflyXY(t, r) {
+  const rr=r*.35*(Math.exp(Math.cos(t))-2*Math.cos(4*t)-Math.pow(Math.sin(t/12),5));
+  return [rr*Math.cos(t)*0.9, rr*Math.sin(t)*0.9];
+}
+function trefoilXY(t, r) {
+  const s=r*.4;
+  return [s*(Math.sin(t)+2*Math.sin(2*t)), s*(Math.cos(t)-2*Math.cos(2*t))];
+}
+function irrationalXY(t, r, phi=1.6180339887) {
+  return [r*Math.sin(phi*t+Math.PI/4)*.85, r*Math.sin(t)*.65];
+}
+function spiralXY(t, r0, speed) {
+  const rr=r0+speed*t;
+  return [rr*Math.cos(t*2.5), rr*Math.sin(t*2.5)];
+}
+
+// ── COLOR UTILITIES ───────────────────────────────────────────────────
+function lerpRGB(a, b, t) {
+  return [Math.round(lerp(a[0],b[0],t)), Math.round(lerp(a[1],b[1],t)), Math.round(lerp(a[2],b[2],t))];
+}
+function rgbStr([r,g,b], a=1) { return `rgba(${r},${g},${b},${a})`; }
+
+// On light bg: darker element color. On void: brighter.
+function trailColor(hue, bgP) {
+  const lightness = lerp(68, 35, bgP); // bright on void → dark on light
+  const sat = lerp(62, 55, bgP);
+  return `hsl(${hue},${sat}%,${lightness}%)`;
+}
+function dotColor(hue, bgP) {
+  const l = lerp(76, 38, bgP);
+  return `hsl(${hue},65%,${l}%)`;
+}
+function dotCenter(bgP) {
+  const v = lerp(255, 8, bgP);
+  return `rgba(${v},${v},${v},.9)`;
+}
+
+// ── PATTERN LIBRARY ───────────────────────────────────────────────────
+// Each pattern: { name, duration, fn(angle, r, progress) → [x,y], speed(p), maxTrail }
+const PATTERNS = [
+  {
+    name:'lemniscate → heart',
+    duration: 22,
+    fn: (a, r, p) => {
+      if(p<.35) return lemniscateXY(a, r);
+      if(p<.65) return morphXY(a, r, (p-.35)/.3);
+      const swell = 1+(p-.65)/.35*2.2;
+      return heartXY(a, r*swell);
+    },
+    speed: p => p<.65 ? 1.6 : 1.6+(p-.65)*20,
+    maxTrail: p => p<.65 ? 120 : 80+Math.floor((p-.65)/.35*2800),
+  },
+  {
+    name:'blooming rose',
+    duration: 18,
+    fn: (a, r, p) => {
+      const k = lerp(2, 6, smoothstep(p));
+      return roseXY(a, k, r*(.9+Math.sin(p*Math.PI)*.3));
+    },
+    speed: p => 1.2+p*3,
+    maxTrail: () => 140,
+  },
+  {
+    name:'spirograph',
+    duration: 25,
+    fn: (a, r, p) => {
+      const R=r*.85, ri=lerp(r*.28, r*.12, p), d=lerp(r*.65, r*.9, p);
+      return hypotrochoidXY(a, R, ri, d);
+    },
+    speed: p => .8+p*.8,
+    maxTrail: () => 200,
+  },
+  {
+    name:'butterfly',
+    duration: 20,
+    fn: (a, r) => butterflyXY(a, r),
+    speed: p => .6+p*1.4,
+    maxTrail: () => 180,
+  },
+  {
+    name:'trefoil',
+    duration: 16,
+    fn: (a, r, p) => {
+      const r2=r*(1+Math.sin(p*Math.PI*.8)*.4);
+      return trefoilXY(a, r2);
+    },
+    speed: p => 1+p*2.5,
+    maxTrail: () => 160,
+  },
+  {
+    name:'irrational lissajous',
+    duration: 24,
+    fn: (a, r, p) => {
+      const phi = lerp(1.618, Math.PI, smoothstep(p));
+      return irrationalXY(a, r*(1+Math.sin(p*Math.PI)*.2), phi);
+    },
+    speed: () => 1.1,
+    maxTrail: () => 220,
+  },
+];
+
+// Seed pattern from song context
+function selectPattern(beatHz, word, callCount) {
+  const wSeed = word ? [...word].reduce((a,c)=>a+c.charCodeAt(0),0) : 42;
+  return (Math.floor(beatHz*7+wSeed*0.31+callCount*37)) % PATTERNS.length;
+}
+
+// ── PHASE CONSTANTS ───────────────────────────────────────────────────
+const PH = { IDLE:0, ARRIVAL:1, DANCE:2, RETURN:3, DISSOLVE:4 };
+const ARRIVAL_DUR  = 3.0;
+const RETURN_DUR   = 5.0;
+const DISSOLVE_DUR = 2.5;
+
+// ── DRAW UTILITIES ────────────────────────────────────────────────────
+function drawTrail(ctx, trail, color, maxAlpha=1) {
+  if(trail.length<2) return;
+  ctx.save(); ctx.lineCap='round'; ctx.lineJoin='round';
+  for(let i=1;i<trail.length;i++){
+    const age=i/trail.length;
+    ctx.globalAlpha=age*maxAlpha;
+    ctx.strokeStyle=color;
+    ctx.lineWidth=.7+age*2.2;
+    ctx.beginPath();
+    ctx.moveTo(trail[i-1].x, trail[i-1].y);
+    ctx.lineTo(trail[i].x,   trail[i].y);
+    ctx.stroke();
+  }
+  ctx.restore();
+}
+function drawDot(ctx, x, y, r, fill, center, alpha) {
+  if(alpha<=0) return;
+  ctx.save(); ctx.globalAlpha=alpha;
+  const g=ctx.createRadialGradient(x,y,0,x,y,r*5);
+  g.addColorStop(0, fill.replace('hsl','hsla').replace(')',',.3)').replace('hsla(','hsla(').replace(/\)$/,',.28)'));
+  g.addColorStop(1,'transparent');
+  ctx.fillStyle=g; ctx.beginPath(); ctx.arc(x,y,r*5,0,Math.PI*2); ctx.fill();
+  ctx.fillStyle=fill; ctx.shadowColor=fill; ctx.shadowBlur=14;
+  ctx.beginPath(); ctx.arc(x,y,r,0,Math.PI*2); ctx.fill();
+  ctx.fillStyle=center; ctx.shadowBlur=0;
+  ctx.beginPath(); ctx.arc(x,y,r*.32,0,Math.PI*2); ctx.fill();
+  ctx.restore();
+}
+
+// ── LALITA CANVAS ─────────────────────────────────────────────────────
+function LalitaCanvas({ hue, beatHz=7.5, word='love', onPhaseChange }) {
+  const cvs     = useRef(null);
+  const stateRef = useRef({
+    phase: PH.IDLE, phaseT: 0,
+    angle: 0, trail: [], rings: [],
+    patternIdx: 0, callCount: 0,
+    bgP: 0,             // 0=void 1=light
+    dotX: 0, dotY: 0,
+    returnAngle: 0, returnR: 0,
+    lastTs: 0,
+  });
+  const activeRef = useRef(false);
+  const hueRef    = useRef(hue);
+  useEffect(()=>{ hueRef.current=hue; },[hue]);
+
+  // Expose a summon function
+  const summon = useCallback(() => {
+    const s = stateRef.current;
+    if(s.phase !== PH.IDLE && s.phase !== PH.DISSOLVE) return;
+    s.patternIdx = selectPattern(beatHz, word, s.callCount);
+    s.callCount++;
+    s.phase   = PH.ARRIVAL;
+    s.phaseT  = 0;
+    s.angle   = 0;
+    s.trail   = [];
+    activeRef.current = true;
+    onPhaseChange?.('arrival');
+  }, [beatHz, word]);
+
+  useEffect(()=>{
+    window.__lalitaSummon = summon;
+    return ()=>{ delete window.__lalitaSummon; };
+  },[summon]);
+
+  useEffect(()=>{
+    const canvas=cvs.current; if(!canvas) return;
+    const dpr=Math.min(window.devicePixelRatio||1,2);
+    let W=0,H=0,ctx;
+    const resize=()=>{
+      const nW=Math.round(window.innerWidth),nH=Math.round(window.innerHeight);
+      if(nW===W&&nH===H) return;
+      W=nW;H=nH;
+      canvas.width=W*dpr; canvas.height=H*dpr;
+      ctx=canvas.getContext('2d'); ctx.scale(dpr,dpr);
+    };
+    resize(); window.addEventListener('resize',resize);
+
+    let raf;
+    const frame=(ts)=>{
+      raf=requestAnimationFrame(frame);
+      resize();
+      const s=stateRef.current;
+      const dt=Math.min(.05,(ts-(s.lastTs||ts))/1000);
+      s.lastTs=ts;
+      const hue=hueRef.current;
+      const CX=W/2, CY=H/2;
+      const R=Math.min(W,H)*.28;
+
+      // ── PHASE MACHINE ────────────────────────────────────────────
+      if(s.phase===PH.ARRIVAL){
+        s.phaseT+=dt;
+        s.bgP=clamp(s.phaseT/ARRIVAL_DUR,0,1);
+        if(s.phaseT>=ARRIVAL_DUR){
+          s.phase=PH.DANCE; s.phaseT=0; s.angle=0; s.trail=[];
+          onPhaseChange?.('dance');
+        }
+      } else if(s.phase===PH.DANCE){
+        s.phaseT+=dt;
+        const pat=PATTERNS[s.patternIdx];
+        const progress=clamp(s.phaseT/pat.duration,0,1);
+        const speed=pat.speed(progress);
+        s.angle+=speed*dt;
+        const [rx,ry]=pat.fn(s.angle, R, progress);
+        s.dotX=CX+rx; s.dotY=CY+ry;
+        const maxT=typeof pat.maxTrail==='function'?pat.maxTrail(progress):pat.maxTrail;
+        s.trail.push({x:s.dotX,y:s.dotY});
+        while(s.trail.length>maxT) s.trail.shift();
+        if(progress>=1){ s.phase=PH.RETURN; s.phaseT=0; s.trail=[]; s.returnAngle=Math.atan2(s.dotY-CY,s.dotX-CX); s.returnR=Math.sqrt((s.dotX-CX)**2+(s.dotY-CY)**2); onPhaseChange?.('return'); }
+      } else if(s.phase===PH.RETURN){
+        s.phaseT+=dt;
+        const p=clamp(s.phaseT/RETURN_DUR,0,1);
+        const ep=smoothstep(p);
+        const maxR=Math.sqrt(W*W+H*H)*.6;
+        const rr=lerp(s.returnR, maxR, ep);
+        const spinAngle=s.returnAngle+ep*Math.PI*4;
+        s.dotX=CX+Math.cos(spinAngle)*rr;
+        s.dotY=CY+Math.sin(spinAngle)*rr;
+        s.trail.push({x:s.dotX,y:s.dotY});
+        while(s.trail.length>400) s.trail.shift();
+        s.bgP=lerp(1,0,smoothstep(p)); // light→void during return
+        if(s.phaseT>=RETURN_DUR){ s.phase=PH.DISSOLVE; s.phaseT=0; s.trail=[]; s.bgP=0; onPhaseChange?.('dissolve'); }
+      } else if(s.phase===PH.DISSOLVE){
+        s.phaseT+=dt;
+        // bgP stays at 0 — void already returned during RETURN phase
+        if(s.phaseT>=DISSOLVE_DUR){ s.phase=PH.IDLE; s.bgP=0; s.trail=[]; activeRef.current=false; onPhaseChange?.('idle'); }
+      }
+
+      // ── RENDER ───────────────────────────────────────────────────
+      ctx.clearRect(0,0,W,H);
+
+      // Background — lerp void ↔ warm cream
+      const bgRGB=lerpRGB(VOID,LIGHT,s.bgP);
+      ctx.fillStyle=rgbStr(bgRGB); ctx.fillRect(0,0,W,H);
+
+      // Background atmosphere on void
+      if(s.bgP<1 && s.phase!==PH.IDLE){
+        const atm=ctx.createRadialGradient(CX,CY,0,CX,CY,W*.55);
+        atm.addColorStop(0,`hsla(${hue},40%,14%,${(1-s.bgP)*.12})`);
+        atm.addColorStop(1,'transparent');
+        ctx.fillStyle=atm; ctx.fillRect(0,0,W,H);
+      }
+
+      // Shadow of other archetypes (faint during dance, void-only)
+      if(s.bgP<.8 && s.phase!==PH.IDLE){
+        const archAlpha=(1-s.bgP)*.04;
+        const COLS=[W*.2,W*.8];
+        for(const cx of COLS){
+          ctx.save(); ctx.globalAlpha=archAlpha;
+          ctx.strokeStyle=`hsl(${hue},30%,45%)`; ctx.lineWidth=.6;
+          ctx.beginPath(); ctx.moveTo(cx,H*.08); ctx.lineTo(cx,H*.62); ctx.stroke();
+          ctx.restore();
+        }
+      }
+
+      if(s.phase===PH.IDLE) return;
+
+      // The Lalita trail
+      const tColor=trailColor(hue, s.bgP);
+      const trailAlpha=s.phase===PH.ARRIVAL ? s.bgP*.8 :
+                       s.phase===PH.DISSOLVE ? (1-clamp(s.phaseT/DISSOLVE_DUR,0,1))*.6 : 1;
+      drawTrail(ctx, s.trail, tColor, trailAlpha);
+
+      // Flash ring during return climax
+      if(s.phase===PH.RETURN){
+        const p=clamp(s.phaseT/RETURN_DUR,0,1);
+        if(p>.75){
+          const fp=(p-.75)/.25;
+          ctx.save(); ctx.globalAlpha=Math.sin(fp*Math.PI)*.35;
+          ctx.fillStyle=`hsl(${hue},60%,${lerp(45,85,fp)}%)`;
+          ctx.fillRect(0,0,W,H); ctx.restore();
+        }
+      }
+
+      // The dot
+      if(s.phase!==PH.IDLE && (s.phase!==PH.ARRIVAL || s.bgP>.3)){
+        const dotAlpha=s.phase===PH.ARRIVAL ? (s.bgP-.3)/.7 :
+                       s.phase===PH.DISSOLVE ? (1-s.phaseT/DISSOLVE_DUR) : 1;
+        drawDot(ctx, s.dotX, s.dotY, 5+s.bgP*1.5, dotColor(hue,s.bgP), dotCenter(s.bgP), clamp(dotAlpha,0,1));
+      }
+
+      // Phase label during dance
+      if(s.phase===PH.DANCE){
+        const pat=PATTERNS[s.patternIdx];
+        ctx.save();
+        ctx.globalAlpha=lerp(.15,.4,s.bgP);
+        ctx.font=`300 ${Math.round(W*.012)}px -apple-system,sans-serif`;
+        ctx.fillStyle=`hsl(${hue},${lerp(45,35,s.bgP)}%,${lerp(65,30,s.bgP)}%)`;
+        ctx.letterSpacing='0.18em';
+        ctx.textAlign='center';
+        ctx.fillText('LALITA', CX, H*.88);
+        ctx.restore();
+      }
+    };
+
+    raf=requestAnimationFrame(frame);
+    return ()=>{ cancelAnimationFrame(raf); window.removeEventListener('resize',resize); };
+  },[]);
+
+  return <canvas ref={cvs}/>;
+}
+
+// ── APP ───────────────────────────────────────────────────────────────
+const TWEAK_DEFAULTS = /*EDITMODE-BEGIN*/{
+  "hue": 270,
+  "beatHz": 7.5,
+  "word": "love",
+  "autoPattern": true
+}/*EDITMODE-END*/;
+
+const ELEMENT_HUES = { Earth:15, Water:210, Fire:25, Air:195, Light:50, Crown:280, Soul:265, Dissolution:190 };
+
+function App() {
+  const [t, setTweak]  = useTweaks(TWEAK_DEFAULTS);
+  const [phase, setPhase] = useState('idle');
+  const [callCount, setCallCount] = useState(0);
+
+  const summon = () => {
+    if(window.__lalitaSummon) {
+      window.__lalitaSummon();
+      setCallCount(c=>c+1);
+    }
+  };
+
+  const handlePhase = (p) => {
+    setPhase(p);
+  };
+
+  const isActive = phase !== 'idle';
+  const isLight  = phase === 'dance' || phase === 'return';
+
+  return (
+    <div style={{width:'100%',height:'100%',position:'relative',overflow:'hidden'}}>
+      <LalitaCanvas
+        hue={t.hue}
+        beatHz={t.beatHz}
+        word={t.word}
+        onPhaseChange={handlePhase}
+      />
+
+      {/* Summon button */}
+      {!isActive && (
+        <div style={{
+          position:'absolute',bottom:'8%',left:'50%',transform:'translateX(-50%)',
+          display:'flex',flexDirection:'column',alignItems:'center',gap:16,
+          animation:'fadeIn 1.2s ease',
+          zIndex:10,
+        }}>
+          {callCount > 0 && (
+            <div style={{
+              fontFamily:"'Lora',Georgia,serif",fontStyle:'italic',fontWeight:300,
+              fontSize:'clamp(13px,1.5vw,18px)',
+              color:'rgba(245,226,214,.28)',letterSpacing:'.04em',marginBottom:4,
+              textAlign:'center',maxWidth:400,
+            }}>
+              She came {callCount} {callCount===1?'time':'times'} this session.
+            </div>
+          )}
+          <button onClick={summon} style={{
+            background:'transparent',
+            border:'1px solid rgba(245,226,214,.2)',
+            borderRadius:28, padding:'14px 44px',
+            fontFamily:"'Lora',Georgia,serif",fontStyle:'italic',fontWeight:300,
+            fontSize:'clamp(14px,1.6vw,20px)',
+            color:'rgba(245,226,214,.45)',
+            letterSpacing:'.04em',cursor:'pointer',
+            transition:'all .4s',
+            animation:'summonPulse 4s ease-in-out infinite',
+          }}>
+            summon Lalita
+          </button>
+          <div style={{
+            fontFamily:'-apple-system,sans-serif',fontSize:9,letterSpacing:'.18em',
+            textTransform:'uppercase',color:'rgba(245,226,214,.18)',
+          }}>
+            {PATTERNS[selectPattern(t.beatHz,t.word,callCount)%PATTERNS.length].name}
+          </div>
+        </div>
+      )}
+
+      {/* Phase label overlay */}
+      {isActive && (
+        <div style={{
+          position:'absolute',bottom:'3%',left:'50%',transform:'translateX(-50%)',
+          fontFamily:'-apple-system,sans-serif',fontSize:9,letterSpacing:'.18em',
+          textTransform:'uppercase',
+          color: isLight ? `hsl(${t.hue},40%,35%)` : 'rgba(245,226,214,.2)',
+          transition:'color 1s ease',
+          zIndex:10,
+        }}>
+          {phase}
+        </div>
+      )}
+
+      <TweaksPanel>
+        <TweakSection label="Element"/>
+        <TweakSelect label="Element" value={Object.keys(ELEMENT_HUES).find(k=>ELEMENT_HUES[k]===t.hue)||'Crown'}
+          options={Object.keys(ELEMENT_HUES)}
+          onChange={v=>setTweak('hue',ELEMENT_HUES[v])}/>
+        <TweakSection label="Song Context"/>
+        <TweakSlider label="Beat Hz" value={t.beatHz} min={.5} max={13} step={.5} unit=" Hz" onChange={v=>setTweak('beatHz',v)}/>
+        <TweakText label="Word" value={t.word} onChange={v=>setTweak('word',v)}/>
+        <TweakSection label="Pattern Preview"/>
+        <TweakSelect label="Pattern" value={PATTERNS[selectPattern(t.beatHz,t.word,callCount)%PATTERNS.length].name}
+          options={PATTERNS.map(p=>p.name)}
+          onChange={v=>{ const idx=PATTERNS.findIndex(p=>p.name===v); if(idx>=0) setTweak('beatHz',idx*2.2+0.5); }}/>
+      </TweaksPanel>
+    </div>
+  );
+}
+
+ReactDOM.createRoot(document.getElementById('root')).render(<App/>);
+</script>
+</body>
+</html>

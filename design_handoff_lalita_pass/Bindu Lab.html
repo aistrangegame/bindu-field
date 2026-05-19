@@ -1,0 +1,651 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Bindu Lab — Lalita Design Pass</title>
+<link href="https://fonts.googleapis.com/css2?family=Lora:ital,wght@0,300;0,400;1,300;1,400&family=DM+Mono:wght@300;400&display=swap" rel="stylesheet">
+<script src="https://unpkg.com/react@18.3.1/umd/react.development.js" integrity="sha384-hD6/rw4ppMLGNu3tX5cjIb+uRZ7UkRJ6BPkLpg4hAu/6onKUg4lLsHAs9EBPT82L" crossorigin="anonymous"></script>
+<script src="https://unpkg.com/react-dom@18.3.1/umd/react-dom.development.js" integrity="sha384-u6aeetuaXnQ38mYT8rp6sbXaQe3NL9t+IBXmnYxwkUI2Hw4bsp2Wvmx4yRQF1uAm" crossorigin="anonymous"></script>
+<script src="https://unpkg.com/@babel/standalone@7.29.0/babel.min.js" integrity="sha384-m08KidiNqLdpJqLq95G/LEi8Qvjl/xUYll3QILypMoQ65QorJ9Lvtp2RXYGBFj1y" crossorigin="anonymous"></script>
+<script type="text/babel" src="design-canvas.jsx"></script>
+<script type="text/babel" src="tweaks-panel.jsx"></script>
+<style>
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{background:#010105;font-family:-apple-system,sans-serif}
+  ::-webkit-scrollbar{display:none}
+  input[type=range]{-webkit-appearance:none;appearance:none;background:transparent;cursor:pointer}
+  input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:14px;height:14px;border-radius:50%;cursor:pointer}
+  input[type=number]{-moz-appearance:textfield}
+  input[type=number]::-webkit-outer-spin-button,input[type=number]::-webkit-inner-spin-button{-webkit-appearance:none}
+  @keyframes breatheGlow{0%,100%{opacity:.6}50%{opacity:1}}
+  @keyframes cycleNum{0%,100%{opacity:1}50%{opacity:.4}}
+  @keyframes lockIn{0%{transform:scale(1.04)}100%{transform:scale(1)}}
+  @keyframes fadeUp{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:translateY(0)}}
+  @keyframes activePulse{0%,100%{box-shadow:none}50%{box-shadow:var(--pulse-shadow)}}
+</style>
+<template id="__bundler_thumbnail" data-bg-color="#020208">
+  <svg viewBox="0 0 393 720" xmlns="http://www.w3.org/2000/svg">
+    <rect width="393" height="720" fill="#020208"/>
+    <text x="196" y="200" text-anchor="middle" font-family="serif" font-style="italic" font-size="14" fill="rgba(245,226,214,0.3)" letter-spacing="4">FREQUENCY LAB</text>
+    <rect x="40" y="220" width="313" height="100" rx="12" fill="rgba(255,255,255,0.03)" stroke="rgba(255,255,255,0.06)" stroke-width="1"/>
+    <line x1="40" y1="270" x2="353" y2="270" stroke="rgba(100,150,200,0.15)" stroke-width="0.5"/>
+    <path d="M40,270 Q80,240 120,270 Q160,300 200,270 Q240,240 280,270 Q320,300 353,270" fill="none" stroke="hsl(210,60%,62%)" stroke-width="1.5" opacity="0.6"/>
+    <text x="196" y="390" text-anchor="middle" font-family="'DM Mono',monospace" font-size="72" fill="hsl(210,60%,65%)" opacity="0.9">8.5</text>
+    <text x="196" y="415" text-anchor="middle" font-family="-apple-system,sans-serif" font-size="10" fill="rgba(245,226,214,0.3)" letter-spacing="3">ALPHA</text>
+  </svg>
+</template>
+</head>
+<body>
+<script type="text/babel">
+const { useState, useEffect, useRef, useCallback } = React;
+
+// ── TOKENS ────────────────────────────────────────────────────────────
+const BG      = '#020208';
+const TEXT    = '#F5E2D6';
+const MUTED   = 'rgba(245,226,214,0.55)';
+const SUBTLE  = 'rgba(245,226,214,0.28)';
+const FAINT   = 'rgba(245,226,214,0.12)';
+const BORDER  = 'rgba(255,255,255,0.08)';
+const SURFACE = 'rgba(255,255,255,0.042)';
+const MONO    = "'DM Mono', 'SF Mono', ui-monospace, monospace";
+const SERIF   = "'Lora', Georgia, serif";
+
+// ── BRAINWAVE STATE DATA ──────────────────────────────────────────────
+const STATES = {
+  delta: { label:'DELTA', range:'0.5–4 Hz', hue:15,  essence:'deep root · healing · integration',    detail:'The deepest ground state. The nervous system releases. The body heals. The field reorganizes below your awareness.' },
+  theta: { label:'THETA', range:'4–8 Hz',   hue:260, essence:'dream · creation · hypnosis',          detail:'The door between conscious and unconscious thins. Images arrive without effort. Creativity flows from a place that doesn\'t know it\'s creating.' },
+  alpha: { label:'ALPHA', range:'8–13 Hz',  hue:210, essence:'open · aware · present',               detail:'Relaxed wakefulness. The witness is active but not grasping. You are here, and here is enough. The nervous system settles into its natural frequency.' },
+  beta:  { label:'BETA',  range:'13–30 Hz', hue:165, essence:'focus · processing · action',          detail:'Active cognition. The analytical mind is engaged. Useful for intentional creation and problem-solving. The field thinks through you.' },
+  gamma: { label:'GAMMA', range:'30+ Hz',   hue:50,  essence:'peak insight · binding · clarity',     detail:'The state of peak cognitive binding. Everything connects. Insights arrive whole. Used in advanced practice to sustain heightened awareness.' },
+};
+
+function getState(hz) {
+  if (hz < 4)  return STATES.delta;
+  if (hz < 8)  return STATES.theta;
+  if (hz < 13) return STATES.alpha;
+  if (hz < 30) return STATES.beta;
+  return STATES.gamma;
+}
+
+// ── SACRED FREQUENCIES ────────────────────────────────────────────────
+const SACRED = [
+  { hz: 136.1, name: 'OM',        note: 'C#3', essence: 'the cosmic sound · Earth year frequency' },
+  { hz: 174.0, name: '174',       note: 'F3',  essence: 'foundation frequency · Solfeggio root' },
+  { hz: 285.0, name: '285',       note: 'D4',  essence: 'cellular resonance · field coherence' },
+  { hz: 396.0, name: 'UT',        note: 'G4',  essence: 'liberation from fear · root clearing' },
+  { hz: 417.0, name: 'RE',        note: 'G#4', essence: 'facilitating change · undoing situations' },
+  { hz: 432.0, name: '432',       note: 'A4♭', essence: 'natural resonance · harmonic with nature' },
+  { hz: 440.0, name: '440',       note: 'A4',  essence: 'standard concert pitch' },
+];
+
+function nearSacred(hz, threshold = 1.2) {
+  return SACRED.find(s => Math.abs(s.hz - hz) <= threshold) || null;
+}
+
+// ── SYSTEM PRESETS ────────────────────────────────────────────────────
+const SYS_PRESETS = [
+  { name: 'Earth Tone', carrier: 136.1, beat: 7.83,  tag: 'OM · Schumann' },
+  { name: 'Deep Delta', carrier: 136.0, beat: 1.5,   tag: 'root descent'  },
+  { name: 'Theta Gate', carrier: 174.0, beat: 5.5,   tag: 'dream portal'  },
+  { name: 'Creative',   carrier: 174.0, beat: 7.0,   tag: '174 Hz mind'   },
+  { name: 'Presence',   carrier: 432.0, beat: 10.0,  tag: '432 · open'    },
+];
+
+// ── EDITABLE NUMBER ───────────────────────────────────────────────────
+function EditableNum({ value, onChange, min, max, step = 0.1, large = false, stateHue, unit = '' }) {
+  const [editing, setEditing] = useState(false);
+  const [raw, setRaw] = useState('');
+  const inputRef = useRef(null);
+  const col = `hsl(${stateHue}, 58%, 68%)`;
+
+  const startEdit = (e) => {
+    e.stopPropagation();
+    setRaw(value.toString());
+    setEditing(true);
+    requestAnimationFrame(() => inputRef.current?.focus());
+  };
+
+  const commit = () => {
+    const n = parseFloat(raw);
+    if (!isNaN(n)) onChange(Math.min(max, Math.max(min, parseFloat(n.toFixed(1)))));
+    setEditing(false);
+  };
+
+  const fontSize = large ? 76 : 14;
+  const baseStyle = {
+    fontFamily: MONO, fontWeight: 300,
+    fontSize, color: col, lineHeight: 1,
+    letterSpacing: '-0.02em',
+  };
+
+  if (editing) {
+    return (
+      <input
+        ref={inputRef}
+        type="number" min={min} max={max} step={step} value={raw}
+        onChange={e => setRaw(e.target.value)}
+        onBlur={commit}
+        onKeyDown={e => { if (e.key === 'Enter') commit(); if (e.key === 'Escape') setEditing(false); }}
+        style={{
+          ...baseStyle,
+          background: 'transparent', border: 'none', outline: 'none',
+          width: large ? 220 : 70, textAlign: 'center',
+          borderBottom: `1px solid ${col}`,
+          paddingBottom: 2,
+        }}
+      />
+    );
+  }
+
+  return (
+    <span
+      onClick={startEdit}
+      title="tap to edit"
+      style={{
+        ...baseStyle,
+        cursor: 'text',
+        borderBottom: `1px solid rgba(255,255,255,0.10)`,
+        paddingBottom: large ? 0 : 2,
+        transition: 'border-color 0.2s, opacity 0.2s',
+      }}
+    >
+      {large ? value.toFixed(1) : `${value}${unit}`}
+    </span>
+  );
+}
+
+// ── WAVEFORM CANVAS ───────────────────────────────────────────────────
+function WaveformCanvas({ carrier, beat, stateHue, active }) {
+  const cvs = useRef(null);
+  const liveRef = useRef({ carrier, beat, stateHue, active });
+  useEffect(() => { liveRef.current = { carrier, beat, stateHue, active }; }, [carrier, beat, stateHue, active]);
+
+  useEffect(() => {
+    const canvas = cvs.current;
+    if (!canvas) return;
+    const dpr = Math.min(window.devicePixelRatio || 1, 2);
+    let W = 0, H = 0, ctx;
+    function resize() {
+      const r = canvas.getBoundingClientRect();
+      const nW = Math.round(r.width), nH = Math.round(r.height);
+      if (nW === W && nH === H) return;
+      W = nW; H = nH;
+      canvas.width = W * dpr; canvas.height = H * dpr;
+      ctx = canvas.getContext('2d'); ctx.scale(dpr, dpr);
+    }
+    resize();
+
+    let t = 0, raf;
+    const draw = () => {
+      raf = requestAnimationFrame(draw);
+      t += 0.014;
+      const { carrier: c, beat: b, stateHue: hue, active: act } = liveRef.current;
+      resize();
+      ctx.clearRect(0, 0, W, H);
+      ctx.fillStyle = BG; ctx.fillRect(0, 0, W, H);
+
+      // Atmosphere
+      const atm = ctx.createRadialGradient(W/2, H/2, 0, W/2, H/2, W*0.6);
+      atm.addColorStop(0, `hsla(${hue}, 40%, 14%, 0.22)`);
+      atm.addColorStop(1, 'transparent');
+      ctx.fillStyle = atm; ctx.fillRect(0, 0, W, H);
+
+      const Cy = H / 2, AMP = H * 0.28;
+
+      if (!act) {
+        // Static beautiful snapshot
+        ctx.save();
+        ctx.globalAlpha = 0.22;
+        ctx.strokeStyle = `hsl(${hue}, 50%, 60%)`;
+        ctx.lineWidth = 0.8;
+        ctx.beginPath();
+        for (let x = 0; x <= W; x += 2) {
+          const phase = (x / W) * Math.PI * 8;
+          const env = Math.cos(phase / 8) * 0.5 + 0.5;
+          const y = Cy + AMP * env * Math.sin(phase);
+          x === 0 ? ctx.moveTo(x, y) : ctx.lineTo(x, y);
+        }
+        ctx.stroke(); ctx.restore();
+        // Center line
+        ctx.save(); ctx.globalAlpha = 0.06;
+        ctx.strokeStyle = TEXT; ctx.lineWidth = 0.5;
+        ctx.beginPath(); ctx.moveTo(0, Cy); ctx.lineTo(W, Cy); ctx.stroke();
+        ctx.restore();
+        return;
+      }
+
+      // Center reference line
+      ctx.save(); ctx.globalAlpha = 0.05;
+      ctx.strokeStyle = TEXT; ctx.lineWidth = 0.5;
+      ctx.setLineDash([3, 8]);
+      ctx.beginPath(); ctx.moveTo(0, Cy); ctx.lineTo(W, Cy); ctx.stroke();
+      ctx.setLineDash([]); ctx.restore();
+
+      // L channel — soft, muted
+      ctx.save();
+      ctx.strokeStyle = 'rgba(245,226,214,0.14)'; ctx.lineWidth = 1;
+      ctx.beginPath();
+      for (let x = 0; x <= W; x += 2) {
+        const tS = (x / W) * 3 / b + t;
+        const y = Cy + AMP * Math.sin(2 * Math.PI * c * tS * 0.04);
+        x === 0 ? ctx.moveTo(x, y) : ctx.lineTo(x, y);
+      }
+      ctx.stroke(); ctx.restore();
+
+      // R channel — element-colored
+      ctx.save();
+      ctx.strokeStyle = `hsla(${hue}, 55%, 65%, 0.38)`;
+      ctx.lineWidth = 1;
+      ctx.beginPath();
+      for (let x = 0; x <= W; x += 2) {
+        const tS = (x / W) * 3 / b + t;
+        const y = Cy + AMP * Math.sin(2 * Math.PI * (c + b) * tS * 0.04);
+        x === 0 ? ctx.moveTo(x, y) : ctx.lineTo(x, y);
+      }
+      ctx.stroke(); ctx.restore();
+
+      // Beat envelope — the visible interference (most prominent)
+      ctx.save();
+      ctx.strokeStyle = `hsl(${hue}, 65%, 72%)`;
+      ctx.lineWidth = 1.8;
+      ctx.shadowColor = `hsl(${hue}, 65%, 68%)`;
+      ctx.shadowBlur = 8;
+      ctx.beginPath();
+      for (let x = 0; x <= W; x += 2) {
+        const tS = (x / W) * 3 / b + t;
+        const env = 0.5 + 0.5 * Math.cos(2 * Math.PI * b * tS * 0.5);
+        const y = Cy + AMP * env * Math.sin(2 * Math.PI * c * tS * 0.04);
+        x === 0 ? ctx.moveTo(x, y) : ctx.lineTo(x, y);
+      }
+      ctx.stroke(); ctx.restore();
+
+      // L / R labels
+      ctx.save(); ctx.globalAlpha = 0.18;
+      ctx.font = `9px ${MONO}`; ctx.fillStyle = TEXT; ctx.textAlign = 'left';
+      ctx.fillText('L', 10, 16); ctx.fillText('R', 10, H - 8); ctx.restore();
+    };
+
+    raf = requestAnimationFrame(draw);
+    return () => cancelAnimationFrame(raf);
+  }, []);
+
+  return <canvas ref={cvs} style={{ width: '100%', height: '100%', display: 'block' }} />;
+}
+
+// ── SACRED FREQ MAP ───────────────────────────────────────────────────
+function SacredMap({ carrier, min = 40, max = 440, stateHue }) {
+  const near = nearSacred(carrier);
+  const col = `hsl(${stateHue}, 58%, 68%)`;
+
+  return (
+    <div style={{ padding: '0 28px' }}>
+      <div style={{ position: 'relative', height: 24 }}>
+        {/* Track line */}
+        <div style={{ position: 'absolute', top: '50%', left: 0, right: 0, height: 1, background: 'rgba(255,255,255,0.07)', transform: 'translateY(-50%)' }} />
+
+        {/* Sacred frequency markers */}
+        {SACRED.map(s => {
+          const pct = (s.hz - min) / (max - min) * 100;
+          if (pct < 0 || pct > 100) return null;
+          const isNear = near?.hz === s.hz;
+          return (
+            <div key={s.hz} style={{ position: 'absolute', left: `${pct}%`, top: '50%', transform: 'translate(-50%,-50%)', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 3 }}>
+              <div style={{
+                width: isNear ? 6 : 3,
+                height: isNear ? 6 : 3,
+                borderRadius: '50%',
+                background: isNear ? col : 'rgba(255,255,255,0.22)',
+                boxShadow: isNear ? `0 0 10px 3px ${col}66` : 'none',
+                transition: 'all 0.4s',
+              }} />
+            </div>
+          );
+        })}
+
+        {/* Current position cursor */}
+        <div style={{
+          position: 'absolute',
+          left: `${(carrier - min) / (max - min) * 100}%`,
+          top: '50%',
+          transform: 'translate(-50%,-50%)',
+          width: 10, height: 10, borderRadius: '50%',
+          background: col,
+          boxShadow: `0 0 12px 3px ${col}55`,
+          transition: 'left 0.15s ease-out',
+        }} />
+      </div>
+
+      {/* Scale labels */}
+      <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: 4 }}>
+        {SACRED.filter(s => s.hz >= min && s.hz <= max).map(s => {
+          const pct = (s.hz - min) / (max - min) * 100;
+          const isNear = near?.hz === s.hz;
+          return (
+            <div key={s.hz} style={{
+              position: 'absolute',
+              left: `${pct}%`,
+              transform: 'translateX(-50%)',
+              fontFamily: MONO, fontSize: 7,
+              color: isNear ? col : FAINT,
+              letterSpacing: '0.06em',
+              textAlign: 'center',
+              transition: 'color 0.4s',
+              marginLeft: 28,
+              top: 16,
+            }}>{s.name}</div>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
+// ── SLIDER ROW ────────────────────────────────────────────────────────
+function SliderRow({ label, value, min, max, step, onChange, stateHue, unit = '' }) {
+  const col = `hsl(${stateHue}, 58%, 68%)`;
+  const colDim = `hsl(${stateHue}, 55%, 68%, 0.4)`;
+  const pct = (value - min) / (max - min) * 100;
+
+  return (
+    <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 14 }}>
+      <span style={{ fontFamily: '-apple-system,sans-serif', fontSize: 9, letterSpacing: '0.20em', textTransform: 'uppercase', color: SUBTLE, width: 64, flexShrink: 0 }}>{label}</span>
+      <div style={{ flex: 1, position: 'relative', height: 22, display: 'flex', alignItems: 'center' }}>
+        <div style={{ position: 'absolute', left: 0, right: 0, height: 1, background: 'rgba(255,255,255,0.12)', borderRadius: 1 }} />
+        <div style={{ position: 'absolute', left: 0, width: `${pct}%`, height: 1, background: col, borderRadius: 1, boxShadow: `0 0 4px ${colDim}` }} />
+        <div style={{ position: 'absolute', left: `${pct}%`, transform: 'translate(-50%,-50%)', top: '50%', width: 12, height: 12, borderRadius: '50%', background: col, boxShadow: `0 0 10px ${colDim}`, pointerEvents: 'none' }} />
+        <input type="range" min={min} max={max} step={step} value={value} onChange={e => onChange(parseFloat(e.target.value))}
+          style={{ position: 'absolute', inset: 0, opacity: 0, width: '100%', height: '100%', cursor: 'pointer' }} />
+      </div>
+      <EditableNum value={value} onChange={onChange} min={min} max={max} step={step} stateHue={stateHue} unit={unit} />
+    </div>
+  );
+}
+
+// ── STATE CARD ────────────────────────────────────────────────────────
+function StateCard({ beat, stateHue }) {
+  const [expanded, setExpanded] = useState(false);
+  const st = getState(beat);
+  const col = `hsl(${stateHue}, 58%, 68%)`;
+
+  return (
+    <div style={{ margin: '0 28px' }}>
+      <div
+        onClick={() => setExpanded(e => !e)}
+        style={{ display: 'flex', alignItems: 'center', gap: 10, cursor: 'pointer', padding: '8px 0' }}>
+        <div style={{ width: 6, height: 6, borderRadius: '50%', background: col, boxShadow: `0 0 8px 2px ${col}55`, flexShrink: 0 }} />
+        <span style={{ fontFamily: '-apple-system,sans-serif', fontSize: 9, letterSpacing: '0.22em', textTransform: 'uppercase', color: col }}>{st.label}</span>
+        <span style={{ fontFamily: SERIF, fontStyle: 'italic', fontSize: 11, color: SUBTLE, flex: 1 }}>{st.essence}</span>
+        <span style={{ color: FAINT, fontSize: 10, flexShrink: 0, transition: 'transform 0.25s', display: 'inline-block', transform: expanded ? 'rotate(180deg)' : 'none' }}>∨</span>
+      </div>
+      {expanded && (
+        <div style={{ padding: '0 0 14px 16px', animation: 'fadeUp 0.25s ease', borderLeft: `1px solid ${col}33` }}>
+          <div style={{ fontFamily: SERIF, fontStyle: 'italic', fontSize: 13, color: MUTED, lineHeight: 1.75, marginBottom: 8 }}>
+            {st.detail}
+          </div>
+          <div style={{ fontFamily: '-apple-system,sans-serif', fontSize: 9, letterSpacing: '0.16em', textTransform: 'uppercase', color: FAINT }}>{st.range} · brainwave band</div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ── PRESET CHIPS ──────────────────────────────────────────────────────
+function PresetChips({ carrier, beat, onChange, stateHue }) {
+  const col = `hsl(${stateHue}, 58%, 68%)`;
+  const [userPresets, setUserPresets] = useState(() => {
+    try { return JSON.parse(localStorage.getItem('bindu_lab_presets') || '[]'); } catch { return []; }
+  });
+  const [saving, setSaving] = useState(false);
+  const [saveName, setSaveName] = useState('');
+
+  const save = () => {
+    if (!saveName.trim()) return;
+    const updated = [{ name: saveName, carrier, beat, tag: `${beat} Hz · ${getState(beat).label.toLowerCase()}` }, ...userPresets].slice(0, 5);
+    setUserPresets(updated);
+    localStorage.setItem('bindu_lab_presets', JSON.stringify(updated));
+    setSaving(false);
+    setSaveName('');
+  };
+
+  const deletePreset = (i) => {
+    const updated = userPresets.filter((_, idx) => idx !== i);
+    setUserPresets(updated);
+    localStorage.setItem('bindu_lab_presets', JSON.stringify(updated));
+  };
+
+  const chipStyle = (active) => ({
+    display: 'inline-flex', flexDirection: 'column', alignItems: 'flex-start',
+    padding: '7px 12px', borderRadius: 20, cursor: 'pointer', flexShrink: 0,
+    background: active ? `hsl(${stateHue}, 38%, 14%)` : SURFACE,
+    border: `1px solid ${active ? col + '55' : BORDER}`,
+    transition: 'all 0.2s',
+  });
+
+  return (
+    <div>
+      <div style={{ display: 'flex', gap: 8, overflowX: 'auto', scrollbarWidth: 'none', padding: '0 28px' }}>
+        {/* System presets */}
+        {SYS_PRESETS.map(p => (
+          <div key={p.name} onClick={() => onChange(p.carrier, p.beat)} style={chipStyle(Math.abs(carrier - p.carrier) < 0.5 && Math.abs(beat - p.beat) < 0.2)}>
+            <span style={{ fontFamily: '-apple-system,sans-serif', fontSize: 10, letterSpacing: '0.10em', color: Math.abs(carrier - p.carrier) < 0.5 ? col : MUTED }}>{p.name}</span>
+            <span style={{ fontFamily: SERIF, fontStyle: 'italic', fontSize: 9, color: SUBTLE, marginTop: 1 }}>{p.tag}</span>
+          </div>
+        ))}
+        {/* User presets */}
+        {userPresets.map((p, i) => (
+          <div key={i} style={chipStyle(Math.abs(carrier - p.carrier) < 0.5 && Math.abs(beat - p.beat) < 0.2)}>
+            <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
+              <span onClick={() => onChange(p.carrier, p.beat)} style={{ fontFamily: '-apple-system,sans-serif', fontSize: 10, color: MUTED }}>{p.name}</span>
+              <span onClick={() => deletePreset(i)} style={{ color: FAINT, fontSize: 11, cursor: 'pointer', lineHeight: 1 }}>×</span>
+            </div>
+            <span style={{ fontFamily: SERIF, fontStyle: 'italic', fontSize: 9, color: SUBTLE, marginTop: 1 }}>{p.tag}</span>
+          </div>
+        ))}
+        {/* Save chip */}
+        {saving ? (
+          <div style={{ display: 'inline-flex', alignItems: 'center', gap: 6, padding: '7px 12px', borderRadius: 20, background: SURFACE, border: `1px solid ${BORDER}`, flexShrink: 0 }}>
+            <input autoFocus value={saveName} onChange={e => setSaveName(e.target.value)} onKeyDown={e => { if (e.key === 'Enter') save(); if (e.key === 'Escape') setSaving(false); }}
+              placeholder="name…" style={{ fontFamily: SERIF, fontStyle: 'italic', fontSize: 11, color: TEXT, background: 'none', border: 'none', outline: 'none', width: 72 }} />
+            <span onClick={save} style={{ fontFamily: '-apple-system,sans-serif', fontSize: 9, color: col, cursor: 'pointer' }}>save</span>
+          </div>
+        ) : (
+          <div onClick={() => setSaving(true)} style={{ ...chipStyle(false), justifyContent: 'center' }}>
+            <span style={{ fontFamily: '-apple-system,sans-serif', fontSize: 10, color: SUBTLE }}>+ save</span>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
+// ── MAIN LAB SCREEN ───────────────────────────────────────────────────
+function LabScreen() {
+  const [carrier, setCarrier] = useState(136.1);
+  const [beat,    setBeat]    = useState(7.83);
+  const [active,  setActive]  = useState(false);
+  const [randomizing, setRandomizing] = useState(false);
+  const [displayBeat, setDisplayBeat] = useState(7.83);
+
+  const st = getState(beat);
+  const col = `hsl(${st.hue}, 58%, 68%)`;
+  const colGlow = `hsl(${st.hue}, 55%, 68%, 0.22)`;
+  const sacredNote = nearSacred(carrier);
+
+  // Keep displayBeat in sync when not randomizing
+  useEffect(() => { if (!randomizing) setDisplayBeat(beat); }, [beat, randomizing]);
+
+  const randomize = useCallback(() => {
+    if (randomizing) return;
+    setRandomizing(true);
+
+    // Weighted random state
+    const rand = Math.random();
+    const targetState = rand < 0.12 ? 'delta' : rand < 0.45 ? 'theta' : rand < 0.82 ? 'alpha' : rand < 0.95 ? 'beta' : 'gamma';
+    const ranges = { delta:[0.5,3.5], theta:[4,7.5], alpha:[8,12.5], beta:[13,25], gamma:[30,45] };
+    const [bMin, bMax] = ranges[targetState];
+    const targetBeat = parseFloat((bMin + Math.random() * (bMax - bMin)).toFixed(1));
+
+    // Carrier near a sacred frequency
+    const sacredCarriers = SACRED.filter(s => s.hz >= 40 && s.hz <= 440);
+    const targetSacred = sacredCarriers[Math.floor(Math.random() * sacredCarriers.length)];
+    const targetCarrier = parseFloat((targetSacred.hz + (Math.random() - 0.5) * 1).toFixed(1));
+
+    // Animate cycling
+    let cycle = 0;
+    const TOTAL = 10;
+    const id = setInterval(() => {
+      cycle++;
+      const progress = cycle / TOTAL;
+      const easing = 1 - Math.pow(1 - progress, 3); // ease-in-cube
+      if (cycle < TOTAL) {
+        setDisplayBeat(parseFloat((0.5 + Math.random() * 29.5).toFixed(1)));
+        setCarrier(parseFloat((40 + Math.random() * 400).toFixed(1)));
+      } else {
+        clearInterval(id);
+        setDisplayBeat(targetBeat);
+        setCarrier(targetCarrier);
+        setBeat(targetBeat);
+        setRandomizing(false);
+      }
+    }, 80 + cycle * 12);
+  }, [randomizing]);
+
+  return (
+    <div style={{ width: 393, height: 720, background: BG, position: 'relative', overflow: 'hidden', borderRadius: 47, fontFamily: SERIF }}>
+
+      {/* ── Dynamic bg atmosphere ──────────────────────────────── */}
+      <div style={{ position: 'absolute', inset: 0, pointerEvents: 'none',
+        background: `radial-gradient(ellipse at 50% 35%, hsl(${st.hue}, 35%, 10%, 0.18) 0%, transparent 65%)`,
+        transition: 'background 0.8s ease' }} />
+
+      {/* ── Header ─────────────────────────────────────────────── */}
+      <div style={{ padding: '52px 28px 0' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 4 }}>
+          <div style={{ width: 5, height: 5, borderRadius: '50%', background: active ? col : SUBTLE, boxShadow: active ? `0 0 8px 2px ${col}55` : 'none', transition: 'all 0.4s', animation: active ? 'breatheGlow 2.4s ease-in-out infinite' : 'none' }} />
+          <span style={{ fontFamily: SERIF, fontStyle: 'italic', fontWeight: 300, fontSize: 18, color: TEXT, letterSpacing: '0.01em' }}>frequency lab</span>
+        </div>
+        <div style={{ fontFamily: '-apple-system,sans-serif', fontSize: 10, letterSpacing: '0.16em', textTransform: 'uppercase', color: SUBTLE, paddingLeft: 15 }}>craft your own permission slip</div>
+      </div>
+
+      {/* ── Waveform ────────────────────────────────────────────── */}
+      <div style={{ margin: '16px 0', height: 120, borderTop: `1px solid ${BORDER}`, borderBottom: `1px solid ${BORDER}` }}>
+        <WaveformCanvas carrier={carrier} beat={beat} stateHue={st.hue} active={active} />
+      </div>
+
+      {/* ── Central Readout ─────────────────────────────────────── */}
+      <div style={{ padding: '0 28px' }}>
+
+        {/* Carrier row */}
+        <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 6 }}>
+          <span style={{ fontFamily: '-apple-system,sans-serif', fontSize: 9, letterSpacing: '0.22em', textTransform: 'uppercase', color: SUBTLE }}>CARRIER</span>
+          <EditableNum value={carrier} onChange={setCarrier} min={40} max={440} step={0.1} stateHue={st.hue} unit=" Hz" />
+          {sacredNote && (
+            <div style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '3px 10px', borderRadius: 12, background: `hsl(${st.hue}, 38%, 12%)`, border: `1px solid ${col}44`, animation: 'fadeUp 0.3s ease' }}>
+              <div style={{ width: 5, height: 5, borderRadius: '50%', background: col, boxShadow: `0 0 8px 2px ${col}55`, animation: 'breatheGlow 2s ease-in-out infinite' }} />
+              <span style={{ fontFamily: '-apple-system,sans-serif', fontSize: 8, letterSpacing: '0.14em', textTransform: 'uppercase', color: col }}>{sacredNote.name}</span>
+              <span style={{ fontFamily: SERIF, fontStyle: 'italic', fontSize: 9, color: SUBTLE }}>{sacredNote.note}</span>
+            </div>
+          )}
+        </div>
+
+        {/* THE beat readout — enormous, intentional */}
+        <div style={{ display: 'flex', alignItems: 'flex-end', gap: 8, marginBottom: 4 }}>
+          <div style={{
+            flex: 1,
+            animation: randomizing ? 'cycleNum 0.16s ease-in-out infinite' : 'none',
+          }}>
+            <EditableNum
+              value={randomizing ? displayBeat : beat}
+              onChange={setBeat}
+              min={0.5} max={44} step={0.5}
+              large={true}
+              stateHue={st.hue}
+            />
+          </div>
+          <div style={{ paddingBottom: 12 }}>
+            <span style={{ fontFamily: MONO, fontWeight: 300, fontSize: 20, color: col, opacity: 0.6, letterSpacing: '0.04em' }}>Hz</span>
+          </div>
+        </div>
+      </div>
+
+      {/* ── State card ──────────────────────────────────────────── */}
+      <StateCard beat={beat} stateHue={st.hue} />
+
+      {/* ── Sliders ─────────────────────────────────────────────── */}
+      <div style={{ padding: '14px 28px 0' }}>
+        <SliderRow label="CARRIER" value={carrier} min={40} max={440} step={0.1} onChange={setCarrier} stateHue={st.hue} unit=" Hz" />
+        <SliderRow label="BEAT" value={beat} min={0.5} max={44} step={0.5} onChange={v => { setBeat(v); setDisplayBeat(v); }} stateHue={st.hue} unit=" Hz" />
+      </div>
+
+      {/* ── Sacred frequency map ─────────────────────────────────── */}
+      <div style={{ position: 'relative', marginBottom: 4 }}>
+        <SacredMap carrier={carrier} stateHue={st.hue} />
+      </div>
+
+      {/* ── Preset chips ─────────────────────────────────────────── */}
+      <div style={{ marginBottom: 18 }}>
+        <div style={{ fontFamily: '-apple-system,sans-serif', fontSize: 9, letterSpacing: '0.20em', textTransform: 'uppercase', color: FAINT, padding: '0 28px', marginBottom: 10 }}>PRESETS</div>
+        <PresetChips carrier={carrier} beat={beat} onChange={(c, b) => { setCarrier(c); setBeat(b); setDisplayBeat(b); }} stateHue={st.hue} />
+      </div>
+
+      {/* ── Action buttons ───────────────────────────────────────── */}
+      <div style={{ padding: '0 28px', display: 'flex', gap: 12 }}>
+        {/* Randomize */}
+        <button
+          onClick={randomize}
+          disabled={randomizing}
+          style={{
+            flex: 1, padding: '13px 0',
+            borderRadius: 24, cursor: randomizing ? 'default' : 'pointer',
+            background: 'transparent',
+            border: `1px solid rgba(255,255,255,0.18)`,
+            fontFamily: SERIF, fontStyle: 'italic', fontSize: 13,
+            color: randomizing ? FAINT : MUTED,
+            transition: 'all 0.3s',
+          }}>
+          {randomizing ? 'choosing…' : 'let the field choose'}
+        </button>
+
+        {/* Activate */}
+        <button
+          onClick={() => setActive(a => !a)}
+          style={{
+            flex: 1.2, padding: '13px 0',
+            borderRadius: 24, cursor: 'pointer',
+            background: active ? col : TEXT,
+            border: 'none',
+            fontFamily: '-apple-system,sans-serif', fontSize: 10,
+            letterSpacing: '0.18em', textTransform: 'uppercase',
+            color: active ? BG : BG,
+            boxShadow: active ? `0 0 28px ${colGlow}, 0 0 60px ${`hsl(${st.hue}, 55%, 68%, 0.10)`}` : 'none',
+            transition: 'all 0.4s cubic-bezier(0.4,0,0.2,1)',
+          }}>
+          {active ? 'ACTIVE  ·  stop' : 'ACTIVATE'}
+        </button>
+      </div>
+
+    </div>
+  );
+}
+
+// ── MAIN ──────────────────────────────────────────────────────────────
+const TWEAK_DEFAULTS = /*EDITMODE-BEGIN*/{}/*EDITMODE-END*/;
+
+function App() {
+  return (
+    <DesignCanvas title="Bindu Lab — Lalita Design Pass">
+      <DCSection id="lab" title="The Frequency Lab — Craft Your Own Permission Slip">
+        <DCArtboard id="lab-main" label="The Lab · interactive · sliders + direct input + randomize + presets" width={393} height={720}>
+          <LabScreen />
+        </DCArtboard>
+      </DCSection>
+    </DesignCanvas>
+  );
+}
+
+ReactDOM.createRoot(document.getElementById('root')).render(<App />);
+</script>
+<div id="root"></div>
+</body>
+</html>
