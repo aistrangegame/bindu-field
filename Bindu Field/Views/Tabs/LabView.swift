@@ -1,10 +1,26 @@
 import SwiftUI
+import UIKit
 
 struct LabView: View {
     @State private var store = PlayerStore.shared
+    @State private var presetStore = PresetStore.shared
     @State private var carrier: Float = 136.0
     @State private var beat: Float = 10.0
     @State private var isPlaying: Bool = false
+
+    // Brainwave state info card expansion (tap the state label).
+    @State private var stateInfoExpanded = false
+
+    // Carrier-note popover trigger (tap the dot next to "carrier X Hz").
+    @State private var carrierNoteVisible = false
+
+    // Inline "save preset" naming flow.
+    @State private var isNamingPreset = false
+    @State private var newPresetName = ""
+    @FocusState private var presetNameFocused: Bool
+
+    // Long-press-to-delete on user presets.
+    @State private var presetPendingDelete: FrequencyPreset? = nil
 
     @Environment(\.binduTheme) private var theme
 
@@ -68,16 +84,72 @@ struct LabView: View {
                             .font(.system(size: 18, design: .monospaced))
                             .foregroundColor(theme.muted)
                     }
-                    Text(stateLabel)
-                        .font(.system(size: 11))
-                        .tracking(3)
-                        .textCase(.uppercase)
-                        .foregroundColor(stateColor)
-                    Text("carrier \(Int(carrier)) Hz")
-                        .font(.system(size: 10))
-                        .tracking(1.5)
-                        .textCase(.uppercase)
-                        .foregroundColor(theme.subtle)
+
+                    Button(action: {
+                        withAnimation(.easeInOut(duration: 0.25)) {
+                            stateInfoExpanded.toggle()
+                        }
+                    }) {
+                        HStack(spacing: 6) {
+                            Text(stateLabel)
+                                .font(.system(size: 11))
+                                .tracking(3)
+                                .textCase(.uppercase)
+                                .foregroundColor(stateColor)
+                            Image(systemName: stateInfoExpanded ? "chevron.up" : "chevron.down")
+                                .font(.system(size: 8, weight: .medium))
+                                .foregroundColor(stateColor.opacity(0.7))
+                        }
+                    }
+                    .buttonStyle(.plain)
+
+                    if stateInfoExpanded, let info = FrequencyInfo.brainwaveInfo(forLabel: stateLabel) {
+                        VStack(spacing: 6) {
+                            Text(info.range)
+                                .font(.system(size: 10, design: .monospaced))
+                                .foregroundColor(theme.subtle)
+                            Text(info.essence)
+                                .font(.system(size: 13, design: .serif))
+                                .italic()
+                                .foregroundColor(theme.muted)
+                                .multilineTextAlignment(.center)
+                            Text(info.detail)
+                                .font(.system(size: 12, design: .serif))
+                                .italic()
+                                .foregroundColor(theme.muted.opacity(0.85))
+                                .multilineTextAlignment(.center)
+                                .padding(.horizontal, 28)
+                                .fixedSize(horizontal: false, vertical: true)
+                        }
+                        .padding(.top, 2)
+                        .transition(.opacity.combined(with: .move(edge: .top)))
+                    }
+
+                    HStack(spacing: 6) {
+                        Text("carrier \(Int(carrier)) Hz")
+                            .font(.system(size: 10))
+                            .tracking(1.5)
+                            .textCase(.uppercase)
+                            .foregroundColor(theme.subtle)
+                        if let note = FrequencyInfo.carrierNote(for: carrier) {
+                            Button(action: { carrierNoteVisible = true }) {
+                                Circle()
+                                    .fill(theme.accent.opacity(0.75))
+                                    .frame(width: 5, height: 5)
+                            }
+                            .buttonStyle(.plain)
+                            .popover(isPresented: $carrierNoteVisible, attachmentAnchor: .point(.center), arrowEdge: .bottom) {
+                                Text(note)
+                                    .font(.system(size: 13, design: .serif))
+                                    .italic()
+                                    .foregroundColor(theme.text)
+                                    .multilineTextAlignment(.center)
+                                    .padding(16)
+                                    .frame(maxWidth: 240)
+                                    .presentationCompactAdaptation(.popover)
+                            }
+                        }
+                    }
                 }
 
                 Spacer()
@@ -115,6 +187,18 @@ struct LabView: View {
                 }
                 .padding(.horizontal, 24)
 
+                // Preset row — system presets + user-saved + inline "+ save".
+                ScrollView(.horizontal, showsIndicators: false) {
+                    HStack(spacing: 8) {
+                        ForEach(presetStore.allPresets) { preset in
+                            presetChip(preset)
+                        }
+                        saveChip
+                    }
+                    .padding(.horizontal, 24)
+                    .padding(.vertical, 2)
+                }
+
                 Spacer()
 
                 // Play/stop button
@@ -134,6 +218,150 @@ struct LabView: View {
                 }
                 .padding(.bottom, 60)
             }
+        }
+        .alert(
+            "Delete preset?",
+            isPresented: Binding(
+                get: { presetPendingDelete != nil },
+                set: { if !$0 { presetPendingDelete = nil } }
+            ),
+            presenting: presetPendingDelete
+        ) { preset in
+            Button("Delete", role: .destructive) {
+                presetStore.delete(preset)
+                presetPendingDelete = nil
+            }
+            Button("Cancel", role: .cancel) {
+                presetPendingDelete = nil
+            }
+        } message: { preset in
+            Text(preset.name)
+        }
+    }
+
+    // MARK: - Preset chips
+
+    @ViewBuilder
+    private func presetChip(_ preset: FrequencyPreset) -> some View {
+        let fill: Color = preset.isSystem
+            ? theme.muted.opacity(0.15)
+            : theme.text.opacity(0.08)
+        let isActive = abs(carrier - preset.carrierHz) < 0.05
+            && abs(beat - preset.beatHz) < 0.05
+
+        Text(preset.name)
+            .font(.system(size: 10, design: .serif))
+            .italic()
+            .tracking(1.5)
+            .textCase(.uppercase)
+            .foregroundColor(isActive ? theme.text : theme.muted)
+            .padding(.horizontal, 12)
+            .padding(.vertical, 6)
+            .background(
+                Capsule()
+                    .fill(fill)
+                    .overlay(
+                        Capsule().stroke(
+                            theme.muted.opacity(isActive ? 0.5 : 0.0),
+                            lineWidth: 1
+                        )
+                    )
+            )
+            .contentShape(Capsule())
+            .onTapGesture { applyPreset(preset) }
+            .onLongPressGesture(minimumDuration: 0.5) {
+                guard !preset.isSystem else { return }
+                UIImpactFeedbackGenerator(style: .medium).impactOccurred()
+                presetPendingDelete = preset
+            }
+    }
+
+    @ViewBuilder
+    private var saveChip: some View {
+        if isNamingPreset {
+            HStack(spacing: 6) {
+                TextField("name", text: $newPresetName)
+                    .font(.system(size: 11, design: .serif))
+                    .italic()
+                    .foregroundColor(theme.text)
+                    .focused($presetNameFocused)
+                    .frame(width: 84)
+                    .submitLabel(.done)
+                    .onSubmit { commitNewPreset() }
+                Button(action: commitNewPreset) {
+                    Image(systemName: "checkmark")
+                        .font(.system(size: 10, weight: .semibold))
+                        .foregroundColor(theme.bg)
+                        .padding(5)
+                        .background(Circle().fill(theme.text))
+                }
+                .buttonStyle(.plain)
+                .disabled(newPresetName.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
+                Button(action: cancelNewPreset) {
+                    Image(systemName: "xmark")
+                        .font(.system(size: 9, weight: .medium))
+                        .foregroundColor(theme.muted)
+                        .padding(4)
+                }
+                .buttonStyle(.plain)
+            }
+            .padding(.horizontal, 10)
+            .padding(.vertical, 4)
+            .background(Capsule().fill(theme.muted.opacity(0.10)))
+        } else {
+            Button(action: {
+                withAnimation(.easeInOut(duration: 0.2)) {
+                    isNamingPreset = true
+                }
+                presetNameFocused = true
+            }) {
+                HStack(spacing: 4) {
+                    Image(systemName: "plus")
+                        .font(.system(size: 9, weight: .semibold))
+                    Text("save")
+                        .font(.system(size: 10, design: .serif))
+                        .italic()
+                        .tracking(1.5)
+                        .textCase(.uppercase)
+                }
+                .foregroundColor(theme.muted)
+                .padding(.horizontal, 12)
+                .padding(.vertical, 6)
+                .background(
+                    Capsule().stroke(theme.muted.opacity(0.3), lineWidth: 1)
+                )
+            }
+            .buttonStyle(.plain)
+        }
+    }
+
+    private func applyPreset(_ preset: FrequencyPreset) {
+        withAnimation(.easeOut(duration: 0.4)) {
+            carrier = preset.carrierHz
+            beat = preset.beatHz
+        }
+        if isPlaying {
+            store.setCarrier(preset.carrierHz)
+            store.setBeat(preset.beatHz)
+        }
+    }
+
+    private func commitNewPreset() {
+        let trimmed = newPresetName.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty else { return }
+        presetStore.save(name: trimmed, carrierHz: carrier, beatHz: beat)
+        newPresetName = ""
+        presetNameFocused = false
+        withAnimation(.easeInOut(duration: 0.2)) {
+            isNamingPreset = false
+        }
+    }
+
+    private func cancelNewPreset() {
+        newPresetName = ""
+        presetNameFocused = false
+        withAnimation(.easeInOut(duration: 0.2)) {
+            isNamingPreset = false
         }
     }
 
