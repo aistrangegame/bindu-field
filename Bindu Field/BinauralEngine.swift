@@ -58,6 +58,9 @@ public final class BinauralEngine: NSObject {
 
     private let audioSessionID = "BinauralEngine"
 
+    /// Retained observer token for `.binduAudioSessionShouldRestart`.
+    private var restartObserver: NSObjectProtocol?
+
     // MARK: - Render parameters (read by render callback, written by setters)
     //
     // All marked private(set) where externally read; render callback accesses
@@ -139,7 +142,39 @@ public final class BinauralEngine: NSObject {
         engine.connect(source, to: mixerNode, format: stereoFormat)
         engine.connect(mixerNode, to: engine.mainMixerNode, format: stereoFormat)
 
+        registerRestartObserver()
+
         Self.log.info("Configured at \(self.sampleRate, privacy: .public) Hz")
+    }
+
+    // MARK: - Interruption recovery
+
+    /// Register once per configure() lifetime. The handler restarts the
+    /// engine after an interruption-ended / mediaServicesReset, but only
+    /// if we believe we should be running.
+    private func registerRestartObserver() {
+        guard restartObserver == nil else { return }
+        restartObserver = NotificationCenter.default.addObserver(
+            forName: .binduAudioSessionShouldRestart,
+            object: nil,
+            queue: .main
+        ) { [weak self] _ in
+            self?.restartIfNeeded()
+        }
+    }
+
+    /// Restart the underlying AVAudioEngine if Swift-side `isRunning` says
+    /// we should be playing but the engine has been paused by the system
+    /// (e.g. after a phone-call interruption). Safe to call when idle.
+    @objc public func restartIfNeeded() {
+        guard isRunning else { return }
+        guard !engine.isRunning else { return }
+        do {
+            try engine.start()
+            Self.log.info("Restarted after interruption")
+        } catch {
+            Self.log.error("Restart failed: \(error.localizedDescription, privacy: .public)")
+        }
     }
 
     // MARK: - Lifecycle

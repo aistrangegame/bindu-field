@@ -39,7 +39,15 @@ final class AudioSessionCoordinator {
 
     private let log = Logger(subsystem: "com.bindufield", category: "audio.session")
 
-    private init() {}
+    /// Retained observer tokens. `addObserver(forName:queue:using:)` returns
+    /// an opaque object the registration is bound to — let it deallocate and
+    /// the notification stops firing.
+    private var interruptionObserver: NSObjectProtocol?
+    private var mediaResetObserver: NSObjectProtocol?
+
+    private init() {
+        registerSystemObservers()
+    }
 
     /// One-time launch hook. Configures the audio session for playback so
     /// any subsequent engine starts see a session that's already active.
@@ -98,6 +106,79 @@ final class AudioSessionCoordinator {
         }
     }
 
+    // MARK: - System notifications
+    //
+    // Even with `audio` in UIBackgroundModes, the audio session can be
+    // interrupted (phone call, Siri, alarm) or torn down (mediaServices
+    // reset). Without an observer, the engines stay paused after the
+    // interruption ends. Re-activate the session and tell engines to
+    // restart themselves via `.binduAudioSessionShouldRestart`.
+
+    private func registerSystemObservers() {
+        interruptionObserver = NotificationCenter.default.addObserver(
+            forName: AVAudioSession.interruptionNotification,
+            object: nil,
+            queue: .main
+        ) { [weak self] notification in
+            MainActor.assumeIsolated {
+                self?.handleInterruption(notification)
+            }
+        }
+
+        mediaResetObserver = NotificationCenter.default.addObserver(
+            forName: AVAudioSession.mediaServicesWereResetNotification,
+            object: nil,
+            queue: .main
+        ) { [weak self] _ in
+            MainActor.assumeIsolated {
+                self?.handleMediaServicesReset()
+            }
+        }
+    }
+
+    private func handleInterruption(_ notification: Notification) {
+        guard let info = notification.userInfo,
+              let typeRaw = info[AVAudioSessionInterruptionTypeKey] as? UInt,
+              let type = AVAudioSession.InterruptionType(rawValue: typeRaw)
+        else { return }
+
+        switch type {
+        case .began:
+            // System paused our audio; engines' .isRunning is now false.
+            // Our Swift-side state (BinauralEngine.isRunning, etc.) is
+            // intact, so we know what to restart when the interruption ends.
+            log.info("Interruption began")
+        case .ended:
+            let optsRaw = info[AVAudioSessionInterruptionOptionKey] as? UInt ?? 0
+            let opts = AVAudioSession.InterruptionOptions(rawValue: optsRaw)
+            log.info("Interruption ended (shouldResume=\(opts.contains(.shouldResume), privacy: .public))")
+            if opts.contains(.shouldResume) {
+                reactivateAndSignalRestart()
+            }
+        @unknown default:
+            break
+        }
+    }
+
+    private func handleMediaServicesReset() {
+        log.error("Media services reset — rebuilding audio session")
+        applyCategory(currentMode)
+        NotificationCenter.default.post(name: .binduAudioSessionShouldRestart, object: nil)
+    }
+
+    private func reactivateAndSignalRestart() {
+        do {
+            try AVAudioSession.sharedInstance().setActive(true)
+            log.info("AudioSession reactivated after interruption")
+            lastError = nil
+        } catch {
+            lastError = error
+            log.error("AudioSession reactivation failed: \(error.localizedDescription, privacy: .public)")
+            return
+        }
+        NotificationCenter.default.post(name: .binduAudioSessionShouldRestart, object: nil)
+    }
+
     private func applyCategory(_ mode: Mode) {
         let session = AVAudioSession.sharedInstance()
         do {
@@ -120,4 +201,12 @@ final class AudioSessionCoordinator {
             log.error("AudioSession setCategory(\(mode.rawValue, privacy: .public)) failed: \(error.localizedDescription, privacy: .public)")
         }
     }
+}
+
+extension Notification.Name {
+    /// Posted by `AudioSessionCoordinator` after the audio session has been
+    /// reactivated following an interruption (`.shouldResume`) or media
+    /// services reset. Engines observe this and restart themselves if
+    /// their Swift-side `isRunning` flag indicates they should be playing.
+    static let binduAudioSessionShouldRestart = Notification.Name("BinduAudioSessionShouldRestart")
 }

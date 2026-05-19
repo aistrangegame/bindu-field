@@ -65,6 +65,9 @@ public final class BinauralListener: NSObject {
 
     private let audioSessionID = "BinauralListener"
 
+    /// Retained observer token for `.binduAudioSessionShouldRestart`.
+    private var restartObserver: NSObjectProtocol?
+
     // MARK: Downmix buffer
     //
     // Pre-allocated once at configure() to a worst-case ceiling. The audio
@@ -124,6 +127,44 @@ public final class BinauralListener: NSObject {
             Self.log.info("Configured at \(sampleRate, privacy: .public) Hz")
         } catch {
             Self.log.error("Failed to start engine: \(error.localizedDescription, privacy: .public)")
+        }
+
+        registerRestartObserver()
+    }
+
+    // MARK: - Interruption recovery
+
+    /// Register once per configure() lifetime. Restarts the engine and
+    /// resumes the player node after the AudioSessionCoordinator
+    /// signals recovery from an interruption / media-services reset.
+    private func registerRestartObserver() {
+        guard restartObserver == nil else { return }
+        restartObserver = NotificationCenter.default.addObserver(
+            forName: .binduAudioSessionShouldRestart,
+            object: nil,
+            queue: .main
+        ) { [weak self] _ in
+            self?.restartIfNeeded()
+        }
+    }
+
+    /// Restart engine + player node if we believe a session is active but
+    /// the underlying AVAudioEngine has been paused (post-interruption).
+    /// Scheduled file content resumes from its prior position — Apple's
+    /// sample clock is preserved across engine restarts.
+    @objc public func restartIfNeeded() {
+        guard isSessionActive else { return }
+        guard !engine.isRunning else {
+            // Engine is running; nudge the player only if it was paused.
+            if !playerNode.isPlaying { playerNode.play() }
+            return
+        }
+        do {
+            try engine.start()
+            if !playerNode.isPlaying { playerNode.play() }
+            Self.log.info("Restarted after interruption")
+        } catch {
+            Self.log.error("Restart failed: \(error.localizedDescription, privacy: .public)")
         }
     }
 
