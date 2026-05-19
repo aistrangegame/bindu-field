@@ -7,7 +7,6 @@ struct PlayerView: View {
     @State private var wire = DSPWireService.shared
     @State private var hudVisible: Bool = true
     @State private var hudHideTask: Task<Void, Never>?
-    @State private var sessionDuration: TimeInterval = SettingsStore.shared.defaultSessionDuration
     @State private var startTime: Date = Date()
 
     // 4A: arrival ceremony
@@ -28,13 +27,7 @@ struct PlayerView: View {
     }
 
     var body: some View {
-        TimelineView(.periodic(from: .now, by: 0.5)) { timeline in
-            let elapsed = timeline.date.timeIntervalSince(startTime)
-            let isInfinite = sessionDuration >= 99_999
-            let remaining = isInfinite ? elapsed : max(0, sessionDuration - elapsed)
-            // Binaural countdown only auto-closes when no track is playing.
-            let expired = !isInfinite && remaining < 0.4 && !trackPlayer.isPlaying
-
+        TimelineView(.periodic(from: .now, by: 0.5)) { _ in
             ZStack {
                 // Background: radial gradient from element color (faint) to black
                 RadialGradient(
@@ -55,15 +48,9 @@ struct PlayerView: View {
 
                 // Foreground content
                 VStack(spacing: 0) {
-                    topBar(remaining: remaining)
+                    topBar
                         .opacity(hudVisible ? 1 : 0)
                         .animation(.easeInOut(duration: 0.4), value: hudVisible)
-
-                    durationChips
-                        .opacity(hudVisible ? 1 : 0)
-                        .animation(.easeInOut(duration: 0.4), value: hudVisible)
-                        .padding(.top, 4)
-                        .allowsHitTesting(!trackPlayer.isPlaying)
 
                     Spacer()
 
@@ -164,9 +151,6 @@ struct PlayerView: View {
                 hudHideTask?.cancel()
                 integrationDismissTask?.cancel()
             }
-            .onChange(of: expired) { _, didExpire in
-                if didExpire { store.closePlayer() }
-            }
             .onChange(of: trackPlayer.hasCompleted) { _, completed in
                 if completed { presentIntegration() }
             }
@@ -177,8 +161,7 @@ struct PlayerView: View {
         }
     }
 
-    @ViewBuilder
-    private func topBar(remaining: TimeInterval) -> some View {
+    private var topBar: some View {
         HStack {
             Button(action: { store.minimizePlayer() }) {
                 Image(systemName: "chevron.down")
@@ -187,9 +170,10 @@ struct PlayerView: View {
                     .frame(width: 44, height: 44)
             }
             Spacer()
-            Text(trackPlayer.isPlaying ? formatPlayerTime(trackPlayer.elapsed) : formatPlayerTime(remaining))
+            Text(formatPlayerTime(trackPlayer.elapsed))
                 .font(.system(size: 13, design: .monospaced))
                 .foregroundColor(theme.muted)
+                .opacity(trackPlayer.isPlaying ? 1 : 0)
             Spacer()
             Button(action: { store.closePlayer() }) {
                 Image(systemName: "xmark")
@@ -197,19 +181,6 @@ struct PlayerView: View {
                     .foregroundColor(theme.muted)
                     .frame(width: 44, height: 44)
             }
-        }
-    }
-
-    private var durationChips: some View {
-        ScrollView(.horizontal, showsIndicators: false) {
-            HStack(spacing: 8) {
-                Chip(label: "5 min", isSelected: sessionDuration == 300) { sessionDuration = 300 }
-                Chip(label: "10 min", isSelected: sessionDuration == 600) { sessionDuration = 600 }
-                Chip(label: "20 min", isSelected: sessionDuration == 1200) { sessionDuration = 1200 }
-                Chip(label: "30 min", isSelected: sessionDuration == 1800) { sessionDuration = 1800 }
-                Chip(label: "∞", isSelected: sessionDuration >= 99_999) { sessionDuration = 999_999 }
-            }
-            .padding(.horizontal, 20)
         }
     }
 
