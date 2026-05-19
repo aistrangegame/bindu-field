@@ -18,6 +18,10 @@ final class PlayerStore {
     private var currentSessionStart: Date? = nil
     private var currentSessionTrack: Track? = nil
 
+    /// Optional note captured by the Integration Chamber. Read once and
+    /// cleared by `finalizeCurrentSession`.
+    var pendingNote: String? = nil
+
     private init() {}
 
     func configureEngine() {
@@ -105,6 +109,10 @@ final class PlayerStore {
 
         if duration < 5 { return }  // ignore very short taps
 
+        let trimmed = pendingNote?.trimmingCharacters(in: .whitespacesAndNewlines)
+        let note = (trimmed?.isEmpty == false) ? trimmed : nil
+        pendingNote = nil
+
         let session = Session(
             id: UUID(),
             timestamp: start,
@@ -115,7 +123,8 @@ final class PlayerStore {
             duration: duration,
             carrier: currentCarrier,
             beat: currentBeat,
-            completed: completed
+            completed: completed,
+            note: note
         )
         SessionStore.shared.save(session)
     }

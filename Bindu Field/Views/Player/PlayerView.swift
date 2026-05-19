@@ -4,10 +4,22 @@ struct PlayerView: View {
     let track: Track
     @State private var store = PlayerStore.shared
     @State private var trackPlayer = TrackPlaybackService.shared
+    @State private var wire = DSPWireService.shared
     @State private var hudVisible: Bool = true
     @State private var hudHideTask: Task<Void, Never>?
     @State private var sessionDuration: TimeInterval = SettingsStore.shared.defaultSessionDuration
     @State private var startTime: Date = Date()
+
+    // 4A: arrival ceremony
+    @State private var hasArrived: Bool = false
+
+    // 4D: binaural pill expanded state
+    @State private var pillExpanded: Bool = false
+
+    // Step 5: Integration Chamber
+    @State private var showingIntegration: Bool = false
+    @State private var integrationText: String = ""
+    @State private var integrationDismissTask: Task<Void, Never>?
 
     private let theme = ThemeData.void
 
@@ -47,12 +59,11 @@ struct PlayerView: View {
                         .opacity(hudVisible ? 1 : 0)
                         .animation(.easeInOut(duration: 0.4), value: hudVisible)
 
-                    if !trackPlayer.isPlaying {
-                        durationChips
-                            .opacity(hudVisible ? 1 : 0)
-                            .animation(.easeInOut(duration: 0.4), value: hudVisible)
-                            .padding(.top, 4)
-                    }
+                    durationChips
+                        .opacity(hudVisible ? 1 : 0)
+                        .animation(.easeInOut(duration: 0.4), value: hudVisible)
+                        .padding(.top, 4)
+                        .allowsHitTesting(!trackPlayer.isPlaying)
 
                     Spacer()
 
@@ -73,6 +84,12 @@ struct PlayerView: View {
                             .foregroundColor(theme.muted)
                     }
                     .padding(.top, 12)
+
+                    // 4C: read-only scrubber (below song/artist, above seed)
+                    if trackPlayer.isPlaying {
+                        trackProgressView
+                            .padding(.top, 18)
+                    }
 
                     // Persistent stop control — always visible, independent of HUD
                     Button(action: { store.closePlayer() }) {
@@ -106,14 +123,6 @@ struct PlayerView: View {
 
                     Spacer()
 
-                    // Track progress (only while music is playing)
-                    if trackPlayer.isPlaying {
-                        trackProgressView
-                            .opacity(hudVisible ? 1 : 0)
-                            .animation(.easeInOut(duration: 0.4), value: hudVisible)
-                            .padding(.bottom, 16)
-                    }
-
                     // Bottom: track info chips
                     HStack(spacing: 16) {
                         InfoChip(label: "carrier", value: "\(Int(store.currentCarrier)) Hz")
@@ -131,16 +140,39 @@ struct PlayerView: View {
                 hudVisible.toggle()
                 resetHudTimer()
             }
+            // 4A: arrival ceremony — content breathes in
+            .opacity(hasArrived ? 1.0 : 0)
+            .scaleEffect(hasArrived ? 1.0 : 0.96)
+            // 4D: binaural pill — top-anchored, always visible, outside HUD opacity
+            .overlay(alignment: .top) {
+                binauralPill
+                    .padding(.top, 64)
+            }
+            // Step 5: Integration Chamber overlay
+            .overlay {
+                if showingIntegration {
+                    integrationChamber
+                        .transition(.opacity)
+                }
+            }
             .onAppear {
                 startTime = Date()
                 resetHudTimer()
+                withAnimation(.easeOut(duration: 0.6)) { hasArrived = true }
             }
-            .onDisappear { hudHideTask?.cancel() }
+            .onDisappear {
+                hudHideTask?.cancel()
+                integrationDismissTask?.cancel()
+            }
             .onChange(of: expired) { _, didExpire in
                 if didExpire { store.closePlayer() }
             }
             .onChange(of: trackPlayer.hasCompleted) { _, completed in
-                if completed { store.closePlayer() }
+                if completed { presentIntegration() }
+            }
+            // BinauralListener posts this when the AVAudioFile finishes.
+            .onReceive(NotificationCenter.default.publisher(for: .binduPlaybackComplete)) { _ in
+                presentIntegration()
             }
         }
     }
@@ -181,14 +213,31 @@ struct PlayerView: View {
         }
     }
 
+    /// Read-only progress display. Tap-to-seek is intentionally not wired —
+    /// seeking music requires repositioning BinauralListener's player node,
+    /// which is out of scope for this session.
     private var trackProgressView: some View {
-        VStack(spacing: 6) {
-            ProgressView(value: trackPlayer.elapsed, total: max(trackPlayer.duration, 0.1))
-                .tint(theme.accent)
+        let elapsed = trackPlayer.elapsed
+        let duration = max(trackPlayer.duration, 0.1)
+        let progress = min(max(elapsed / duration, 0), 1)
+
+        return VStack(spacing: 6) {
+            GeometryReader { geo in
+                ZStack(alignment: .leading) {
+                    Capsule()
+                        .fill(theme.muted.opacity(0.20))
+                        .frame(height: 3)
+                    Capsule()
+                        .fill(elementColor)
+                        .frame(width: geo.size.width * progress, height: 3)
+                }
+            }
+            .frame(height: 3)
+
             HStack {
-                Text(formatPlayerTime(trackPlayer.elapsed))
+                Text(formatPlayerTime(elapsed))
                 Spacer()
-                Text(formatPlayerTime(trackPlayer.duration))
+                Text("-\(formatPlayerTime(max(0, duration - elapsed)))")
             }
             .font(.system(size: 11, design: .monospaced))
             .foregroundColor(theme.muted)
@@ -224,7 +273,187 @@ struct PlayerView: View {
         let secs = Int(seconds) % 60
         return String(format: "%d:%02d", mins, secs)
     }
+
+    // MARK: - 4D: Binaural presence pill
+
+    private var binauralPill: some View {
+        let on = wire.binauralEnabled
+        return VStack(spacing: 0) {
+            // Header — always visible, tap to expand/collapse
+            Button {
+                withAnimation(.easeInOut(duration: 0.25)) { pillExpanded.toggle() }
+            } label: {
+                HStack(spacing: 8) {
+                    Circle()
+                        .strokeBorder(theme.muted.opacity(on ? 0 : 0.5), lineWidth: 1)
+                        .background(Circle().fill(on ? theme.accent : Color.clear))
+                        .frame(width: 8, height: 8)
+                    Text("binaural")
+                        .font(.system(size: 11))
+                        .tracking(1.6)
+                        .textCase(.uppercase)
+                        .foregroundColor(theme.muted)
+                    Image(systemName: pillExpanded ? "chevron.up" : "chevron.down")
+                        .font(.system(size: 9, weight: .light))
+                        .foregroundColor(theme.subtle)
+                }
+                .padding(.horizontal, 14)
+                .padding(.vertical, 8)
+            }
+            .buttonStyle(.plain)
+
+            if pillExpanded {
+                VStack(spacing: 12) {
+                    Toggle(isOn: Binding(
+                        get: { wire.binauralEnabled },
+                        set: { wire.binauralEnabled = $0 }
+                    )) {
+                        Text("BINAURAL")
+                            .font(.system(size: 10, weight: .light))
+                            .tracking(2)
+                            .foregroundColor(theme.subtle)
+                    }
+                    .tint(theme.accent)
+
+                    VStack(alignment: .leading, spacing: 4) {
+                        HStack {
+                            Text("PRESENCE")
+                                .font(.system(size: 10, weight: .light))
+                                .tracking(2)
+                                .foregroundColor(theme.subtle)
+                            Spacer()
+                            Text(String(format: "%.0f%%", wire.userPresence * 100))
+                                .font(.system(size: 11, design: .monospaced))
+                                .foregroundColor(theme.muted)
+                        }
+                        Slider(value: Binding(
+                            get: { Double(wire.userPresence) },
+                            set: { wire.userPresence = Float($0) }
+                        ), in: 0.0...1.0)
+                        .tint(theme.accent)
+                    }
+                }
+                .padding(.horizontal, 16)
+                .padding(.vertical, 12)
+                .frame(width: 240)
+            }
+        }
+        .background(
+            Capsule(style: .continuous)
+                .fill(.ultraThinMaterial)
+                .opacity(pillExpanded ? 0 : 1)
+        )
+        .background(
+            RoundedRectangle(cornerRadius: 16, style: .continuous)
+                .fill(.ultraThinMaterial)
+                .opacity(pillExpanded ? 1 : 0)
+        )
+        .overlay {
+            if pillExpanded {
+                RoundedRectangle(cornerRadius: 16, style: .continuous)
+                    .stroke(theme.muted.opacity(0.18), lineWidth: 1)
+            } else {
+                Capsule(style: .continuous)
+                    .stroke(theme.muted.opacity(0.18), lineWidth: 1)
+            }
+        }
+    }
+
+    // MARK: - Step 5: Integration Chamber
+
+    private var integrationChamber: some View {
+        ZStack {
+            Color.black.opacity(0.78).ignoresSafeArea()
+
+            VStack(spacing: 24) {
+                Text("what did you remember?")
+                    .font(.system(size: 24, weight: .ultraLight, design: .serif))
+                    .italic()
+                    .foregroundColor(theme.text)
+                    .multilineTextAlignment(.center)
+                    .padding(.horizontal, 32)
+
+                TextField("", text: $integrationText, axis: .vertical)
+                    .font(.system(size: 15, design: .serif))
+                    .italic()
+                    .foregroundColor(theme.text)
+                    .lineLimit(2...5)
+                    .padding(14)
+                    .background(
+                        RoundedRectangle(cornerRadius: 12)
+                            .fill(theme.surface)
+                            .overlay(
+                                RoundedRectangle(cornerRadius: 12)
+                                    .stroke(theme.muted.opacity(0.25), lineWidth: 1)
+                            )
+                    )
+                    .padding(.horizontal, 40)
+
+                HStack(spacing: 12) {
+                    Button {
+                        dismissIntegration(save: false)
+                    } label: {
+                        Text("close")
+                            .font(.system(size: 14, design: .serif))
+                            .italic()
+                            .foregroundColor(theme.muted)
+                            .padding(.horizontal, 28)
+                            .padding(.vertical, 10)
+                            .background(Capsule().stroke(theme.muted.opacity(0.3), lineWidth: 1))
+                    }
+                    .buttonStyle(.plain)
+
+                    Button {
+                        dismissIntegration(save: true)
+                    } label: {
+                        Text("save note")
+                            .font(.system(size: 14, design: .serif))
+                            .italic()
+                            .foregroundColor(theme.bg)
+                            .padding(.horizontal, 28)
+                            .padding(.vertical, 10)
+                            .background(Capsule().fill(theme.text))
+                    }
+                    .buttonStyle(.plain)
+                }
+            }
+            .padding(.vertical, 32)
+        }
+    }
+
+    private func presentIntegration() {
+        guard !showingIntegration else { return }
+        showingIntegration = true
+        integrationText = ""
+
+        // Auto-dismiss after 30s if the user does nothing.
+        integrationDismissTask?.cancel()
+        integrationDismissTask = Task {
+            try? await Task.sleep(nanoseconds: 30_000_000_000)
+            if !Task.isCancelled {
+                await MainActor.run {
+                    if showingIntegration {
+                        dismissIntegration(save: false)
+                    }
+                }
+            }
+        }
+    }
+
+    private func dismissIntegration(save: Bool) {
+        integrationDismissTask?.cancel()
+        integrationDismissTask = nil
+        if save {
+            let trimmed = integrationText.trimmingCharacters(in: .whitespacesAndNewlines)
+            if !trimmed.isEmpty {
+                store.pendingNote = trimmed
+            }
+        }
+        showingIntegration = false
+        store.closePlayer()
+    }
 }
+
 
 private struct InfoChip: View {
     let label: String

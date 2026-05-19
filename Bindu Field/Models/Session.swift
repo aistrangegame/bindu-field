@@ -16,4 +16,5 @@ struct Session: Identifiable, Codable, Hashable {
     let carrier: Float
     let beat: Float
     let completed: Bool         // ran to natural end vs stopped early
+    var note: String? = nil     // optional Integration Chamber note
 }
