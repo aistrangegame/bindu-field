@@ -4,6 +4,7 @@ import UIKit
 struct FieldView: View {
     @State private var store = PlayerStore.shared
     @State private var catalog = CatalogStore.shared
+    @State private var sessionStore = SessionStore.shared
     @State private var committedRotY: Double = 0
     @State private var dragRotY: Double = 0
     @State private var dragStart: CGPoint?
@@ -26,6 +27,16 @@ struct FieldView: View {
     private var filteredTracks: [Track] {
         guard let filter = stateFilter else { return catalog.tracks }
         return catalog.tracks.filter { $0.state == filter }
+    }
+
+    /// Track IDs that appear in saved session history. Drives the
+    /// "you've been here" inner glow + full-opacity render.
+    private var playedTrackIDs: Set<Int> {
+        Set(
+            sessionStore.sessions
+                .filter { $0.type == .track }
+                .compactMap { Int($0.sourceID) }
+        )
     }
 
     var body: some View {
@@ -79,19 +90,58 @@ struct FieldView: View {
 
                         Canvas { ctx, size in
                             let positions = computePositions(rotY: rotY, size: size)
+                            let played = playedTrackIDs
 
-                            // Sort by depth (z) so back orbs render first
-                            let sorted = positions.sorted { $0.depth < $1.depth }
+                            // Layer C — same-element pair lines on the front hemisphere.
+                            // depth is rzz in [-1, +1]; normalize so 0 = front, 1 = back.
+                            let frontByElement: [String: [Projection]] = Dictionary(
+                                grouping: positions.filter { (($0.depth + 1.0) * 0.5) < 0.5 },
+                                by: { $0.track.element }
+                            )
+                            for (_, group) in frontByElement where group.count >= 2 {
+                                guard let first = group.first else { continue }
+                                let strokeColor = Color.bindu(element: first.track.element).opacity(0.07)
+                                for i in 0..<group.count {
+                                    for j in (i + 1)..<group.count {
+                                        var path = Path()
+                                        path.move(to: group[i].screen)
+                                        path.addLine(to: group[j].screen)
+                                        ctx.stroke(path, with: .color(strokeColor), lineWidth: 0.5)
+                                    }
+                                }
+                            }
+
+                            // Sort back-first so front orbs paint last.
+                            let sorted = positions.sorted { $0.depth > $1.depth }
 
                             for proj in sorted {
                                 let isPlaying = (store.currentTrack?.id == proj.track.id)
-                                let baseRadius = 3.5 + 5.5 * proj.scale
+                                let isPlayed = played.contains(proj.track.id)
+
+                                let depthNorm = (proj.depth + 1.0) * 0.5     // 0 front .. 1 back
+                                let fogFactor = 1.0 - (depthNorm * 0.5)      // 1.0 front .. 0.5 back
+                                let sizeScale = 1.0 - (depthNorm * 0.2)      // 1.0 front .. 0.8 back
+
+                                let baseRadius = 9.0 * sizeScale
                                 let radius = isPlaying ? baseRadius * 1.8 : baseRadius
 
                                 let color = Color.bindu(element: proj.track.element)
-                                let alpha = 0.3 + 0.7 * proj.scale  // depth fading
+                                let baseOpacity: Double = isPlaying ? 1.0 : (isPlayed ? 1.0 : 0.55)
+                                let foggedOpacity = baseOpacity * fogFactor
 
-                                // Active orb pulse
+                                // Played mark — soft inner glow ring beneath the orb.
+                                if isPlayed && !isPlaying {
+                                    let ringR = radius * 1.4
+                                    let ringRect = CGRect(
+                                        x: proj.screen.x - ringR,
+                                        y: proj.screen.y - ringR,
+                                        width: ringR * 2,
+                                        height: ringR * 2
+                                    )
+                                    ctx.fill(Path(ellipseIn: ringRect), with: .color(color.opacity(0.25 * fogFactor)))
+                                }
+
+                                // Playing orb — original pulse rings (kept verbatim).
                                 if isPlaying {
                                     let pulse = sin(t * 4) * 0.5 + 0.5
                                     for ringIdx in 1...3 {
@@ -110,15 +160,19 @@ struct FieldView: View {
                                     }
                                 }
 
-                                // The orb
+                                // The orb itself.
                                 let rect = CGRect(
                                     x: proj.screen.x - radius,
                                     y: proj.screen.y - radius,
                                     width: radius * 2,
                                     height: radius * 2
                                 )
-                                ctx.fill(Path(ellipseIn: rect), with: .color(color.opacity(alpha)))
-                                ctx.stroke(Path(ellipseIn: rect), with: .color(color.opacity(alpha * 1.2)), lineWidth: 0.8)
+                                ctx.fill(Path(ellipseIn: rect), with: .color(color.opacity(foggedOpacity)))
+                                ctx.stroke(
+                                    Path(ellipseIn: rect),
+                                    with: .color(color.opacity(min(foggedOpacity * 1.2, 1.0))),
+                                    lineWidth: 0.8
+                                )
                             }
                         }
                     }
