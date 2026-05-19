@@ -2,6 +2,7 @@ import SwiftUI
 
 struct OracleView: View {
     @State private var store = PlayerStore.shared
+    @State private var sessionStore = SessionStore.shared
     @State private var input: String = ""
     @State private var viewState: ViewState = .idle
     @State private var hasKey: Bool = KeychainHelper.hasKey
@@ -9,6 +10,19 @@ struct OracleView: View {
     @FocusState private var inputFocused: Bool
 
     @Environment(\.binduTheme) private var theme
+
+    /// Up to 10 most-recent track IDs from session history, deduplicated
+    /// in order of recency. Empty when the user has no track sessions
+    /// yet — the Oracle skips the "deprioritize" hint in that case.
+    private var recentTrackIDs: [Int] {
+        Array(
+            sessionStore.sessions
+                .filter { $0.type == .track }
+                .compactMap { Int($0.sourceID) }
+                .uniqued()
+                .prefix(10)
+        )
+    }
 
     enum ViewState {
         case idle
@@ -217,9 +231,15 @@ struct OracleView: View {
 
         let catalog = CatalogStore.shared.tracks
 
+        let recent = recentTrackIDs
+
         Task {
             do {
-                let response = try await OracleService.shared.ask(userInput, allTracks: catalog)
+                let response = try await OracleService.shared.ask(
+                    userInput,
+                    allTracks: catalog,
+                    recentlyPlayed: recent
+                )
                 // Track.id is Int in our model; OracleResponse.trackID is String — stringify for compare.
                 if let track = catalog.first(where: { String($0.id) == response.trackID }) {
                     await MainActor.run { viewState = .result(track: track, why: response.why) }
@@ -232,5 +252,14 @@ struct OracleView: View {
                 await MainActor.run { viewState = .error(error.localizedDescription) }
             }
         }
+    }
+}
+
+private extension Array where Element: Hashable {
+    /// Order-preserving deduplication. Used to collapse repeat-play
+    /// history into a recency-sorted unique list.
+    func uniqued() -> [Element] {
+        var seen = Set<Element>()
+        return filter { seen.insert($0).inserted }
     }
 }

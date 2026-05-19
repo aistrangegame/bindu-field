@@ -44,4 +44,13 @@ struct Track: Codable, Hashable {
     let seed: String
     let carrierHz: Double
     let beatHz: Double
+
+    /// One-line statement of what this track IS, passed to the Oracle so
+    /// it has knowledge beyond verb/element/state. `nil` when the
+    /// Airtable column has not been populated (or in older on-disk
+    /// caches that pre-date the field — synthesized `Codable` uses
+    /// `decodeIfPresent` for `String?` so old caches still decode).
+    /// The Oracle treats `nil` and empty as the same and skips the
+    /// catalog suffix in either case.
+    let recognitionStatement: String?
 }

@@ -32,16 +32,24 @@ final class OracleService {
 
     private init() {}
 
-    func ask(_ stateText: String, allTracks: [Track]) async throws -> OracleResponse {
+    func ask(
+        _ stateText: String,
+        allTracks: [Track],
+        recentlyPlayed: [Int] = []
+    ) async throws -> OracleResponse {
         guard let key = KeychainHelper.load(), !key.isEmpty else {
             throw OracleError.noAPIKey
         }
 
         let catalogLines = allTracks.map { t in
-            "id=\(t.id) | verb=\(t.verb) | \(t.song) — \(t.artist) | state=\(t.state.rawValue) | element=\(t.element) | seed=\(t.seed)"
+            var line = "id=\(t.id) | verb=\(t.verb) | \(t.song) — \(t.artist) | state=\(t.state.rawValue) | element=\(t.element) | seed=\(t.seed)"
+            if let rec = t.recognitionStatement, !rec.isEmpty {
+                line += " | recognition=\(rec)"
+            }
+            return line
         }.joined(separator: "\n")
 
-        let systemPrompt = """
+        var systemPrompt = """
         You are the Oracle of Bindu Field, a consciousness instrument. The user describes their current state, mood, or what they need. Recommend ONE track from the catalog below that meets them where they are.
 
         Catalog:
@@ -50,6 +58,15 @@ final class OracleService {
         Respond with ONLY valid JSON in this exact format, no markdown, no preamble:
         {"track_id": "<exact id from catalog>", "why": "<2-3 sentences of intuitive reading addressed directly to the user. Speak as the Oracle. Reference what they shared. Be specific to the track you chose. Sparse, serif, italic in spirit. No emojis.>"}
         """
+
+        if !recentlyPlayed.isEmpty {
+            let recentNames = recentlyPlayed.compactMap { id in
+                allTracks.first { $0.id == id }.map { "\($0.verb) — \($0.song)" }
+            }.joined(separator: ", ")
+            if !recentNames.isEmpty {
+                systemPrompt += "\n\nRecently played by this person (deprioritize unless most relevant to their current state): \(recentNames)."
+            }
+        }
 
         let body: [String: Any] = [
             "model": model,
