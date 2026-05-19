@@ -118,7 +118,8 @@ final class AirtableService {
                 youtubeID: f.youtubeID,
                 seed: seed,
                 carrierHz: carrierHz,
-                beatHz: beatHz
+                beatHz: beatHz,
+                recognitionStatement: f.recognitionStatement
             )
         }
 
@@ -174,6 +175,7 @@ private nonisolated struct AirtableFields: Decodable {
     let carrierHz: Double?
     let beatHz: Double?
     let seedPhrase: String?
+    let recognitionStatement: String?
 
     enum CodingKeys: String, CodingKey {
         case trackID = "Track ID"
@@ -189,5 +191,6 @@ private nonisolated struct AirtableFields: Decodable {
         case carrierHz = "Carrier Hz"
         case beatHz = "Beat Hz"
         case seedPhrase = "Seed Phrase"
+        case recognitionStatement = "Recognition Statement"
     }
 }
