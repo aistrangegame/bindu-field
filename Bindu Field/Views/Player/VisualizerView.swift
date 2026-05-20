@@ -77,6 +77,18 @@ struct VisualizerView: View {
                     drawGaiaGround(ctx: ctx, size: size, t: t,
                                    gaia: gaiaPresence)
 
+                    // TIER 2 — ensemble (presence-gated)
+                    let archPresence = performer.archetypePresence[.arch] ?? 0
+                    if archPresence > 0.1 {
+                        drawArchChant(ctx: ctx, size: size, t: t,
+                                      presence: archPresence)
+                    }
+                    let sakshiPresence = performer.archetypePresence[.sakshi] ?? 0
+                    if sakshiPresence > 0.1 {
+                        drawSakshiGesture(ctx: ctx, size: size, t: t,
+                                          presence: sakshiPresence)
+                    }
+
                     // BINDU — singular Lissajous on top
                     drawBindu(ctx: ctx, size: size, t: t,
                               energy: energy, beat: beat, mod: mod,
@@ -336,6 +348,166 @@ struct VisualizerView: View {
                 startRadius: 0,
                 endRadius: radius
             )
+        )
+    }
+
+    // MARK: - TIER 2 · Arch chant
+    //
+    // A single Bezier arc above center, breathing with sin(t*0.35)*8 in
+    // Y. Five ghost echoes behind, each at an older `t` value (50ms
+    // increments) so the chant feels like a phrase that has just been
+    // said and is still ringing. Three phrase-lights — small warm-yellow
+    // dots — traverse the arc with phase offsets, like syllables landing.
+
+    private func drawArchChant(ctx: GraphicsContext, size: CGSize,
+                               t: Double, presence: Double) {
+        let W = size.width, H = size.height
+        guard W > 0, H > 0 else { return }
+
+        let archColor = Color(hue: elementHueDeg / 360,
+                              saturation: 0.50, brightness: 0.78)
+
+        // Five ghost echoes behind the primary, oldest first so the
+        // primary is drawn last on top.
+        for i in (1...5).reversed() {
+            let lag = 0.05 * Double(i)
+            let yShift = sin((t - lag) * 0.35) * 8
+            let ghostAlpha = (0.05 - Double(i - 1) * 0.008) * presence
+            let path = archPath(W: W, H: H, yShift: yShift)
+            ctx.stroke(path,
+                       with: .color(archColor.opacity(ghostAlpha)),
+                       lineWidth: 0.5)
+        }
+
+        // Primary arc
+        let primaryShift = sin(t * 0.35) * 8
+        let primaryPath = archPath(W: W, H: H, yShift: primaryShift)
+        ctx.stroke(primaryPath,
+                   with: .color(archColor.opacity(0.22 * presence)),
+                   lineWidth: 1)
+
+        // Three phrase-lights — small dots traversing the arc with phase
+        // offsets. Light color is warm yellow per the design spec
+        // (hsl(50, 60%, 72%)) — phrase-lights aren't element-keyed.
+        let phraseColor = Color(hue: 50 / 360, saturation: 0.60, brightness: 0.72)
+        let arcA = CGPoint(x: W * 0.25, y: H * 0.30 + primaryShift)
+        let arcC = CGPoint(x: W * 0.50, y: H * 0.17 + primaryShift)
+        let arcB = CGPoint(x: W * 0.75, y: H * 0.30 + primaryShift)
+        for i in 0..<3 {
+            let phase = (t * 0.6 + Double(i) * 0.33).truncatingRemainder(dividingBy: 1.0)
+            let p = quadraticPoint(a: arcA, c: arcC, b: arcB, at: phase)
+            let r: CGFloat = 2.5
+            ctx.fill(
+                Path(ellipseIn: CGRect(x: p.x - r, y: p.y - r,
+                                       width: r * 2, height: r * 2)),
+                with: .color(phraseColor.opacity(0.6 * presence))
+            )
+            // Soft halo around each phrase-light
+            let haloR: CGFloat = 6
+            ctx.fill(
+                Path(ellipseIn: CGRect(x: p.x - haloR, y: p.y - haloR,
+                                       width: haloR * 2, height: haloR * 2)),
+                with: .radialGradient(
+                    Gradient(colors: [
+                        phraseColor.opacity(0.30 * presence),
+                        phraseColor.opacity(0)
+                    ]),
+                    center: p,
+                    startRadius: 0,
+                    endRadius: haloR
+                )
+            )
+        }
+    }
+
+    /// The base Bezier arc — moveTo(W*0.25, H*0.30) → quadCurve through
+    /// (W*0.5, H*0.17) → (W*0.75, H*0.30). `yShift` is applied uniformly
+    /// to all three points so the whole arc breathes.
+    private func archPath(W: CGFloat, H: CGFloat, yShift: Double) -> Path {
+        var p = Path()
+        let dy = CGFloat(yShift)
+        p.move(to: CGPoint(x: W * 0.25, y: H * 0.30 + dy))
+        p.addQuadCurve(
+            to: CGPoint(x: W * 0.75, y: H * 0.30 + dy),
+            control: CGPoint(x: W * 0.50, y: H * 0.17 + dy)
+        )
+        return p
+    }
+
+    /// Point on a quadratic Bezier at parameter `at` in [0,1].
+    private func quadraticPoint(a: CGPoint, c: CGPoint, b: CGPoint,
+                                at u: Double) -> CGPoint {
+        let oneMinusU = 1.0 - u
+        let x = oneMinusU * oneMinusU * a.x
+            + 2 * oneMinusU * u * c.x
+            + u * u * b.x
+        let y = oneMinusU * oneMinusU * a.y
+            + 2 * oneMinusU * u * c.y
+            + u * u * b.y
+        return CGPoint(x: x, y: y)
+    }
+
+    // MARK: - TIER 2 · Sakshi (the unmade gesture)
+    //
+    // A 72%-of-circle arc at the right periphery (W*0.88, H*0.42), radius
+    // W*0.05. The whole arc rotates slowly — the witness gesture starts,
+    // traces 72%, releases, starts again. Three ghost trails at older
+    // phases sit at opacity 0.08 behind it.
+
+    private func drawSakshiGesture(ctx: GraphicsContext, size: CGSize,
+                                   t: Double, presence: Double) {
+        let W = size.width, H = size.height
+        guard W > 0, H > 0 else { return }
+
+        let center = CGPoint(x: W * 0.88, y: H * 0.42)
+        let radius = W * 0.05
+        // Phase advances at ~0.15 cycles/sec → ~6.7s per full rotation
+        let rotationSpeed = 0.15
+        let arcFraction = 0.72   // of a full circle
+        let arcSpan = arcFraction * 2 * .pi
+        let col = Color(hue: elementHueDeg / 360,
+                        saturation: 0.40, brightness: 0.78)
+
+        // Three ghost trails, oldest first so the primary draws last
+        for i in (1...3).reversed() {
+            let lag = 0.18 * Double(i)
+            let oldPhase = ((t - lag) * rotationSpeed)
+                .truncatingRemainder(dividingBy: 1.0)
+            let s = oldPhase * 2 * .pi
+            var ghost = Path()
+            ghost.addArc(center: center, radius: radius,
+                         startAngle: .radians(s),
+                         endAngle: .radians(s + arcSpan),
+                         clockwise: false)
+            ctx.stroke(ghost,
+                       with: .color(col.opacity(0.08 * presence)),
+                       lineWidth: 0.5)
+        }
+
+        // Primary arc
+        let phase = (t * rotationSpeed).truncatingRemainder(dividingBy: 1.0)
+        let startAngle = phase * 2 * .pi
+        var arc = Path()
+        arc.addArc(center: center, radius: radius,
+                   startAngle: .radians(startAngle),
+                   endAngle: .radians(startAngle + arcSpan),
+                   clockwise: false)
+        ctx.stroke(arc,
+                   with: .color(col.opacity(0.35 * presence)),
+                   lineWidth: 1)
+
+        // Subtle leading-edge dot at the end of the arc — the active tip
+        // of the gesture. Helps the eye find where the witness is now.
+        let tipAngle = startAngle + arcSpan
+        let tip = CGPoint(
+            x: center.x + radius * cos(tipAngle),
+            y: center.y + radius * sin(tipAngle)
+        )
+        let tipR: CGFloat = 2
+        ctx.fill(
+            Path(ellipseIn: CGRect(x: tip.x - tipR, y: tip.y - tipR,
+                                   width: tipR * 2, height: tipR * 2)),
+            with: .color(col.opacity(0.6 * presence))
         )
     }
 
