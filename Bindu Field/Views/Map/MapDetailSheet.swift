@@ -125,7 +125,10 @@ struct MapDetailSheet: View {
                 }
                 .buttonStyle(.plain)
             } else {
-                lockedCopy
+                // Composed but no Track linked in the catalogue. Distinct
+                // from genuinely locked — surfaces the data gap honestly
+                // instead of recycling "not yet composed."
+                unlinkedCopy
             }
         case .danced:
             if let track {
@@ -141,7 +144,7 @@ struct MapDetailSheet: View {
                 }
                 .buttonStyle(.plain)
             } else {
-                lockedCopy
+                unlinkedCopy
             }
         case .locked:
             lockedCopy
@@ -149,9 +152,30 @@ struct MapDetailSheet: View {
     }
 
     private var lockedCopy: some View {
-        Text("this dance has not yet been composed")
-            .font(.system(size: 11, weight: .light, design: .serif).italic())
-            .foregroundStyle(Color(hex: "#F5E2D6").opacity(0.32))
-            .multilineTextAlignment(.center)
+        VStack(spacing: 16) {
+            Text("this dance has not yet been composed")
+                .font(.system(size: 11, weight: .light, design: .serif).italic())
+                .foregroundStyle(Color(hex: "#F5E2D6").opacity(0.32))
+                .multilineTextAlignment(.center)
+            Text("swipe down to close")
+                .font(.system(size: 9, weight: .light))
+                .tracking(1.5)
+                .textCase(.uppercase)
+                .foregroundStyle(Color(hex: "#F5E2D6").opacity(0.30))
+        }
+    }
+
+    private var unlinkedCopy: some View {
+        VStack(spacing: 16) {
+            Text("track not yet linked to catalog")
+                .font(.system(size: 11, weight: .light, design: .serif).italic())
+                .foregroundStyle(Color(hex: "#F5E2D6").opacity(0.35))
+                .multilineTextAlignment(.center)
+            Text("swipe down to close")
+                .font(.system(size: 9, weight: .light))
+                .tracking(1.5)
+                .textCase(.uppercase)
+                .foregroundStyle(Color(hex: "#F5E2D6").opacity(0.30))
+        }
     }
 }

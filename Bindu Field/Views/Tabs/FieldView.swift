@@ -266,13 +266,35 @@ struct FieldView: View {
                             }
                             .padding(.bottom, 24)
                         } else if catalog.tracks.isEmpty, let err = catalog.loadError {
-                            Text(err)
-                                .font(.system(size: 11, design: .serif))
-                                .italic()
-                                .foregroundColor(theme.muted)
-                                .multilineTextAlignment(.center)
-                                .padding(.horizontal, 32)
-                                .padding(.bottom, 24)
+                            // Catalog failed with no cache to fall back on.
+                            // Surface the error AND a retry — without it the
+                            // user has to find the gear icon in Archive's
+                            // toolbar and call refresh from there.
+                            VStack(spacing: 12) {
+                                Text(err)
+                                    .font(.system(size: 11, design: .serif))
+                                    .italic()
+                                    .foregroundColor(theme.muted)
+                                    .multilineTextAlignment(.center)
+                                    .padding(.horizontal, 32)
+                                Button {
+                                    Task { await catalog.refresh(force: true) }
+                                } label: {
+                                    Text("refresh catalog")
+                                        .font(.system(size: 10, weight: .light))
+                                        .tracking(1.8)
+                                        .textCase(.uppercase)
+                                        .foregroundColor(theme.text.opacity(0.55))
+                                        .padding(.horizontal, 18)
+                                        .padding(.vertical, 9)
+                                        .overlay(
+                                            Capsule()
+                                                .stroke(theme.muted.opacity(0.30), lineWidth: 1)
+                                        )
+                                }
+                                .buttonStyle(.plain)
+                            }
+                            .padding(.bottom, 24)
                         }
                     }
                 }

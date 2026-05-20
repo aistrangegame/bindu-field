@@ -76,6 +76,13 @@ final class AudioSessionCoordinator {
         recompute()
     }
 
+    /// Dismiss the surfaced error banner. Lets the RootView banner be
+    /// user-dismissable instead of waiting for the next successful
+    /// session transition to self-clear.
+    func clearError() {
+        lastError = nil
+    }
+
     // MARK: - Private
 
     /// Tracks which identifier holds which mode count, so we can

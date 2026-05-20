@@ -125,6 +125,8 @@ struct RootView: View {
 /// O20: terse error banner surfaced when `AudioSessionCoordinator.lastError`
 /// becomes non-nil. Foreground/background of the engine error reads as
 /// "audio is broken" to a user — saying so is better than silence.
+/// Tap to dismiss — without this the banner is sticky until a successful
+/// session transition self-clears it, which may never happen.
 private struct AudioErrorBanner: View {
     let message: String
 
@@ -138,6 +140,10 @@ private struct AudioErrorBanner: View {
                 .italic()
                 .foregroundColor(ThemeData.void.text)
                 .lineLimit(2)
+            Spacer().frame(width: 4)
+            Image(systemName: "xmark")
+                .font(.system(size: 11, weight: .light))
+                .foregroundColor(ThemeData.void.muted)
         }
         .padding(.horizontal, 16)
         .padding(.vertical, 10)
@@ -147,6 +153,8 @@ private struct AudioErrorBanner: View {
                 .overlay(Capsule().stroke(Color.orange.opacity(0.4), lineWidth: 1))
         )
         .padding(.horizontal, 32)
+        .contentShape(Capsule())
+        .onTapGesture { AudioSessionCoordinator.shared.clearError() }
     }
 }
 

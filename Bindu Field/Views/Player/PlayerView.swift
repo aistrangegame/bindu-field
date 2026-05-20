@@ -752,6 +752,9 @@ struct PlayerView: View {
                 .font(.system(size: 12, design: .monospaced))
                 .foregroundColor(theme.muted)
             Spacer()
+            // DERIVED once DSP has locked onto the song's carrier;
+            // AUTHORED until then so the user knows the value shown is
+            // the Airtable hint rather than placeholder.
             if wire.hasDerivedCarrier {
                 Text("DERIVED")
                     .font(.system(size: 8, weight: .regular))
@@ -765,6 +768,22 @@ struct PlayerView: View {
                             .overlay(
                                 RoundedRectangle(cornerRadius: 4)
                                     .stroke(elementColor.opacity(0.42), lineWidth: 1)
+                            )
+                    )
+                    .transition(.opacity)
+            } else {
+                Text("AUTHORED")
+                    .font(.system(size: 8, weight: .regular))
+                    .tracking(1.4)
+                    .foregroundColor(theme.text.opacity(0.45))
+                    .padding(.horizontal, 8)
+                    .padding(.vertical, 2)
+                    .background(
+                        RoundedRectangle(cornerRadius: 4)
+                            .fill(Color.white.opacity(0.04))
+                            .overlay(
+                                RoundedRectangle(cornerRadius: 4)
+                                    .stroke(Color.white.opacity(0.22), lineWidth: 1)
                             )
                     )
                     .transition(.opacity)

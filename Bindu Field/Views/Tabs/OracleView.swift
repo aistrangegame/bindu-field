@@ -17,6 +17,10 @@ struct OracleView: View {
     @State private var errorMessage: String? = nil
     @State private var hasKey: Bool = KeychainHelper.hasKey
     @State private var showingSettings = false
+    /// Retained so a cancel tap on the waiting state can abort the
+    /// in-flight Claude request and return the user to idle without
+    /// having to leave the tab.
+    @State private var pendingTask: Task<Void, Never>? = nil
 
     @State private var store = PlayerStore.shared
     @State private var sessionStore = SessionStore.shared
@@ -49,10 +53,11 @@ struct OracleView: View {
                 case .typing:
                     TypingContent(
                         question: $question,
-                        onSubmit: { submitQuestion() }
+                        onSubmit: { submitQuestion() },
+                        onCancel: { resetToIdle() }
                     )
                 case .waiting:
-                    WaitingContent()
+                    WaitingContent(onCancel: { cancelPendingRequest() })
                 case .response:
                     if let r = response {
                         ResponseContent(
@@ -105,7 +110,8 @@ struct OracleView: View {
         let catalogTracks = catalog.tracks
         let recent = recentTrackIDs
 
-        Task {
+        pendingTask?.cancel()
+        pendingTask = Task {
             do {
                 let result = try await OracleService.shared.ask(
                     userInput,
@@ -129,7 +135,12 @@ struct OracleView: View {
                         }
                     }
                 }
+            } catch is CancellationError {
+                // User pressed cancel — cancelPendingRequest already
+                // reset the UI. Don't surface anything.
+                return
             } catch let error as OracleError {
+                if Task.isCancelled { return }
                 await MainActor.run {
                     errorMessage = error.errorDescription ?? "the Oracle is silent"
                     withAnimation(.easeInOut(duration: 0.35)) {
@@ -137,6 +148,7 @@ struct OracleView: View {
                     }
                 }
             } catch {
+                if Task.isCancelled { return }
                 await MainActor.run {
                     errorMessage = error.localizedDescription
                     withAnimation(.easeInOut(duration: 0.35)) {
@@ -145,6 +157,16 @@ struct OracleView: View {
                 }
             }
         }
+    }
+
+    /// Abort the in-flight Claude request. Triggered by the cancel
+    /// affordance on the waiting state — the Task throws CancellationError
+    /// out of `try await` and the UI returns to idle without an error
+    /// banner.
+    private func cancelPendingRequest() {
+        pendingTask?.cancel()
+        pendingTask = nil
+        resetToIdle()
     }
 
     private func enterField(track: Track) {
@@ -247,6 +269,7 @@ private struct IdleContent: View {
 private struct TypingContent: View {
     @Binding var question: String
     let onSubmit: () -> Void
+    let onCancel: () -> Void
     @FocusState private var focused: Bool
 
     private var trimmed: String {
@@ -264,6 +287,17 @@ private struct TypingContent: View {
                     .padding(.leading, 24)
                     .padding(.top, 22)
                 Spacer()
+                Button(action: {
+                    focused = false
+                    onCancel()
+                }) {
+                    Text("cancel")
+                        .font(.system(size: 11, weight: .light, design: .serif).italic())
+                        .foregroundStyle(Color(hex: "#F5E2D6").opacity(0.40))
+                }
+                .buttonStyle(.plain)
+                .padding(.trailing, 24)
+                .padding(.top, 20)
             }
 
             Spacer()
@@ -309,25 +343,52 @@ private struct TypingContent: View {
 // MARK: — Waiting
 
 private struct WaitingContent: View {
+    let onCancel: () -> Void
     @State private var phase = false
+    /// Reveal a cancel button once the wait passes the threshold where a
+    /// healthy response would have arrived. 15s is the spec — long enough
+    /// not to interrupt a normal request, short enough to escape a hang.
+    @State private var showCancel = false
 
     var body: some View {
-        HStack(spacing: 10) {
-            ForEach(0..<3, id: \.self) { i in
-                Circle()
-                    .fill(Color(hex: "#F5E2D6").opacity(0.35))
-                    .frame(width: 4, height: 4)
-                    .scaleEffect(phase ? 1.0 : 0.6)
-                    .opacity(phase ? 0.80 : 0.30)
-                    .animation(
-                        .easeInOut(duration: 0.8)
-                            .repeatForever(autoreverses: true)
-                            .delay(Double(i) * 0.25),
-                        value: phase
-                    )
+        VStack(spacing: 0) {
+            HStack(spacing: 10) {
+                ForEach(0..<3, id: \.self) { i in
+                    Circle()
+                        .fill(Color(hex: "#F5E2D6").opacity(0.35))
+                        .frame(width: 4, height: 4)
+                        .scaleEffect(phase ? 1.0 : 0.6)
+                        .opacity(phase ? 0.80 : 0.30)
+                        .animation(
+                            .easeInOut(duration: 0.8)
+                                .repeatForever(autoreverses: true)
+                                .delay(Double(i) * 0.25),
+                            value: phase
+                        )
+                }
+            }
+
+            if showCancel {
+                Button(action: onCancel) {
+                    Text("cancel")
+                        .font(.system(size: 9, weight: .light))
+                        .tracking(1.5)
+                        .textCase(.uppercase)
+                        .foregroundStyle(Color(hex: "#F5E2D6").opacity(0.40))
+                        .padding(.horizontal, 16).padding(.vertical, 8)
+                        .overlay(Capsule().stroke(Color(hex: "#F5E2D6").opacity(0.15), lineWidth: 1))
+                }
+                .buttonStyle(.plain)
+                .padding(.top, 40)
+                .transition(.opacity)
             }
         }
-        .onAppear { phase = true }
+        .onAppear {
+            phase = true
+            DispatchQueue.main.asyncAfter(deadline: .now() + 15) {
+                withAnimation(.easeInOut(duration: 0.6)) { showCancel = true }
+            }
+        }
     }
 }
 
