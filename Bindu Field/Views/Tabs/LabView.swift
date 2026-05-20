@@ -135,6 +135,18 @@ struct LabView: View {
                 .foregroundColor(theme.accent)
             }
         }
+        // Audio exclusivity: when a different source claims audio, the
+        // coordinator posts .binduLabStop. Stop the local engine so the
+        // tone fades out, then sync the UI flag. Lab keeps ownership
+        // across tab switches (so background audio continues) — only an
+        // explicit eviction or the user's own stop tap releases it.
+        .onReceive(NotificationCenter.default.publisher(for: .binduLabStop)) { _ in
+            if isPlaying {
+                store.stopBinaural()
+                NowPlayingService.shared.clear()
+                isPlaying = false
+            }
+        }
     }
 
     // MARK: - Header
@@ -813,7 +825,11 @@ struct LabView: View {
             store.stopBinaural()
             NowPlayingService.shared.clear()
             isPlaying = false
+            AudioExclusivityCoordinator.shared.release(.lab)
         } else {
+            // Claim audio. Evicts any prior source (Track, Space, Ritual)
+            // via the coordinator's stop notifications.
+            AudioExclusivityCoordinator.shared.request(.lab)
             store.startBinaural(carrier: carrier, beat: beat)
             store.setGain(SettingsStore.shared.gain)
             let duration = SettingsStore.shared.defaultSessionDuration

@@ -274,6 +274,43 @@ struct BinduTabIcon: View {
             opacity: active ? 0.40 : 0.20)
     }
 
+    // MARK: - Static rasterization cache
+    //
+    // SwiftUI's `.tabItem` slot does not render a Canvas-based icon — the
+    // tab bar item only displays Image / Text descendants and Canvas
+    // resolves to an empty rect inside it. Workaround: rasterize each
+    // (tab, active) variant once via ImageRenderer and surface the result
+    // through `BinduTabIconImage` below, which is what `RootView` plugs
+    // into the `.tabItem` Label.
+    //
+    // The cache uses CGImage (Core Graphics) instead of UIImage so this
+    // file stays platform-neutral — the project's supported platforms
+    // include macOS + visionOS in addition to iOS, and UIImage doesn't
+    // exist on macOS.
+    //
+    // The cache is keyed by "tab-active-scale" and indexed by displayScale
+    // so 2x and 3x devices each get a crisply-rendered copy.
+    @MainActor fileprivate static var rasterCache: [String: CGImage] = [:]
+
+    /// Render the icon at the given display scale and cache the result.
+    /// Subsequent calls with the same key return the cached image.
+    @MainActor fileprivate static func rasterImage(
+        tab: Tab,
+        active: Bool,
+        scale: CGFloat
+    ) -> CGImage? {
+        let key = "\(tab)-\(active)-\(Int(scale * 100))"
+        if let cached = rasterCache[key] { return cached }
+        let renderer = ImageRenderer(content:
+            BinduTabIcon(tab: tab, active: active)
+                .frame(width: 28, height: 28)
+        )
+        renderer.scale = scale
+        guard let cg = renderer.cgImage else { return nil }
+        rasterCache[key] = cg
+        return cg
+    }
+
     /// RITUAL — three linked arcs around a center, like beads on a thread.
     /// The HTML icon set does not include a Ritual glyph; this matches
     /// the design vocabulary (concentric, sparse, verb-as-presence) and
@@ -310,5 +347,29 @@ struct BinduTabIcon: View {
         // Center dot
         dot(ctx, x: cx, y: cy, r: 1.4,
             opacity: active ? 0.85 : 0.45)
+    }
+}
+
+/// Tab-bar-safe wrapper around `BinduTabIcon`. Resolves to a rasterized
+/// `Image(decorative:scale:)` because `Canvas` does not render inside
+/// `.tabItem`. Reads `\.displayScale` so the raster matches the device's
+/// pixel density. `.renderingMode(.original)` preserves the icon's
+/// encoded active/inactive opacity instead of letting iOS retint it.
+struct BinduTabIconImage: View {
+    let tab: BinduTabIcon.Tab
+    let active: Bool
+
+    @Environment(\.displayScale) private var displayScale
+
+    var body: some View {
+        let scale = max(displayScale, 2.0)
+        if let cg = BinduTabIcon.rasterImage(tab: tab, active: active, scale: scale) {
+            Image(decorative: cg, scale: scale)
+                .renderingMode(.original)
+        } else {
+            // Fallback: empty 28×28 placeholder if the ImageRenderer
+            // bailed (rare — typically a zero-size frame in preview).
+            Color.clear.frame(width: 28, height: 28)
+        }
     }
 }

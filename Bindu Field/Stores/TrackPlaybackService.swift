@@ -61,6 +61,11 @@ final class TrackPlaybackService {
     func play(fileURL: URL, carrier: Float, beat: Float, gain: Float) throws {
         stop()
 
+        // Claim audio. If Lab/Space/Ritual was active, the coordinator
+        // posts a stop notification so those surfaces tear themselves
+        // down before this track's audio graph spins up.
+        AudioExclusivityCoordinator.shared.request(.track)
+
         // Read duration via AVAudioFile (frames / sampleRate)
         if let audioFile = try? AVAudioFile(forReading: fileURL) {
             let frames = audioFile.length
@@ -108,6 +113,7 @@ final class TrackPlaybackService {
         isPaused = false
         duration = 0
         startTime = nil
+        AudioExclusivityCoordinator.shared.release(.track)
     }
 
     /// Pause both engines and the DSP wire. The session stays "active"

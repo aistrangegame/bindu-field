@@ -14,56 +14,56 @@ struct RootView: View {
                 MapView()
                     .tabItem {
                         Label { Text("Map") } icon: {
-                            BinduTabIcon(tab: .map, active: nav.selectedTab == 0)
+                            BinduTabIconImage(tab: .map, active: nav.selectedTab == 0)
                         }
                     }
                     .tag(0)
                 FieldView()
                     .tabItem {
                         Label { Text("Field") } icon: {
-                            BinduTabIcon(tab: .field, active: nav.selectedTab == 1)
+                            BinduTabIconImage(tab: .field, active: nav.selectedTab == 1)
                         }
                     }
                     .tag(1)
                 OracleView()
                     .tabItem {
                         Label { Text("Oracle") } icon: {
-                            BinduTabIcon(tab: .oracle, active: nav.selectedTab == 2)
+                            BinduTabIconImage(tab: .oracle, active: nav.selectedTab == 2)
                         }
                     }
                     .tag(2)
                 SpaceView()
                     .tabItem {
                         Label { Text("Space") } icon: {
-                            BinduTabIcon(tab: .space, active: nav.selectedTab == 3)
+                            BinduTabIconImage(tab: .space, active: nav.selectedTab == 3)
                         }
                     }
                     .tag(3)
                 LabView()
                     .tabItem {
                         Label { Text("Lab") } icon: {
-                            BinduTabIcon(tab: .lab, active: nav.selectedTab == 4)
+                            BinduTabIconImage(tab: .lab, active: nav.selectedTab == 4)
                         }
                     }
                     .tag(4)
                 ArchiveView()
                     .tabItem {
                         Label { Text("Archive") } icon: {
-                            BinduTabIcon(tab: .archive, active: nav.selectedTab == 5)
+                            BinduTabIconImage(tab: .archive, active: nav.selectedTab == 5)
                         }
                     }
                     .tag(5)
                 RitualView()
                     .tabItem {
                         Label { Text("Ritual") } icon: {
-                            BinduTabIcon(tab: .ritual, active: nav.selectedTab == 6)
+                            BinduTabIconImage(tab: .ritual, active: nav.selectedTab == 6)
                         }
                     }
                     .tag(6)
                 LetterView()
                     .tabItem {
                         Label { Text("Letter") } icon: {
-                            BinduTabIcon(tab: .letter, active: nav.selectedTab == 7)
+                            BinduTabIconImage(tab: .letter, active: nav.selectedTab == 7)
                         }
                     }
                     .tag(7)

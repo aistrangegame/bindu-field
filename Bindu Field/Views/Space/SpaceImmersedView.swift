@@ -5,6 +5,10 @@ struct SpaceImmersedView: View {
     let durationMinutes: Int
     let onEnd: (Bool) -> Void  // true = completed naturally, false = user cancelled
     var ritualProgress: (current: Int, total: Int)? = nil
+    /// Which audio source this immersive session claims. Standalone
+    /// Space passes the default `.space`; `RitualRunningView` passes
+    /// `.ritual` so a Track or Lab can evict the ritual cleanly.
+    var audioSource: AudioSource = .space
 
     @State private var store = PlayerStore.shared
     @State private var sessionStart: Date = Date()
@@ -65,6 +69,10 @@ struct SpaceImmersedView: View {
             }
         }
         .onAppear {
+            // Claim audio. If a Track or Lab was playing, the coordinator
+            // tears it down before this session starts so two sources
+            // never render to hardware simultaneously.
+            AudioExclusivityCoordinator.shared.request(audioSource)
             store.startBinaural(carrier: baseCarrier, beat: baseBeat)
             store.setGain(SettingsStore.shared.gain)
             NowPlayingService.shared.updateForChakra(
@@ -77,6 +85,17 @@ struct SpaceImmersedView: View {
             store.stopBinaural()
             saveSession()
             NowPlayingService.shared.clear()
+            AudioExclusivityCoordinator.shared.release(audioSource)
+        }
+        // Audio exclusivity: a Track or Lab claim from another tab
+        // sends a stop notification matching this session's source.
+        // Treat it as a user-cancelled end so the parent (SpaceView /
+        // RitualRunningView) unwinds cleanly.
+        .onReceive(NotificationCenter.default.publisher(for: .binduSpaceStop)) { _ in
+            if audioSource == .space { onEnd(false) }
+        }
+        .onReceive(NotificationCenter.default.publisher(for: .binduRitualStop)) { _ in
+            if audioSource == .ritual { onEnd(false) }
         }
         .statusBarHidden()
     }

@@ -20,7 +20,8 @@ struct RitualRunningView: View {
                             onEnd()
                         }
                     },
-                    ritualProgress: (current: currentIndex + 1, total: steps.count)
+                    ritualProgress: (current: currentIndex + 1, total: steps.count),
+                    audioSource: .ritual
                 )
                 .id(currentIndex)  // force fresh state on each step transition
                 .transition(.opacity)
