@@ -89,6 +89,27 @@ struct VisualizerView: View {
                                           presence: sakshiPresence)
                     }
 
+                    // TIER 3 — crescendo (modulator > 0)
+                    if mod > 0 {
+                        drawRisingArches(ctx: ctx, size: size,
+                                         elapsed: performer.elapsed,
+                                         mod: mod)
+                        drawConvergenceLines(ctx: ctx, size: size, mod: mod)
+                    }
+
+                    // TIER 4 — climax (modulator > 0.25)
+                    if mod > 0.25 {
+                        drawKeystoneCascade(ctx: ctx, size: size, t: t,
+                                            mod: mod, beat: beat)
+                        drawEarthRising(ctx: ctx, size: size,
+                                        elapsed: performer.elapsed)
+                    }
+                    let shwetaPresence = performer.archetypePresence[.shweta] ?? 0
+                    if shwetaPresence > 0.01 {
+                        drawShwetaCrystallization(ctx: ctx, size: size,
+                                                  shweta: shwetaPresence)
+                    }
+
                     // BINDU — singular Lissajous on top
                     drawBindu(ctx: ctx, size: size, t: t,
                               energy: energy, beat: beat, mod: mod,
@@ -508,6 +529,282 @@ struct VisualizerView: View {
             Path(ellipseIn: CGRect(x: tip.x - tipR, y: tip.y - tipR,
                                    width: tipR * 2, height: tipR * 2)),
             with: .color(col.opacity(0.6 * presence))
+        )
+    }
+
+    // MARK: - TIER 3 · Rising arches
+    //
+    // Seven arches reaching from floor-side anchors to the keystone at
+    // (W/2, H*0.14). Alternating left/right. Triggered sequentially as
+    // `(elapsed - 145) / 15` advances — arch N appears once the progress
+    // exceeds N/7. Per-arch opacity, line width, and a faked glow all
+    // scale with the crescendo modulator.
+
+    private func drawRisingArches(ctx: GraphicsContext, size: CGSize,
+                                  elapsed: Double, mod: Double) {
+        let W = size.width, H = size.height
+        guard W > 0, H > 0 else { return }
+        let totalProgress = max(0, min(1, (elapsed - 145.0) / 15.0)) * 7.0
+        let keystone = CGPoint(x: W / 2, y: H * 0.14)
+        let col = Color(hue: elementHueDeg / 360,
+                        saturation: 0.55, brightness: 0.78)
+
+        for i in 0..<7 {
+            let archProgress = max(0, min(1, totalProgress - Double(i)))
+            if archProgress <= 0.001 { continue }
+
+            // Alternate left / right side anchors
+            let sideX = (i % 2 == 0) ? W * 0.04 : W * 0.96
+            let floorY = H * 0.85
+            let start = CGPoint(x: sideX, y: floorY)
+            // Control point pulls the curve high and inward — gives an
+            // arching shape that springs off the floor toward the apex.
+            let control = CGPoint(x: (sideX + keystone.x) / 2, y: H * 0.20)
+
+            var arch = Path()
+            arch.move(to: start)
+            arch.addQuadCurve(to: keystone, control: control)
+
+            let opacity = archProgress * (0.20 + mod * 0.45)
+            let lineWidth = 0.8 + archProgress * mod
+            // Faked glow — wider, fainter stroke under the main line. The
+            // spec calls for shadowBlur 4 + mod*10 which SwiftUI Canvas
+            // doesn't have natively; this two-pass stroke approximates it.
+            let glowWidth = lineWidth + (4 + mod * 10) * 0.6
+            ctx.stroke(arch, with: .color(col.opacity(opacity * 0.35)),
+                       lineWidth: glowWidth)
+            ctx.stroke(arch, with: .color(col.opacity(opacity)),
+                       lineWidth: lineWidth)
+        }
+    }
+
+    // MARK: - TIER 3 · Convergence lines
+    //
+    // Seven hairlines from screen-edge points all converging at the
+    // keystone. Drawn with additive blending so they brighten the
+    // keystone area at intersection without overwhelming the cathedral.
+
+    private func drawConvergenceLines(ctx: GraphicsContext, size: CGSize,
+                                      mod: Double) {
+        let W = size.width, H = size.height
+        guard W > 0, H > 0 else { return }
+        let keystone = CGPoint(x: W / 2, y: H * 0.14)
+        let endpoints: [CGPoint] = [
+            CGPoint(x: 0,       y: 0),         // TL
+            CGPoint(x: W,       y: 0),         // TR
+            CGPoint(x: 0,       y: H),         // BL
+            CGPoint(x: W,       y: H),         // BR
+            CGPoint(x: W / 2,   y: H),         // bottom center
+            CGPoint(x: 0,       y: H / 2),     // mid-left
+            CGPoint(x: W,       y: H / 2),     // mid-right
+        ]
+        let col = Color(hue: elementHueDeg / 360,
+                        saturation: 0.55, brightness: 0.88)
+        let alpha = mod * 0.04
+
+        var convergence = ctx
+        convergence.blendMode = .plusLighter
+
+        for e in endpoints {
+            var p = Path()
+            p.move(to: e)
+            p.addLine(to: keystone)
+            convergence.stroke(p,
+                               with: .color(col.opacity(alpha)),
+                               lineWidth: 0.5)
+        }
+    }
+
+    // MARK: - TIER 4 · Keystone cascade
+    //
+    // A bright radial glow at the keystone, sized by the crescendo
+    // strength and the beat pulse. Four expanding rings cycle through a
+    // 0.42s period, each starting at a different phase so a ring is
+    // always somewhere in its expansion. Climax intensity `str` ramps 0
+    // → 1 over modulator [0.25, 0.80].
+
+    private func drawKeystoneCascade(ctx: GraphicsContext, size: CGSize,
+                                     t: Double, mod: Double, beat: Double) {
+        let W = size.width, H = size.height
+        guard W > 0, H > 0 else { return }
+        let keystone = CGPoint(x: W / 2, y: H * 0.14)
+        let str = min(1.0, max(0.0, (mod - 0.25) / 0.55))
+
+        // Radial glow
+        let glowR = W * 0.28 * (0.5 + beat * 0.3) * str
+        if glowR > 1 {
+            let inner = Color(hue: elementHueDeg / 360, saturation: 0.88, brightness: 0.90)
+            let outer = Color(hue: elementHueDeg / 360, saturation: 0.70, brightness: 0.68)
+            ctx.fill(
+                Path(ellipseIn: CGRect(x: keystone.x - glowR,
+                                       y: keystone.y - glowR,
+                                       width: glowR * 2,
+                                       height: glowR * 2)),
+                with: .radialGradient(
+                    Gradient(colors: [
+                        inner.opacity(0.55 * str),
+                        outer.opacity(0.20 * str),
+                        outer.opacity(0)
+                    ]),
+                    center: keystone,
+                    startRadius: 0,
+                    endRadius: glowR
+                )
+            )
+        }
+
+        // Four expanding rings, cycling with period 0.42s, staggered
+        let period = 0.42
+        let ringColor = Color(hue: elementHueDeg / 360, saturation: 0.78, brightness: 0.88)
+        let maxRingR = W * 0.45
+        for i in 0..<4 {
+            let phaseOffset = period * Double(i) / 4.0
+            let progress = ((t + phaseOffset).truncatingRemainder(dividingBy: period)) / period
+            let radius = CGFloat(progress) * maxRingR
+            let alpha = (1.0 - progress) * str * 0.45
+            if alpha < 0.005 { continue }
+            ctx.stroke(
+                Path(ellipseIn: CGRect(x: keystone.x - radius,
+                                       y: keystone.y - radius,
+                                       width: radius * 2,
+                                       height: radius * 2)),
+                with: .color(ringColor.opacity(alpha)),
+                lineWidth: 1
+            )
+        }
+    }
+
+    // MARK: - TIER 4 · Earth rising
+    //
+    // 5-second Schumann window (elapsed 161–166). A linear gradient rises
+    // from the bottom of the canvas in a grounding hue. Alpha forms a
+    // bell over the window: easeIn-easeOut, peak alpha 0.25.
+
+    private func drawEarthRising(ctx: GraphicsContext, size: CGSize,
+                                 elapsed: Double) {
+        let W = size.width, H = size.height
+        guard W > 0, H > 0 else { return }
+        guard elapsed >= 161, elapsed <= 166 else { return }
+
+        // Bell curve: 0 → 1 → 0 over [161, 166]
+        let progress = (elapsed - 161) / 5.0
+        let bell = sin(progress * .pi)
+        let alpha = bell * 0.25
+
+        // Hue shifted -15° to land in the terracotta / earth direction.
+        let h = (elementHueDeg - 15 + 360).truncatingRemainder(dividingBy: 360) / 360
+        let col = Color(hue: h, saturation: 0.60, brightness: 0.55)
+
+        // Linear gradient covering the bottom half
+        let topY = H * 0.5
+        let rect = CGRect(x: 0, y: topY, width: W, height: H - topY)
+        ctx.fill(
+            Path(rect),
+            with: .linearGradient(
+                Gradient(colors: [col.opacity(0), col.opacity(alpha)]),
+                startPoint: CGPoint(x: W / 2, y: topY),
+                endPoint: CGPoint(x: W / 2, y: H)
+            )
+        )
+    }
+
+    // MARK: - TIER 4 · Shweta crystallization
+    //
+    // The clarity moment. 22 shards radiating from the keystone, alternating
+    // long (W*0.20) and short (W*0.12). Even-indexed shards are pure
+    // white-ish, odd-indexed shards rotate through a prismatic hue spread.
+    // 14 secondary diffraction dashes sit at fractional positions along
+    // alternating shards. A bright glowing center caps it.
+
+    private func drawShwetaCrystallization(ctx: GraphicsContext, size: CGSize,
+                                           shweta: Double) {
+        let W = size.width, H = size.height
+        guard W > 0, H > 0 else { return }
+        let keystone = CGPoint(x: W / 2, y: H * 0.14)
+
+        // 22 shards
+        for i in 0..<22 {
+            let angle = (Double(i) / 22.0) * 2 * .pi
+            let longShard = (i % 2 == 0)
+            let length = (longShard ? W * 0.20 : W * 0.12) * CGFloat(shweta)
+            let end = CGPoint(
+                x: keystone.x + CGFloat(cos(angle)) * length,
+                y: keystone.y + CGFloat(sin(angle)) * length
+            )
+            let color: Color
+            if longShard {
+                color = Color(red: 1.0, green: 0.988, blue: 1.0)
+            } else {
+                let h = (elementHueDeg + Double(i) * 6).truncatingRemainder(dividingBy: 360) / 360
+                color = Color(hue: h, saturation: 0.62, brightness: 0.85)
+            }
+            var shard = Path()
+            shard.move(to: keystone)
+            shard.addLine(to: end)
+            ctx.stroke(shard,
+                       with: .color(color.opacity(0.85 * shweta)),
+                       lineWidth: longShard ? 1.2 : 0.8)
+        }
+
+        // 14 secondary diffraction dashes — small perpendicular dashes
+        // at fractional positions along every-other shard. Adds the
+        // "diffraction grating" feel without doubling the shard count.
+        let diffractionColor = Color(red: 1.0, green: 0.995, blue: 1.0)
+        for i in 0..<14 {
+            let shardIndex = (i * 22 / 14) % 22
+            let angle = (Double(shardIndex) / 22.0) * 2 * .pi
+            let baseLen: CGFloat = (shardIndex % 2 == 0 ? W * 0.20 : W * 0.12) * CGFloat(shweta)
+            // Inner and outer positions along the shard
+            let positions: [CGFloat] = [0.45, 0.78]
+            for posFrac in positions {
+                let alongLen = baseLen * posFrac
+                let along = CGPoint(
+                    x: keystone.x + CGFloat(cos(angle)) * alongLen,
+                    y: keystone.y + CGFloat(sin(angle)) * alongLen
+                )
+                // Perpendicular direction
+                let perpAngle = angle + .pi / 2
+                let dashLen: CGFloat = 4
+                let dashA = CGPoint(
+                    x: along.x + CGFloat(cos(perpAngle)) * dashLen,
+                    y: along.y + CGFloat(sin(perpAngle)) * dashLen
+                )
+                let dashB = CGPoint(
+                    x: along.x - CGFloat(cos(perpAngle)) * dashLen,
+                    y: along.y - CGFloat(sin(perpAngle)) * dashLen
+                )
+                var dash = Path()
+                dash.move(to: dashA)
+                dash.addLine(to: dashB)
+                ctx.stroke(dash,
+                           with: .color(diffractionColor.opacity(0.55 * shweta)),
+                           lineWidth: 0.5)
+            }
+        }
+
+        // Glowing center — simulates the spec's shadowBlur 22 with a wide
+        // radial gradient halo + a tight bright core.
+        let haloR = CGFloat(28) * CGFloat(shweta)
+        ctx.fill(
+            Path(ellipseIn: CGRect(x: keystone.x - haloR,
+                                   y: keystone.y - haloR,
+                                   width: haloR * 2, height: haloR * 2)),
+            with: .radialGradient(
+                Gradient(colors: [
+                    Color.white.opacity(0.85 * shweta),
+                    Color.white.opacity(0)
+                ]),
+                center: keystone,
+                startRadius: 0,
+                endRadius: haloR
+            )
+        )
+        let coreR = CGFloat(4) * CGFloat(shweta)
+        ctx.fill(
+            Path(ellipseIn: CGRect(x: keystone.x - coreR,
+                                   y: keystone.y - coreR,
+                                   width: coreR * 2, height: coreR * 2)),
+            with: .color(Color(red: 1, green: 1, blue: 1).opacity(0.97 * shweta))
         )
     }
 
