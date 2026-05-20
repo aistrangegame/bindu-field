@@ -368,7 +368,7 @@ struct LabView: View {
                 onChange: { v in
                     carrier = v
                     displayCarrier = v
-                    if isPlaying { store.setCarrier(v) }
+                    if isPlaying || store.isPlaying { store.setCarrier(v) }
                 }
             )
             customSlider(
@@ -379,7 +379,7 @@ struct LabView: View {
                 onChange: { v in
                     beat = v
                     displayBeat = v
-                    if isPlaying { store.setBeat(v) }
+                    if isPlaying || store.isPlaying { store.setBeat(v) }
                 }
             )
         }
@@ -689,7 +689,7 @@ struct LabView: View {
         let clamped = min(max(v, 40), 440)
         carrier = clamped
         displayCarrier = clamped
-        if isPlaying { store.setCarrier(clamped) }
+        if isPlaying || store.isPlaying { store.setCarrier(clamped) }
     }
 
     private func beginBeatEdit() {
@@ -711,7 +711,7 @@ struct LabView: View {
         let clamped = min(max(v, 0.5), 44)
         beat = clamped
         displayBeat = clamped
-        if isPlaying { store.setBeat(clamped) }
+        if isPlaying || store.isPlaying { store.setBeat(clamped) }
     }
 
     // MARK: - Randomize (1D)
@@ -756,7 +756,7 @@ struct LabView: View {
                         displayBeat = targetBeat
                     }
                     UIImpactFeedbackGenerator(style: .light).impactOccurred()
-                    if isPlaying {
+                    if isPlaying || store.isPlaying {
                         store.setCarrier(targetCarrier)
                         store.setBeat(targetBeat)
                     }
@@ -775,7 +775,7 @@ struct LabView: View {
             displayCarrier = preset.carrierHz
             displayBeat = preset.beatHz
         }
-        if isPlaying {
+        if isPlaying || store.isPlaying {
             store.setCarrier(preset.carrierHz)
             store.setBeat(preset.beatHz)
         }

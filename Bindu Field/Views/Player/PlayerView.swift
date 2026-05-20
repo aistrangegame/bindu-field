@@ -121,6 +121,26 @@ struct PlayerView: View {
                     Spacer()
                 }
 
+                // Always-accessible close — visible in every mode, top
+                // trailing. Sits above the pill row so it isn't shadowed
+                // by the centred pill's hit area.
+                VStack(spacing: 0) {
+                    HStack {
+                        Spacer()
+                        Button(action: { store.closePlayer() }) {
+                            Image(systemName: "xmark")
+                                .font(.system(size: 12, weight: .light))
+                                .foregroundStyle(theme.subtle)
+                                .frame(width: 36, height: 36)
+                                .contentShape(Rectangle())
+                        }
+                        .buttonStyle(.plain)
+                        .padding(.top, 52)
+                        .padding(.trailing, 16)
+                    }
+                    Spacer()
+                }
+
                 // Loading state overlays everything when fetching audio
                 if store.isLoadingTrack {
                     loadingView
@@ -340,6 +360,14 @@ struct PlayerView: View {
             Color.clear
                 .contentShape(Rectangle())
                 .onTapGesture { enterControl() }
+                .gesture(
+                    DragGesture(minimumDistance: 40)
+                        .onEnded { value in
+                            if value.translation.height > 60 && mode == .field {
+                                store.closePlayer()
+                            }
+                        }
+                )
         case .control:
             VStack(spacing: 0) {
                 Color.clear
