@@ -85,8 +85,12 @@ final class TrackPlaybackService {
         BinauralEngine.shared.updateBeat(beat)
         BinauralEngine.shared.updateGain(gain)
 
-        // === DSPWireService: poll analysis frames and drive engine gain
+        // === DSPWireService: poll analysis frames and drive engine gain.
+        // Phase 3: also reset track-aware state so the Player CONTROL sheet
+        // surfaces this track's beat/carrier (and clears any prior user
+        // BEAT override) before the wire starts ticking.
         DSPWireService.shared.resetCarrierLock()
+        DSPWireService.shared.resetForNewTrack(beatHz: beat, carrierHz: carrier)
         DSPWireService.shared.startPolling()
 
         isPlaying = true
