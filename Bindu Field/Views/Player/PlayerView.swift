@@ -55,6 +55,7 @@ struct PlayerView: View {
     }
 
     private var elementColor: Color { Color.bindu(element: track.element) }
+    private var vocab: ElementVocabulary { ElementVocabulary.forTrack(track) }
 
     var body: some View {
         GeometryReader { geo in
@@ -174,12 +175,15 @@ struct PlayerView: View {
 
     // MARK: - Background
     //
-    // Flat void. Removed in Phase 2 of the design pass — the vocabulary
-    // renderer supplies all atmospheric color, the bg should not add
-    // a competing element-color radial.
+    // Background flows from the current vocabulary. Each element has its
+    // own near-black tint (see `ElementVocabulary.bg`) so the void itself
+    // reads as belonging to the dance. No radial — the vocabulary
+    // renderer provides every atmospheric layer above this color.
 
     private var background: some View {
-        theme.bg.ignoresSafeArea()
+        vocab.bg
+            .ignoresSafeArea()
+            .animation(.easeInOut(duration: 0.6), value: vocab)
     }
 
     // MARK: - Visualizer (mode-aware)
@@ -194,7 +198,9 @@ struct PlayerView: View {
         let dim = visualizerOpacity(for: mode)
 
         VStack(spacing: 0) {
-            VisualizerView(color: elementColor, elementHueDeg: elementHueDeg)
+            VisualizerView(color: elementColor,
+                           elementHueDeg: elementHueDeg,
+                           track: track)
                 .frame(maxWidth: .infinity)
                 .frame(height: h)
                 .opacity(dim)

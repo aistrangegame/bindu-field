@@ -18,6 +18,10 @@ struct VisualizerView: View {
     /// HSB hue (0–360) of the element. Lets tier colors stay in the
     /// element family without re-extracting from the `Color` opaque type.
     let elementHueDeg: Double
+    /// Track drives vocabulary routing. The Cathedral is one of nine
+    /// vocabularies (Air); every other element renders a different
+    /// visual world. See `ElementVocabulary.forTrack`.
+    let track: Track
 
     @State private var wire = DSPWireService.shared
     @State private var performer = Performer.shared
@@ -71,86 +75,32 @@ struct VisualizerView: View {
                     let beat = performer.beatPulse
                     let energy = performer.energy
                     let isSingular = settings.vizMode == "singular"
+                    let vocab = ElementVocabulary.forTrack(track)
+                    // Vocabulary intensity maps Performer state to a 0–1
+                    // band. DSP energy is the floor; crescendo modulator
+                    // is the ceiling — at climax the vocabulary peaks.
+                    let intensity = min(1.0,
+                        Double(energy) * 0.4 + Double(mod) * 0.6)
 
-                    // Cathedral + ensemble layers — ensemble mode only.
-                    // Singular mode renders just the Bindu Lissajous below.
+                    // Cathedral + ensemble layers run only for the Air
+                    // vocabulary (Anahata). Every other element gets its
+                    // own visual world from VocabularyRenderer. Singular
+                    // vizMode bypasses both — just the Bindu Lissajous.
                     if !isSingular {
-                        let gaiaPresence = performer.archetypePresence[.gaia] ?? 0
-
-                        // TIER 1 — continuous
-                        drawCathedralFloor(ctx: ctx, size: size, t: t,
-                                           mod: mod, beat: beat)
-                        drawSidColumns(ctx: ctx, size: size, t: t, mod: mod)
-                        drawVaultCeiling(ctx: ctx, size: size, t: t,
-                                         energy: energy, mod: mod)
-                        drawAtmosphericGrain(ctx: ctx, t: t)
-                        drawGaiaGround(ctx: ctx, size: size, t: t,
-                                       gaia: gaiaPresence)
-
-                        // ENSEMBLE · Karishma — silence's presence sits deep,
-                        // before the chanting ensemble so the arches and the
-                        // witness arc still read on top of it.
-                        let karishmaPresence = performer.archetypePresence[.karishma] ?? 0
-                        if karishmaPresence > 0.10 {
-                            drawKarishma(ctx: ctx, size: size, t: t,
-                                         presence: karishmaPresence)
-                        }
-
-                        // TIER 2 — ensemble (presence-gated)
-                        let archPresence = performer.archetypePresence[.arch] ?? 0
-                        if archPresence > 0.1 {
-                            drawArchChant(ctx: ctx, size: size, t: t,
-                                          presence: archPresence)
-                        }
-                        let sakshiPresence = performer.archetypePresence[.sakshi] ?? 0
-                        if sakshiPresence > 0.1 {
-                            drawSakshiGesture(ctx: ctx, size: size, t: t,
-                                              presence: sakshiPresence)
-                        }
-
-                        // ENSEMBLE · Ashrey — synthesis. Sits above the chant
-                        // and witness; below the crescendo so peak visuals
-                        // still take the foreground.
-                        let ashreyPresence = performer.archetypePresence[.ashrey] ?? 0
-                        if ashreyPresence > 0.05 {
-                            drawAshrey(ctx: ctx, size: size, t: t,
-                                       presence: ashreyPresence)
-                        }
-
-                        // TIER 3 — crescendo (modulator > 0)
-                        if mod > 0 {
-                            drawRisingArches(ctx: ctx, size: size,
-                                             elapsed: performer.elapsed,
-                                             mod: mod)
-                            drawConvergenceLines(ctx: ctx, size: size, mod: mod)
-                        }
-
-                        // TIER 4 — climax (modulator > 0.25)
-                        if mod > 0.25 {
-                            drawKeystoneCascade(ctx: ctx, size: size, t: t,
-                                                mod: mod, beat: beat)
-                            drawEarthRising(ctx: ctx, size: size,
-                                            elapsed: performer.elapsed)
-                        }
-                        let shwetaPresence = performer.archetypePresence[.shweta] ?? 0
-                        if shwetaPresence > 0.01 {
-                            drawShwetaCrystallization(ctx: ctx, size: size,
-                                                      shweta: shwetaPresence)
-                        }
-
-                        // ENSEMBLE · Neev — foundation. Bookends only.
-                        // Draws above the cathedral but below Bindu so the
-                        // descending rings settle in front of the architecture.
-                        let neevPresence = performer.archetypePresence[.neev] ?? 0
-                        if neevPresence > 0.10 {
-                            drawNeev(ctx: ctx, size: size, t: t,
-                                     presence: neevPresence)
+                        if vocab == .air {
+                            drawAirCathedral(ctx: ctx, size: size, t: t,
+                                             mod: mod, beat: beat,
+                                             energy: energy)
+                        } else {
+                            drawVocabulary(vocab: vocab, ctx: ctx,
+                                           size: size, t: t,
+                                           intensity: intensity)
                         }
                     }
 
                     // BINDU — singular Lissajous, always drawn (it IS the
                     // singular-mode rendering, and it's the foreground in
-                    // ensemble mode).
+                    // ensemble mode and over every vocabulary).
                     drawBindu(ctx: ctx, size: size, t: t,
                               energy: energy, beat: beat, mod: mod,
                               bindu: bindu)
@@ -188,6 +138,105 @@ struct VisualizerView: View {
             withAnimation(.easeOut(duration: 0.18)) {
                 carrierPulse = locked ? 1.5 : 1.0
             }
+        }
+    }
+
+    // MARK: - Cathedral entry point
+    //
+    // Wraps the existing Tier 1–4 + Ensemble draw calls so the body's
+    // routing block stays small. The cathedral's composition is
+    // unchanged — it's just hoisted into one method.
+
+    private func drawAirCathedral(ctx: GraphicsContext, size: CGSize,
+                                  t: Double, mod: Double, beat: Double,
+                                  energy: Double) {
+        let gaiaPresence = performer.archetypePresence[.gaia] ?? 0
+
+        // TIER 1 — continuous
+        drawCathedralFloor(ctx: ctx, size: size, t: t, mod: mod, beat: beat)
+        drawSidColumns(ctx: ctx, size: size, t: t, mod: mod)
+        drawVaultCeiling(ctx: ctx, size: size, t: t, energy: energy, mod: mod)
+        drawAtmosphericGrain(ctx: ctx, t: t)
+        drawGaiaGround(ctx: ctx, size: size, t: t, gaia: gaiaPresence)
+
+        // ENSEMBLE · Karishma — silence sits deep, before the chant.
+        let karishmaPresence = performer.archetypePresence[.karishma] ?? 0
+        if karishmaPresence > 0.10 {
+            drawKarishma(ctx: ctx, size: size, t: t, presence: karishmaPresence)
+        }
+
+        // TIER 2 — ensemble (presence-gated)
+        let archPresence = performer.archetypePresence[.arch] ?? 0
+        if archPresence > 0.1 {
+            drawArchChant(ctx: ctx, size: size, t: t, presence: archPresence)
+        }
+        let sakshiPresence = performer.archetypePresence[.sakshi] ?? 0
+        if sakshiPresence > 0.1 {
+            drawSakshiGesture(ctx: ctx, size: size, t: t, presence: sakshiPresence)
+        }
+
+        // ENSEMBLE · Ashrey — synthesis. Above chant + witness; below crescendo.
+        let ashreyPresence = performer.archetypePresence[.ashrey] ?? 0
+        if ashreyPresence > 0.05 {
+            drawAshrey(ctx: ctx, size: size, t: t, presence: ashreyPresence)
+        }
+
+        // TIER 3 — crescendo (modulator > 0)
+        if mod > 0 {
+            drawRisingArches(ctx: ctx, size: size,
+                             elapsed: performer.elapsed, mod: mod)
+            drawConvergenceLines(ctx: ctx, size: size, mod: mod)
+        }
+
+        // TIER 4 — climax (modulator > 0.25)
+        if mod > 0.25 {
+            drawKeystoneCascade(ctx: ctx, size: size, t: t, mod: mod, beat: beat)
+            drawEarthRising(ctx: ctx, size: size, elapsed: performer.elapsed)
+        }
+        let shwetaPresence = performer.archetypePresence[.shweta] ?? 0
+        if shwetaPresence > 0.01 {
+            drawShwetaCrystallization(ctx: ctx, size: size, shweta: shwetaPresence)
+        }
+
+        // ENSEMBLE · Neev — bookends only.
+        let neevPresence = performer.archetypePresence[.neev] ?? 0
+        if neevPresence > 0.10 {
+            drawNeev(ctx: ctx, size: size, t: t, presence: neevPresence)
+        }
+    }
+
+    // MARK: - Vocabulary routing
+    //
+    // Each non-Air element gets its own draw function from
+    // VocabularyRenderer.swift. Ambient and family route to the breathing
+    // void with the element's hue.
+
+    private func drawVocabulary(vocab: ElementVocabulary,
+                                ctx: GraphicsContext,
+                                size: CGSize, t: Double, intensity: Double) {
+        switch vocab {
+        case .earth:
+            drawEarth(in: ctx, size: size, t: t, intens: intensity)
+        case .water:
+            drawWater(in: ctx, size: size, t: t, intens: intensity)
+        case .fire:
+            drawFire(in: ctx, size: size, t: t, intens: intensity)
+        case .ether:
+            drawEther(in: ctx, size: size, t: t, intens: intensity)
+        case .constellation:
+            drawConstellation(in: ctx, size: size, t: t, intens: intensity)
+        case .crown:
+            drawCrown(in: ctx, size: size, t: t, intens: intensity)
+        case .soul:
+            drawSoul(in: ctx, size: size, t: t, intens: intensity)
+        case .dissolution:
+            drawDissolution(in: ctx, size: size, t: t, intens: intensity)
+        case .meditate, .family:
+            drawAmbient(in: ctx, size: size, t: t,
+                        intens: intensity, hue: vocab.hue)
+        case .air:
+            // Routed through drawAirCathedral above — should not reach here.
+            break
         }
     }
 
