@@ -173,18 +173,13 @@ struct PlayerView: View {
     }
 
     // MARK: - Background
+    //
+    // Flat void. Removed in Phase 2 of the design pass — the vocabulary
+    // renderer supplies all atmospheric color, the bg should not add
+    // a competing element-color radial.
 
     private var background: some View {
-        ZStack {
-            theme.bg.ignoresSafeArea()
-            RadialGradient(
-                colors: [elementColor.opacity(0.14), theme.bg],
-                center: .center,
-                startRadius: 60,
-                endRadius: 540
-            )
-            .ignoresSafeArea()
-        }
+        theme.bg.ignoresSafeArea()
     }
 
     // MARK: - Visualizer (mode-aware)
@@ -239,10 +234,11 @@ struct PlayerView: View {
             // Text block — verb is the primary gesture.
             VStack(spacing: 0) {
                 Text(track.verb)
-                    .font(.system(size: 62, weight: .ultraLight, design: .serif))
+                    .font(.system(size: 62, weight: .light, design: .serif))
                     .italic()
                     .foregroundColor(elementColor)
-                    .shadow(color: elementColor.opacity(0.5), radius: 22)
+                    .shadow(color: elementColor.opacity(0.28), radius: 24)
+                    .shadow(color: elementColor.opacity(0.10), radius: 50)
                     .padding(.horizontal, 24)
                     .padding(.bottom, 8)
 
@@ -256,7 +252,7 @@ struct PlayerView: View {
                     Text("\u{201C}\(rs)\u{201D}")
                         .font(.system(size: 13, design: .serif))
                         .italic()
-                        .foregroundColor(theme.text.opacity(0.65))
+                        .foregroundColor(theme.text.opacity(0.12))
                         .multilineTextAlignment(.center)
                         .lineSpacing(4)
                         .padding(.horizontal, 38)
@@ -264,7 +260,7 @@ struct PlayerView: View {
                 }
             }
             .frame(maxWidth: .infinity)
-            .padding(.top, geo.size.height * 0.56)
+            .padding(.top, geo.size.height * 0.59)
 
             // Scrubber pinned to the bottom of the screen.
             VStack(spacing: 0) {
@@ -392,20 +388,22 @@ struct PlayerView: View {
     @ViewBuilder
     private var controlSheet: some View {
         ZStack(alignment: .top) {
-            // Surface
+            // Surface — near-opaque dark panel. The earlier ultraThinMaterial
+            // was too translucent; the design wants the sheet to read as a
+            // solid surface lifted off the field with a hint of glass.
             UnevenRoundedRectangle(
                 topLeadingRadius: 32, bottomLeadingRadius: 0,
                 bottomTrailingRadius: 0, topTrailingRadius: 32,
                 style: .continuous
             )
-            .fill(.ultraThinMaterial)
-            .overlay(
+            .fill(Color(red: 5/255, green: 5/255, blue: 16/255).opacity(0.97))
+            .background(
                 UnevenRoundedRectangle(
                     topLeadingRadius: 32, bottomLeadingRadius: 0,
                     bottomTrailingRadius: 0, topTrailingRadius: 32,
                     style: .continuous
                 )
-                .fill(Color.white.opacity(0.04))
+                .fill(.ultraThinMaterial.opacity(0.25))
             )
             .overlay(
                 UnevenRoundedRectangle(
@@ -441,7 +439,7 @@ struct PlayerView: View {
                             .foregroundColor(elementColor)
                             .offset(x: trackPlayer.isPaused ? 2 : 0)
                     }
-                    .shadow(color: elementColor.opacity(0.28), radius: 14)
+                    .binduGlow(color: elementColor)
                 }
                 .buttonStyle(.plain)
                 .padding(.bottom, 20)
@@ -518,7 +516,7 @@ struct PlayerView: View {
     }
 
     private var binauralToggleRow: some View {
-        HStack(spacing: 12) {
+        HStack(spacing: 8) {
             // Custom toggle (44x24)
             Button {
                 wire.binauralEnabled.toggle()
@@ -545,25 +543,24 @@ struct PlayerView: View {
                 .tracking(1.4)
                 .foregroundColor(wire.binauralEnabled ? theme.muted : theme.subtle)
 
-            Spacer()
-
-            // Breathing dot — appears when binaural is on and breathes
-            // continuously at a 2s cycle. Shows that binaural is alive.
-            // (The 500ms carrier-derivation pulse lives on the binaural
-            // pill at the top and in the CARRIER row's DERIVED chip; this
-            // dot is purely an "on" indicator.)
+            // Breathing dot sits immediately after the ON/OFF label —
+            // no spacer between, so the eye reads label · dot as one
+            // status token. Animation is a 2s total cycle (1s ease ×
+            // autoreverses) and the scale ramp is 1.0 → 1.25.
             if wire.binauralEnabled {
                 Circle()
                     .fill(elementColor)
                     .frame(width: 6, height: 6)
                     .shadow(color: elementColor.opacity(0.55), radius: 4)
-                    .scaleEffect(ctrlDotBreathePhase ? 1.15 : 1.0)
+                    .scaleEffect(ctrlDotBreathePhase ? 1.25 : 1.0)
                     .opacity(ctrlDotBreathePhase ? 1.0 : 0.65)
-                    .animation(.easeInOut(duration: 2.0).repeatForever(autoreverses: true),
+                    .animation(.easeInOut(duration: 1.0).repeatForever(autoreverses: true),
                                value: ctrlDotBreathePhase)
                     .onAppear { ctrlDotBreathePhase = true }
                     .onDisappear { ctrlDotBreathePhase = false }
             }
+
+            Spacer()
         }
     }
 
@@ -742,14 +739,14 @@ struct PlayerView: View {
                 bottomTrailingRadius: 0, topTrailingRadius: 32,
                 style: .continuous
             )
-            .fill(.ultraThinMaterial)
-            .overlay(
+            .fill(Color(red: 5/255, green: 5/255, blue: 15/255).opacity(0.98))
+            .background(
                 UnevenRoundedRectangle(
                     topLeadingRadius: 32, bottomLeadingRadius: 0,
                     bottomTrailingRadius: 0, topTrailingRadius: 32,
                     style: .continuous
                 )
-                .fill(Color.white.opacity(0.04))
+                .fill(.ultraThinMaterial.opacity(0.20))
             )
             .overlay(
                 UnevenRoundedRectangle(
@@ -778,6 +775,13 @@ struct PlayerView: View {
                         .padding(.horizontal, 28)
                         .padding(.top, 14)
                         .padding(.bottom, 16)
+
+                    // Fix 2J — hairline rule between recognition and tab
+                    // bar so the header reads as a distinct section.
+                    Rectangle()
+                        .fill(Color.white.opacity(0.06))
+                        .frame(height: 1)
+                        .padding(.horizontal, 20)
                 }
 
                 // Tab bar
@@ -906,16 +910,16 @@ struct PlayerView: View {
             )
         } else {
             VStack(alignment: .leading, spacing: 24) {
-                Text("the Lalita reading for this song is still forming. what you've brought to it is part of the reading.")
+                Text("The Lalita reading for this song is still forming. What you've brought to it is part of the reading.")
                     .font(.system(size: 15, design: .serif))
                     .italic()
                     .foregroundColor(theme.muted)
-                    .lineSpacing(6)
-                Text("return when the field calls you back.")
+                    .lineSpacing(12)
+                Text("Return when the field calls you back.")
                     .font(.system(size: 14, design: .serif))
                     .italic()
                     .foregroundColor(theme.subtle.opacity(0.6))
-                    .lineSpacing(6)
+                    .lineSpacing(12)
             }
             .frame(maxWidth: .infinity, alignment: .leading)
         }
@@ -1166,7 +1170,7 @@ private struct ReadingContent: View {
                         .font(.system(size: 15, design: .serif))
                         .italic()
                         .foregroundColor(isLast ? elementColor : theme.muted)
-                        .lineSpacing(6)
+                        .lineSpacing(12)
                         .fixedSize(horizontal: false, vertical: true)
                         .padding(.top, isLast ? 18 : 0)
                         .overlay(alignment: .top) {

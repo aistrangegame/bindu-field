@@ -267,7 +267,7 @@ struct LabView: View {
         if editingBeat {
             TextField("", text: $beatInput)
                 .keyboardType(.decimalPad)
-                .font(.system(size: 76, weight: .ultraLight, design: .monospaced))
+                .font(.system(size: 76, weight: .light, design: .monospaced))
                 .foregroundColor(stateColor)
                 .focused($beatFocused)
                 .frame(width: 220)
@@ -280,7 +280,7 @@ struct LabView: View {
         } else {
             Button(action: beginBeatEdit) {
                 Text(String(format: "%.1f", shownBeat))
-                    .font(.system(size: 76, weight: .ultraLight, design: .monospaced))
+                    .font(.system(size: 76, weight: .light, design: .monospaced))
                     .foregroundColor(stateColor)
                     .lineLimit(1)
                     .minimumScaleFactor(0.7)
@@ -629,9 +629,10 @@ struct LabView: View {
                     .background(
                         Capsule().fill(isPlaying ? stateColor : theme.text)
                     )
-                    .shadow(
-                        color: isPlaying ? stateColor.opacity(0.22) : .clear,
-                        radius: 28
+                    .binduGlow(
+                        color: isPlaying ? stateColor : .clear,
+                        tight: isPlaying ? 0.22 : 0,
+                        wide:  isPlaying ? 0.08 : 0
                     )
             }
             .buttonStyle(.plain)
