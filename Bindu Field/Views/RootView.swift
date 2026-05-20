@@ -11,26 +11,64 @@ struct RootView: View {
         ZStack {
             TabView(selection: $nav.selectedTab) {
                 FieldView()
-                    .tabItem { Label("Field", systemImage: "circle.dotted") }
+                    .tabItem {
+                        Label { Text("Field") } icon: {
+                            BinduTabIcon(tab: .field, active: nav.selectedTab == 0)
+                        }
+                    }
                     .tag(0)
                 OracleView()
-                    .tabItem { Label("Oracle", systemImage: "ear") }
+                    .tabItem {
+                        Label { Text("Oracle") } icon: {
+                            BinduTabIcon(tab: .oracle, active: nav.selectedTab == 1)
+                        }
+                    }
                     .tag(1)
                 SpaceView()
-                    .tabItem { Label("Space", systemImage: "moon.stars") }
+                    .tabItem {
+                        Label { Text("Space") } icon: {
+                            BinduTabIcon(tab: .space, active: nav.selectedTab == 2)
+                        }
+                    }
                     .tag(2)
                 LabView()
-                    .tabItem { Label("Lab", systemImage: "waveform.path") }
+                    .tabItem {
+                        Label { Text("Lab") } icon: {
+                            BinduTabIcon(tab: .lab, active: nav.selectedTab == 3)
+                        }
+                    }
                     .tag(3)
                 ArchiveView()
-                    .tabItem { Label("Archive", systemImage: "book.closed") }
+                    .tabItem {
+                        Label { Text("Archive") } icon: {
+                            BinduTabIcon(tab: .archive, active: nav.selectedTab == 4)
+                        }
+                    }
                     .tag(4)
                 RitualView()
-                    .tabItem { Label("Ritual", systemImage: "flame") }
+                    .tabItem {
+                        Label { Text("Ritual") } icon: {
+                            BinduTabIcon(tab: .ritual, active: nav.selectedTab == 5)
+                        }
+                    }
                     .tag(5)
                 LetterView()
-                    .tabItem { Label("Letter", systemImage: "envelope") }
+                    .tabItem {
+                        Label { Text("Letter") } icon: {
+                            BinduTabIcon(tab: .letter, active: nav.selectedTab == 6)
+                        }
+                    }
                     .tag(6)
+                // MAP tab — placeholder for Session B. Tag 7 keeps existing
+                // tags untouched so the Field → Oracle deep-link and other
+                // tag-7-aware code paths stay correct.
+                EmptyView()
+                    .tabItem {
+                        Label { Text("Map") } icon: {
+                            BinduTabIcon(tab: .map, active: nav.selectedTab == 7)
+                        }
+                    }
+                    .tag(7)
             }
             .preferredColorScheme(.dark)
             .tint(ThemeData.void.accent)
