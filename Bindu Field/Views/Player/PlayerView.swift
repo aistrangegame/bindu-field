@@ -33,6 +33,10 @@ struct PlayerView: View {
     // 6pt dot's repeatForever animation kicks off when the pill renders.
     @State private var pillBreathePhase: Bool = false
 
+    // CONTROL-sheet toggle-row dot breathing phase. Same pattern as the
+    // pill: flipped on appear, kicks off a repeatForever scale animation.
+    @State private var ctrlDotBreathePhase: Bool = false
+
     // Integration Chamber
     @State private var showingIntegration: Bool = false
     @State private var integrationText: String = ""
@@ -515,14 +519,22 @@ struct PlayerView: View {
 
             Spacer()
 
-            // Carrier-lock pulse dot — uses wire.carrierLocked (500ms pulse)
+            // Breathing dot — appears when binaural is on and breathes
+            // continuously at a 2s cycle. Shows that binaural is alive.
+            // (The 500ms carrier-derivation pulse lives on the binaural
+            // pill at the top and in the CARRIER row's DERIVED chip; this
+            // dot is purely an "on" indicator.)
             if wire.binauralEnabled {
                 Circle()
                     .fill(elementColor)
                     .frame(width: 6, height: 6)
                     .shadow(color: elementColor.opacity(0.55), radius: 4)
-                    .opacity(wire.carrierLocked ? 1.0 : 0.55)
-                    .animation(.easeInOut(duration: 0.18), value: wire.carrierLocked)
+                    .scaleEffect(ctrlDotBreathePhase ? 1.15 : 1.0)
+                    .opacity(ctrlDotBreathePhase ? 1.0 : 0.65)
+                    .animation(.easeInOut(duration: 2.0).repeatForever(autoreverses: true),
+                               value: ctrlDotBreathePhase)
+                    .onAppear { ctrlDotBreathePhase = true }
+                    .onDisappear { ctrlDotBreathePhase = false }
             }
         }
     }
