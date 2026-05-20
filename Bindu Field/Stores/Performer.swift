@@ -55,6 +55,10 @@ struct Score {
     let modulatorRampOut: Double
     let modulatorBoost: Double
 
+    /// Per-track mirror words flashed during the Consciousness Loop's
+    /// Dance step. `nil` → the Loop uses its default 5-word set.
+    let mirrorWords: [String]?
+
     // MARK: Hardcoded scores
 
     /// Track 27 — Sound of Silence (Disturbed) · Vishuddha. The first
@@ -81,7 +85,8 @@ struct Score {
         modulatorHoldStart: 160,
         modulatorHoldEnd:   180,
         modulatorRampOut:   195,
-        modulatorBoost:     0.8
+        modulatorBoost:     0.8,
+        mirrorWords: ["pn", "open", "breathe", "opn", "clear", "release", "pn", "open"]
     )
 
     /// Lookup table. Add a `case` per scored track. Returns `nil` for

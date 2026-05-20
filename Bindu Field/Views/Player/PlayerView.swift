@@ -42,6 +42,9 @@ struct PlayerView: View {
     @State private var integrationText: String = ""
     @State private var integrationDismissTask: Task<Void, Never>?
 
+    // Consciousness Loop — full-screen ceremony lifted over the player.
+    @State private var showingLoop: Bool = false
+
     @Environment(\.binduTheme) private var theme
 
     enum PlayerMode { case field, control, reading }
@@ -171,6 +174,14 @@ struct PlayerView: View {
         .onReceive(NotificationCenter.default.publisher(for: .binduPlaybackComplete)) { _ in
             presentIntegration()
         }
+        .fullScreenCover(isPresented: $showingLoop) {
+            LoopHostView()
+        }
+    }
+
+    private func presentLoop() {
+        ConsciousnessLoopCoordinator.shared.begin(track: track)
+        showingLoop = true
     }
 
     // MARK: - Background
@@ -264,6 +275,26 @@ struct PlayerView: View {
                         .padding(.horizontal, 38)
                         .fixedSize(horizontal: false, vertical: true)
                 }
+
+                // Discreet BEGIN affordance — opens the Consciousness Loop.
+                // Sits below the recognition statement; tap target is the
+                // text + capsule, not the surrounding area, so background
+                // taps still escalate to CONTROL.
+                Button(action: { presentLoop() }) {
+                    Text("BEGIN THE LOOP")
+                        .font(.system(size: 8.5, weight: .light))
+                        .tracking(3.0)
+                        .textCase(.uppercase)
+                        .foregroundColor(elementColor.opacity(0.55))
+                        .padding(.horizontal, 18)
+                        .padding(.vertical, 10)
+                        .overlay(
+                            Capsule()
+                                .stroke(elementColor.opacity(0.25), lineWidth: 1)
+                        )
+                }
+                .buttonStyle(.plain)
+                .padding(.top, 28)
             }
             .frame(maxWidth: .infinity)
             .padding(.top, geo.size.height * 0.59)
