@@ -75,6 +75,11 @@ final class PlayerStore {
                 isLoadingTrack = false
                 isPlaying = true
 
+                // Phase 4: start the Performer with this track's authored
+                // score (nil = ambient mode — Performer still ticks but
+                // skips phase / modulator / silence tracking).
+                Performer.shared.start(score: Score.forTrack(id: myTrack.id))
+
                 let dur = TrackPlaybackService.shared.duration
                 NowPlayingService.shared.updateForTrack(
                     verb: myTrack.verb,
@@ -96,6 +101,10 @@ final class PlayerStore {
                 BinauralEngine.shared.updateBeat(beat)
                 BinauralEngine.shared.updateGain(SettingsStore.shared.gain)
                 isPlaying = true
+                // Phase 4: binaural-only fallback still wants Performer
+                // running so the visualizer is alive. Ambient mode (nil
+                // score) since the audio file path didn't load.
+                Performer.shared.start(score: nil)
                 NowPlayingService.shared.updateForTrack(
                     verb: myTrack.verb,
                     song: myTrack.song,
@@ -115,6 +124,9 @@ final class PlayerStore {
     /// (lock-screen, stop button, X button) leave the default `false`.
     func stop(completed: Bool = false) {
         TrackPlaybackService.shared.stop()  // stops both engines
+        // Phase 4: stop the Performer too so its 60Hz tick doesn't keep
+        // running after audio ends. Idempotent; safe to call always.
+        Performer.shared.stop()
         finalizeCurrentSession(completed: completed)
         isPlaying = false
         isLoadingTrack = false
