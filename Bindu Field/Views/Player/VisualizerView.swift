@@ -1,25 +1,33 @@
 import SwiftUI
 
-/// Audio-reactive Bindu visualization.
+/// The Cathedral — the sonic architecture of the Cross dance made visible.
 ///
-/// Reads observable state from `DSPWireService.shared`:
-///   - `rms` drives the bloom brightness around Bindu
-///   - `hasOnset` emits an expanding ring at Bindu's current position
-///   - `carrierLocked` triggers a brief 1.5x size pulse on Bindu
-///   - `binauralEnabled` softens everything to 40% opacity when off
+/// Tier 1 (continuous, always running): cathedral floor, Sid columns,
+/// vault ceiling, atmospheric grain, Gaia ground. Bindu (the singular
+/// Lissajous) is always on top of all tiers.
 ///
-/// Bindu moves along a multi-harmonic Lissajous path. A rolling buffer
-/// of the last 20 positions renders as a comet trail.
+/// Tier 2 (ensemble, presence-driven) and Tier 3+4 (crescendo / climax)
+/// arrive in later phases of the Lalita pass.
+///
+/// All tiers read from `Performer.shared` for time-aware state
+/// (crescendoModulator, beatPulse, energy, archetypePresence) and from
+/// `DSPWireService.shared` for low-level signal state (rms, carrierLocked,
+/// userBeatHz, onsetCount).
 struct VisualizerView: View {
-    let beat: Float       // Hz — preserved as legacy parameter (unused for motion)
     let color: Color
+    /// HSB hue (0–360) of the element. Lets tier colors stay in the
+    /// element family without re-extracting from the `Color` opaque type.
+    let elementHueDeg: Double
 
     @State private var wire = DSPWireService.shared
+    @State private var performer = Performer.shared
 
     @State private var trailPositions: [CGPoint] = []
     @State private var rings: [Ring] = []
-    @State private var lastOnsetEmittedAt: Double = 0
+    @State private var grain: [Grain] = []
     @State private var lastTrailSampleAt: Double = 0
+    @State private var lastGrainStepAt: Double = 0
+    @State private var lastBeatPulseTrigger: Double = 0
     @State private var carrierPulse: CGFloat = 1.0
 
     private struct Ring: Identifiable {
@@ -29,146 +37,65 @@ struct VisualizerView: View {
         let color: Color
     }
 
+    private struct Grain: Identifiable {
+        let id = UUID()
+        var pos: CGPoint
+        var vy: CGFloat        // upward drift (negative)
+        var bornAt: Double
+        var lifetime: Double
+        var size: CGFloat
+    }
+
     // MARK: - Tunables
-    private let trailLength: Int = 20
+    private let trailLength: Int = 120
     private let trailSampleInterval: Double = 0.04   // ~25 Hz
-    private let ringDurationSec: Double = 0.6
-    private let ringMaxRadius: CGFloat = 80
+    private let ringDurationSec: Double = 0.7
+    private let ringMaxRadius: CGFloat = 110
+    private let grainTarget: Int = 80
+    private let grainStepInterval: Double = 1.0 / 30.0
 
     var body: some View {
-        TimelineView(.animation(minimumInterval: 1.0/60.0)) { timeline in
+        TimelineView(.animation(minimumInterval: 1.0 / 60.0)) { timeline in
             let t = timeline.date.timeIntervalSinceReferenceDate
 
             GeometryReader { geo in
                 let bindu = binduPosition(t: t, in: geo.size)
 
                 Canvas { ctx, size in
-                    let baseOpacity: Double = wire.binauralEnabled ? 1.0 : 0.4
+                    let mod = performer.crescendoModulator
+                    let beat = performer.beatPulse
+                    let energy = performer.energy
+                    let gaiaPresence = performer.archetypePresence[.gaia] ?? 0
 
-                    // === Bloom around Bindu (RMS-driven) ===
-                    let bloomR: CGFloat = 40 + CGFloat(wire.rms) * 60
-                    let bloomRect = CGRect(
-                        x: bindu.x - bloomR,
-                        y: bindu.y - bloomR,
-                        width: bloomR * 2,
-                        height: bloomR * 2
-                    )
-                    let bloomOpacity = (0.18 + Double(wire.rms) * 0.45) * baseOpacity
-                    ctx.fill(
-                        Path(ellipseIn: bloomRect),
-                        with: .radialGradient(
-                            Gradient(colors: [
-                                color.opacity(bloomOpacity),
-                                color.opacity(0)
-                            ]),
-                            center: bindu,
-                            startRadius: 0,
-                            endRadius: bloomR
-                        )
-                    )
+                    // TIER 1 — continuous
+                    drawCathedralFloor(ctx: ctx, size: size, t: t,
+                                       mod: mod, beat: beat)
+                    drawSidColumns(ctx: ctx, size: size, t: t, mod: mod)
+                    drawVaultCeiling(ctx: ctx, size: size, t: t,
+                                     energy: energy, mod: mod)
+                    drawAtmosphericGrain(ctx: ctx, t: t)
+                    drawGaiaGround(ctx: ctx, size: size, t: t,
+                                   gaia: gaiaPresence)
 
-                    // === Beat rings (onset-spawned, age-fading) ===
-                    for ring in rings {
-                        let age = t - ring.bornAt
-                        if age < 0 || age > ringDurationSec { continue }
-                        let progress = age / ringDurationSec
-                        let r = CGFloat(progress) * ringMaxRadius
-                        let alpha = (0.6 * (1 - progress)) * baseOpacity
-                        let rect = CGRect(
-                            x: ring.center.x - r,
-                            y: ring.center.y - r,
-                            width: r * 2,
-                            height: r * 2
-                        )
-                        ctx.stroke(
-                            Path(ellipseIn: rect),
-                            with: .color(ring.color.opacity(alpha)),
-                            lineWidth: 1.4
-                        )
-                    }
-
-                    // === Comet trail (oldest to newest, opacity ramp) ===
-                    let trail = trailPositions
-                    let n = trail.count
-                    if n > 0 {
-                        for (i, p) in trail.enumerated() {
-                            // Newest at end of array. opacity climbs with i.
-                            let frac = Double(i + 1) / Double(n)
-                            let dotR: CGFloat = 1.5 + CGFloat(frac) * 3.5
-                            let alpha = frac * frac * 0.7 * baseOpacity
-                            let rect = CGRect(
-                                x: p.x - dotR,
-                                y: p.y - dotR,
-                                width: dotR * 2,
-                                height: dotR * 2
-                            )
-                            ctx.fill(
-                                Path(ellipseIn: rect),
-                                with: .color(color.opacity(alpha))
-                            )
-                        }
-                    }
-
-                    // === Bindu core ===
-                    let coreR = 10 * carrierPulse
-                    let coreRect = CGRect(
-                        x: bindu.x - coreR,
-                        y: bindu.y - coreR,
-                        width: coreR * 2,
-                        height: coreR * 2
-                    )
-                    ctx.fill(
-                        Path(ellipseIn: coreRect),
-                        with: .radialGradient(
-                            Gradient(colors: [
-                                color.opacity(0.95 * baseOpacity),
-                                color.opacity(0.55 * baseOpacity),
-                                color.opacity(0)
-                            ]),
-                            center: bindu,
-                            startRadius: 0,
-                            endRadius: coreR
-                        )
-                    )
-
-                    let dotR = coreR * 0.32
-                    let dotRect = CGRect(
-                        x: bindu.x - dotR,
-                        y: bindu.y - dotR,
-                        width: dotR * 2,
-                        height: dotR * 2
-                    )
-                    ctx.fill(
-                        Path(ellipseIn: dotRect),
-                        with: .color(.white.opacity(0.85 * baseOpacity))
-                    )
+                    // BINDU — singular Lissajous on top
+                    drawBindu(ctx: ctx, size: size, t: t,
+                              energy: energy, beat: beat, mod: mod,
+                              bindu: bindu)
                 }
-                // Sample Bindu position into the trail every ~40 ms.
                 .onChange(of: t) { _, newT in
                     if newT - lastTrailSampleAt >= trailSampleInterval {
                         lastTrailSampleAt = newT
-                        appendTrail(bindu, t: newT)
+                        appendTrail(bindu)
                     }
+                    if newT - lastGrainStepAt >= grainStepInterval {
+                        let dt = newT - lastGrainStepAt
+                        lastGrainStepAt = newT
+                        stepGrain(dt: dt, t: newT, in: geo.size)
+                    }
+                    triggerBeatRingIfNeeded(t: newT)
                 }
             }
         }
-        // Spawn a beat ring whenever the wire reports a fresh onset.
-        .onChange(of: wire.hasOnset) { _, isOnset in
-            guard isOnset else { return }
-            let now = Date().timeIntervalSinceReferenceDate
-            // Coalesce rapid retriggers — DSP onset flag can sit "true" across a poll.
-            if now - lastOnsetEmittedAt < 0.08 { return }
-            lastOnsetEmittedAt = now
-            let center = trailPositions.last ?? .zero
-            if center != .zero {
-                rings.append(Ring(center: center, bornAt: now, color: color))
-                // Cap ring history so we don't grow without bound.
-                if rings.count > 24 {
-                    rings.removeFirst(rings.count - 24)
-                }
-            }
-        }
-        // Carrier lock → 1.5x size pulse for the 500ms ack window.
         .onChange(of: wire.carrierLocked) { _, locked in
             withAnimation(.easeOut(duration: 0.18)) {
                 carrierPulse = locked ? 1.5 : 1.0
@@ -176,28 +103,372 @@ struct VisualizerView: View {
         }
     }
 
-    // MARK: - Lissajous path
+    // MARK: - TIER 1 · Cathedral floor
+    //
+    // Vanishing point at (W/2, H*0.52). 7 radial lines fanning from the
+    // VP to evenly-spaced bottom points; 10 horizontal lines spaced by a
+    // perspective-quadratic curve (closer-together near the horizon).
+    // Beat pulse adds a bright horizontal across the horizon.
+
+    private func drawCathedralFloor(ctx: GraphicsContext, size: CGSize,
+                                    t: Double, mod: Double, beat: Double) {
+        let W = size.width, H = size.height
+        guard W > 0, H > 0 else { return }
+        let vp = CGPoint(x: W / 2, y: H * 0.52)
+        let opacity = 0.03 + mod * 0.08 + beat * 0.025
+        let col = Color(hue: elementHueDeg / 360, saturation: 0.35, brightness: 0.5)
+            .opacity(opacity)
+
+        var path = Path()
+        // 7 radial lines from VP to bottom
+        for i in 0..<7 {
+            let x = W * (Double(i) / 6.0)
+            path.move(to: vp)
+            path.addLine(to: CGPoint(x: x, y: H))
+        }
+        // 10 horizontal lines, perspective-spaced (closer near horizon)
+        for i in 0..<10 {
+            let progress = pow(Double(i) / 9.0, 2.5)
+            let y = vp.y + (H - vp.y) * progress
+            path.move(to: CGPoint(x: 0, y: y))
+            path.addLine(to: CGPoint(x: W, y: y))
+        }
+        ctx.stroke(path, with: .color(col), lineWidth: 0.5)
+
+        // Beat pulse — bright horizontal at the horizon line
+        if beat > 0.3 {
+            var horizon = Path()
+            horizon.move(to: CGPoint(x: 0, y: vp.y))
+            horizon.addLine(to: CGPoint(x: W, y: vp.y))
+            let beatCol = Color(hue: elementHueDeg / 360,
+                                saturation: 0.55, brightness: 0.7)
+                .opacity(beat * 0.4)
+            ctx.stroke(horizon, with: .color(beatCol), lineWidth: 1)
+        }
+    }
+
+    // MARK: - TIER 1 · Sid columns
+    //
+    // Two verticals at x = W*0.18 and W*0.82. Brightness pulses on a 5.5s
+    // drone cycle and rises with the crescendo modulator. Capital + base
+    // ticks (4 horizontal hairlines per column).
+
+    private func drawSidColumns(ctx: GraphicsContext, size: CGSize,
+                                t: Double, mod: Double) {
+        let W = size.width, H = size.height
+        guard W > 0, H > 0 else { return }
+        let positions: [Double] = [0.18, 0.82]
+        let cycle = (t.truncatingRemainder(dividingBy: 5.5)) / 5.5
+        let dronePulse = (cos(cycle * .pi * 2) + 1) / 2
+        let brightness = 0.20 + dronePulse * 0.30 + mod * 0.40
+        let col = Color(hue: elementHueDeg / 360,
+                        saturation: 0.20, brightness: brightness)
+
+        for xFrac in positions {
+            let x = W * xFrac
+            let top = H * 0.06
+            let bottom = H * 0.58
+
+            var column = Path()
+            column.move(to: CGPoint(x: x, y: top))
+            column.addLine(to: CGPoint(x: x, y: bottom))
+            ctx.stroke(column, with: .color(col), lineWidth: 1.5)
+
+            // Capital + base ticks
+            for tickY in [top, top + 8, bottom - 8, bottom] {
+                var tick = Path()
+                tick.move(to: CGPoint(x: x - 5, y: tickY))
+                tick.addLine(to: CGPoint(x: x + 5, y: tickY))
+                ctx.stroke(tick, with: .color(col.opacity(0.6)), lineWidth: 0.5)
+            }
+        }
+    }
+
+    // MARK: - TIER 1 · Vault ceiling
+    //
+    // Three layered Bezier arches from left anchor through an apex
+    // overhead to right anchor, with 4 rib vaults from each Sid column
+    // to the apex. Opacity rises with energy + modulator.
+
+    private func drawVaultCeiling(ctx: GraphicsContext, size: CGSize,
+                                  t: Double, energy: Double, mod: Double) {
+        let W = size.width, H = size.height
+        guard W > 0, H > 0 else { return }
+        let left = CGPoint(x: W * 0.04, y: H * 0.28)
+        let apex = CGPoint(x: W / 2,     y: H * 0.04)
+        let right = CGPoint(x: W * 0.96, y: H * 0.28)
+        let ctrlL = CGPoint(x: W * 0.04, y: H * 0.07)
+        let ctrlR = CGPoint(x: W * 0.96, y: H * 0.07)
+
+        let baseOp = min(0.38, energy * 0.22 + mod * 0.4)
+        let col = Color(hue: elementHueDeg / 360,
+                        saturation: 0.45, brightness: 0.65)
+
+        // 3 layered arches with slight vertical offset for depth
+        for layer in 0..<3 {
+            let yOffset = CGFloat(layer) * 1.5
+            var arch = Path()
+            arch.move(to: CGPoint(x: left.x, y: left.y + yOffset))
+            arch.addQuadCurve(
+                to: CGPoint(x: apex.x, y: apex.y + yOffset),
+                control: CGPoint(x: ctrlL.x, y: ctrlL.y + yOffset)
+            )
+            arch.addQuadCurve(
+                to: CGPoint(x: right.x, y: right.y + yOffset),
+                control: CGPoint(x: ctrlR.x, y: ctrlR.y + yOffset)
+            )
+            ctx.stroke(arch,
+                       with: .color(col.opacity(baseOp * (1.0 - Double(layer) * 0.3))),
+                       lineWidth: 1)
+        }
+
+        // 4 rib vaults from each column to the apex
+        let columnXs: [Double] = [0.18, 0.82]
+        for xFrac in columnXs {
+            let base = CGPoint(x: W * xFrac, y: H * 0.28)
+            for r in 0..<4 {
+                let frac = Double(r + 1) / 5.0
+                let endX = base.x + (apex.x - base.x) * frac
+                let endY = base.y + (apex.y - base.y) * frac * 0.9
+                var rib = Path()
+                rib.move(to: base)
+                rib.addLine(to: CGPoint(x: endX, y: endY))
+                ctx.stroke(rib,
+                           with: .color(col.opacity(baseOp * 0.55)),
+                           lineWidth: 0.5)
+            }
+        }
+    }
+
+    // MARK: - TIER 1 · Atmospheric grain
+    //
+    // 80 slow-rising motes. Density (per-particle alpha scale) drops to
+    // 0.05 inside score silence windows, rises with energy + modulator
+    // elsewhere. Alpha peaks at mid-life.
+
+    private func drawAtmosphericGrain(ctx: GraphicsContext, t: Double) {
+        let mod = performer.crescendoModulator
+        let energy = performer.energy
+        let density = performer.inSilence
+            ? 0.05
+            : 0.18 + energy * 0.45 + mod * 0.35
+        let col = Color(hue: elementHueDeg / 360,
+                        saturation: 0.30, brightness: 0.75)
+
+        for p in grain {
+            let age = t - p.bornAt
+            guard age >= 0, age < p.lifetime else { continue }
+            let lifeFrac = age / p.lifetime
+            let envelope = sin(lifeFrac * .pi)   // 0 → 1 → 0
+            let alpha = envelope * density
+            let rect = CGRect(x: p.pos.x - p.size / 2,
+                              y: p.pos.y - p.size / 2,
+                              width: p.size, height: p.size)
+            ctx.fill(
+                Path(ellipseIn: rect),
+                with: .color(col.opacity(alpha))
+            )
+        }
+    }
+
+    private func stepGrain(dt: Double, t: Double, in size: CGSize) {
+        guard size.width > 0, size.height > 0 else { return }
+
+        // Advance positions, drop expired
+        var living: [Grain] = []
+        living.reserveCapacity(grain.count)
+        for var p in grain {
+            let age = t - p.bornAt
+            if age > p.lifetime { continue }
+            p.pos.y += p.vy * CGFloat(dt)
+            // Slight horizontal sway with a per-particle phase
+            let sway = sin(t * 0.3 + Double(p.id.hashValue % 1000) * 0.07) * 0.2
+            p.pos.x += CGFloat(sway)
+            living.append(p)
+        }
+
+        // Spawn to maintain target density
+        let toSpawn = max(0, grainTarget - living.count)
+        for _ in 0..<toSpawn {
+            let p = spawnGrain(in: size, t: t)
+            living.append(p)
+        }
+        grain = living
+    }
+
+    private func spawnGrain(in size: CGSize, t: Double) -> Grain {
+        let x = CGFloat.random(in: 0...size.width)
+        // Spawn anywhere in the lower 2/3 so the rise is visible
+        let y = CGFloat.random(in: size.height * 0.35...size.height)
+        let lifetime = Double.random(in: 6...12)
+        // Rise velocity: -2 to -6 pt/sec (negative = up)
+        let vy = CGFloat.random(in: -6 ... -1.5)
+        let sz = CGFloat.random(in: 0.4...1.4)
+        return Grain(pos: CGPoint(x: x, y: y),
+                     vy: vy, bornAt: t, lifetime: lifetime, size: sz)
+    }
+
+    // MARK: - TIER 1 · Gaia ground
+    //
+    // Soft radial glow at y = H*0.85, breathing on a slow 52s cycle,
+    // scaled by Gaia's archetype presence (which ramps from 0 over the
+    // first ~6s of a session).
+
+    private func drawGaiaGround(ctx: GraphicsContext, size: CGSize,
+                                t: Double, gaia: Double) {
+        let W = size.width, H = size.height
+        guard W > 0, H > 0, gaia > 0.02 else { return }
+        let center = CGPoint(x: W / 2, y: H * 0.85)
+        let breath = sin(t * 0.12) * 0.5 + 0.5
+        let radius = W * 0.55 * (0.85 + breath * 0.30)
+        // Hue shifted 15° down to ground the color (terracotta direction).
+        let h = (elementHueDeg - 15 + 360).truncatingRemainder(dividingBy: 360) / 360
+        let col = Color(hue: h, saturation: 0.45, brightness: 0.40)
+        let alpha = (0.04 + breath * 0.08) * gaia
+        ctx.fill(
+            Path(ellipseIn: CGRect(x: center.x - radius,
+                                   y: center.y - radius,
+                                   width: radius * 2,
+                                   height: radius * 2)),
+            with: .radialGradient(
+                Gradient(colors: [col.opacity(alpha), col.opacity(0)]),
+                center: center,
+                startRadius: 0,
+                endRadius: radius
+            )
+        )
+    }
+
+    // MARK: - Bindu (singular Lissajous)
+    //
+    // Multi-harmonic Lissajous driven by the running BEAT Hz. Trail of
+    // 120 samples renders as a comet behind the head; an RMS-driven
+    // bloom halos the head; beat rings spawn on each performer.beatPulse
+    // edge above 0.9; the carrier-lock flag pulses the core to 1.5×
+    // size for ~180ms.
+
+    private func drawBindu(ctx: GraphicsContext, size: CGSize, t: Double,
+                           energy: Double, beat: Double, mod: Double,
+                           bindu: CGPoint) {
+        let baseOpacity: Double = wire.binauralEnabled ? 1.0 : 0.4
+
+        // RMS-driven halo
+        let haloR: CGFloat = 28 + CGFloat(mod) * 20 + CGFloat(energy) * 20
+        let haloRect = CGRect(x: bindu.x - haloR, y: bindu.y - haloR,
+                              width: haloR * 2, height: haloR * 2)
+        let haloAlpha = (0.18 + energy * 0.45) * baseOpacity
+        ctx.fill(
+            Path(ellipseIn: haloRect),
+            with: .radialGradient(
+                Gradient(colors: [
+                    color.opacity(haloAlpha),
+                    color.opacity(0)
+                ]),
+                center: bindu,
+                startRadius: 0,
+                endRadius: haloR
+            )
+        )
+
+        // Beat rings (onset-spawned, age-fading)
+        for ring in rings {
+            let age = t - ring.bornAt
+            if age < 0 || age > ringDurationSec { continue }
+            let progress = age / ringDurationSec
+            let r = CGFloat(progress) * (ringMaxRadius + CGFloat(energy) * 60)
+            let alpha = (0.6 * (1 - progress)) * baseOpacity
+            ctx.stroke(
+                Path(ellipseIn: CGRect(x: ring.center.x - r,
+                                       y: ring.center.y - r,
+                                       width: r * 2, height: r * 2)),
+                with: .color(ring.color.opacity(alpha)),
+                lineWidth: 1.4
+            )
+        }
+
+        // Comet trail (120-sample buffer; newest at end of array)
+        let trail = trailPositions
+        let n = trail.count
+        if n > 0 {
+            for (i, p) in trail.enumerated() {
+                let frac = Double(i + 1) / Double(n)
+                let dotR: CGFloat = 1.0 + CGFloat(frac) * 3.0
+                let alpha = pow(frac, 2.2) * 0.7 * baseOpacity
+                ctx.fill(
+                    Path(ellipseIn: CGRect(x: p.x - dotR, y: p.y - dotR,
+                                           width: dotR * 2, height: dotR * 2)),
+                    with: .color(color.opacity(alpha))
+                )
+            }
+        }
+
+        // Bindu core (carrier-pulse-scaled)
+        let coreR = 10 * carrierPulse
+        let coreRect = CGRect(x: bindu.x - coreR, y: bindu.y - coreR,
+                              width: coreR * 2, height: coreR * 2)
+        ctx.fill(
+            Path(ellipseIn: coreRect),
+            with: .radialGradient(
+                Gradient(colors: [
+                    color.opacity(0.95 * baseOpacity),
+                    color.opacity(0.55 * baseOpacity),
+                    color.opacity(0)
+                ]),
+                center: bindu,
+                startRadius: 0,
+                endRadius: coreR
+            )
+        )
+
+        // White center dot
+        let dotR = coreR * 0.32
+        ctx.fill(
+            Path(ellipseIn: CGRect(x: bindu.x - dotR, y: bindu.y - dotR,
+                                   width: dotR * 2, height: dotR * 2)),
+            with: .color(.white.opacity(0.85 * baseOpacity))
+        )
+    }
+
+    // MARK: - Bindu position (multi-harmonic Lissajous)
 
     private func binduPosition(t: Double, in size: CGSize) -> CGPoint {
         let cx = size.width / 2
-        let cy = size.height / 2
-        let r = min(size.width, size.height) * 0.22
+        let cy = size.height * 0.38   // upper center (above the cathedral floor's VP)
+        let minDim = min(size.width, size.height)
+        // Grows with the crescendo modulator — the Bindu opens up at climax.
+        let maxR = minDim * 0.12 + CGFloat(performer.crescendoModulator) * minDim * 0.10
+        // Frequency tracks the current binaural beat Hz so visual motion
+        // is rhythmically tied to the audible beat. 0.88 scale keeps it
+        // legible at the upper beat range.
+        let freq = max(Double(wire.userBeatHz), 0.5) * 0.88
 
-        // Primary orbit
-        let x1 = r * sin(2 * t + 0.5)
-        let y1 = r * sin(3 * t)
-
-        // Secondary harmonic (smaller, faster)
-        let x2 = r * 0.3 * sin(5 * t + 1.2)
-        let y2 = r * 0.3 * sin(4 * t + 0.8)
-
-        return CGPoint(x: cx + x1 + x2, y: cy + y1 + y2)
+        let bx = cx + (sin(2 * t * freq + .pi / 2) * 0.88 + sin(3 * t * freq + 0.5) * 0.12) * maxR
+        let by = cy + sin(t * freq) * 0.84 * maxR * 0.70
+        return CGPoint(x: bx, y: by)
     }
 
-    private func appendTrail(_ p: CGPoint, t: Double) {
+    // MARK: - Trail + ring management
+
+    private func appendTrail(_ p: CGPoint) {
         trailPositions.append(p)
         if trailPositions.count > trailLength {
             trailPositions.removeFirst(trailPositions.count - trailLength)
+        }
+    }
+
+    /// Beat-pulse-edge ring trigger. Spawns a ring at the head of the
+    /// comet when Performer's beatPulse crosses above 0.9, with a 80ms
+    /// debounce so two adjacent frames don't double-spawn.
+    private func triggerBeatRingIfNeeded(t: Double) {
+        let bp = performer.beatPulse
+        guard bp > 0.9 else { return }
+        guard t - lastBeatPulseTrigger > 0.08 else { return }
+        lastBeatPulseTrigger = t
+        let center = trailPositions.last ?? .zero
+        if center == .zero { return }
+        rings.append(Ring(center: center, bornAt: t, color: color))
+        if rings.count > 24 {
+            rings.removeFirst(rings.count - 24)
         }
     }
 }

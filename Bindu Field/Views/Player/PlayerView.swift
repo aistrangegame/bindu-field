@@ -145,34 +145,32 @@ struct PlayerView: View {
     }
 
     // MARK: - Visualizer (mode-aware)
+    //
+    // Phase 5: the Cathedral renderer needs a wide-and-short canvas (the
+    // cathedral floor + Sid columns + vault all reference the canvas's
+    // own width). Anchor top, full-width, height per mode.
 
     @ViewBuilder
     private func visualizerLayer(in geo: GeometryProxy) -> some View {
-        let size = visualizerSize(for: mode, in: geo.size)
-        let yCenter = visualizerYCenter(for: mode, in: geo.size)
+        let h = visualizerHeight(for: mode, in: geo.size)
         let dim = visualizerOpacity(for: mode)
 
-        VisualizerView(beat: store.currentBeat, color: elementColor)
-            .frame(width: size, height: size)
-            .opacity(dim)
-            .position(x: geo.size.width / 2, y: yCenter)
-            .allowsHitTesting(false)
-            .animation(.spring(response: 0.55, dampingFraction: 0.82), value: mode)
-    }
-
-    private func visualizerSize(for mode: PlayerMode, in size: CGSize) -> CGFloat {
-        switch mode {
-        case .field:   return min(size.width, 320)
-        case .control: return min(size.width * 0.55, 220)
-        case .reading: return min(size.width * 0.28, 110)
+        VStack(spacing: 0) {
+            VisualizerView(color: elementColor, elementHueDeg: elementHueDeg)
+                .frame(maxWidth: .infinity)
+                .frame(height: h)
+                .opacity(dim)
+            Spacer(minLength: 0)
         }
+        .allowsHitTesting(false)
+        .animation(.spring(response: 0.55, dampingFraction: 0.82), value: mode)
     }
 
-    private func visualizerYCenter(for mode: PlayerMode, in size: CGSize) -> CGFloat {
+    private func visualizerHeight(for mode: PlayerMode, in size: CGSize) -> CGFloat {
         switch mode {
-        case .field:   return size.height * 0.34
-        case .control: return size.height * 0.18
-        case .reading: return size.height * 0.10
+        case .field:   return size.height * 0.60
+        case .control: return size.height * 0.45
+        case .reading: return size.height * 0.20
         }
     }
 
