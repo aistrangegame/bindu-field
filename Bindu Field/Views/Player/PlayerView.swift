@@ -61,8 +61,19 @@ struct PlayerView: View {
                 // opacity respond to mode transitions.
                 visualizerLayer(in: geo)
 
+                // Bottom gradient — fades the visualizer's lower edge into
+                // the bg around the 48–57% mark so the verb floats over a
+                // softened canvas instead of sitting on a hard horizontal
+                // line. FIELD mode only; CONTROL/READING use their own
+                // sheet surfaces to mask the lower viz area.
+                if mode == .field {
+                    bottomFadeGradient(in: geo)
+                }
+
                 // FIELD content (verb / song / recognition / scrubber).
-                // Always laid out, opacity-faded in non-FIELD modes.
+                // Now a ZStack overlay floating over the visualizer's
+                // lower edge — verb anchored ~56% from the top, scrubber
+                // pinned to the bottom.
                 fieldContent(in: geo)
                     .opacity(mode == .field ? 1.0 : 0)
                     .animation(.easeInOut(duration: 0.32), value: mode)
@@ -70,6 +81,13 @@ struct PlayerView: View {
 
                 // Mode-specific tap zones (above any sheets).
                 modeTapZone(in: geo)
+
+                // Top gradient — fades the bg-color over the top 88pt for
+                // status-bar legibility, masking any cathedral arches that
+                // reach the upper edge of the viz. Always present; sits
+                // above the tap zone but below the pill / sheets.
+                topStatusBarGradient
+                    .allowsHitTesting(false)
 
                 // CONTROL sheet — surfaces in CONTROL and READING (READING
                 // overlays a taller sheet on top).
@@ -184,46 +202,85 @@ struct PlayerView: View {
     }
 
     // MARK: - FIELD content
+    //
+    // ZStack overlay on top of the visualizer area. The text block (verb,
+    // song · artist, recognition) is anchored ~56% from the top so it
+    // floats over the visualizer's lower edge where the bottom gradient
+    // fades the viz into the bg. The scrubber is anchored to the bottom
+    // of the screen, independent of the text block.
 
     @ViewBuilder
     private func fieldContent(in geo: GeometryProxy) -> some View {
-        VStack(spacing: 0) {
-            Spacer()
-                .frame(height: geo.size.height * 0.60)
-
-            Text(track.verb)
-                .font(.system(size: 62, weight: .ultraLight, design: .serif))
-                .italic()
-                .foregroundColor(elementColor)
-                .shadow(color: elementColor.opacity(0.5), radius: 22)
-                .padding(.horizontal, 24)
-                .padding(.bottom, 8)
-
-            Text("\(track.song) — \(track.artist)")
-                .font(.system(size: 12, design: .serif))
-                .italic()
-                .foregroundColor(theme.subtle)
-                .padding(.bottom, 12)
-
-            if let rs = track.recognitionStatement, !rs.isEmpty {
-                Text("\u{201C}\(rs)\u{201D}")
-                    .font(.system(size: 13, design: .serif))
+        ZStack(alignment: .top) {
+            // Text block — verb is the primary gesture.
+            VStack(spacing: 0) {
+                Text(track.verb)
+                    .font(.system(size: 62, weight: .ultraLight, design: .serif))
                     .italic()
-                    .foregroundColor(theme.text.opacity(0.65))
-                    .multilineTextAlignment(.center)
-                    .lineSpacing(4)
-                    .padding(.horizontal, 38)
-                    .padding(.bottom, 22)
-                    .fixedSize(horizontal: false, vertical: true)
+                    .foregroundColor(elementColor)
+                    .shadow(color: elementColor.opacity(0.5), radius: 22)
+                    .padding(.horizontal, 24)
+                    .padding(.bottom, 8)
+
+                Text("\(track.song) — \(track.artist)")
+                    .font(.system(size: 12, design: .serif))
+                    .italic()
+                    .foregroundColor(theme.subtle)
+                    .padding(.bottom, 12)
+
+                if let rs = track.recognitionStatement, !rs.isEmpty {
+                    Text("\u{201C}\(rs)\u{201D}")
+                        .font(.system(size: 13, design: .serif))
+                        .italic()
+                        .foregroundColor(theme.text.opacity(0.65))
+                        .multilineTextAlignment(.center)
+                        .lineSpacing(4)
+                        .padding(.horizontal, 38)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
             }
+            .frame(maxWidth: .infinity)
+            .padding(.top, geo.size.height * 0.56)
 
-            Spacer()
-
-            slimScrubber
-                .padding(.horizontal, 28)
-                .padding(.bottom, 28)
+            // Scrubber pinned to the bottom of the screen.
+            VStack(spacing: 0) {
+                Spacer()
+                slimScrubber
+                    .padding(.horizontal, 28)
+                    .padding(.bottom, 28)
+            }
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
+    }
+
+    // MARK: - Gradient overlays
+
+    @ViewBuilder
+    private func bottomFadeGradient(in geo: GeometryProxy) -> some View {
+        VStack(spacing: 0) {
+            Spacer()
+                .frame(height: geo.size.height * 0.48)
+            LinearGradient(
+                colors: [Color.clear, theme.bg],
+                startPoint: .top,
+                endPoint: .bottom
+            )
+            .frame(height: 86)
+            Spacer()
+        }
+        .allowsHitTesting(false)
+    }
+
+    private var topStatusBarGradient: some View {
+        VStack(spacing: 0) {
+            LinearGradient(
+                colors: [theme.bg.opacity(0.80), Color.clear],
+                startPoint: .top,
+                endPoint: .bottom
+            )
+            .frame(height: 88)
+            Spacer()
+        }
     }
 
     // Read-only "flowing" scrubber. Slim (2pt), element-color fill.
