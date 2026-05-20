@@ -1,0 +1,468 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Bindu Tab Bar Icons</title>
+<link href="https://fonts.googleapis.com/css2?family=Lora:ital,wght@0,300;0,400;1,300;1,400&family=DM+Mono:wght@300;400&display=swap" rel="stylesheet">
+<script src="https://unpkg.com/react@18.3.1/umd/react.development.js" integrity="sha384-hD6/rw4ppMLGNu3tX5cjIb+uRZ7UkRJ6BPkLpg4hAu/6onKUg4lLsHAs9EBPT82L" crossorigin="anonymous"></script>
+<script src="https://unpkg.com/react-dom@18.3.1/umd/react-dom.development.js" integrity="sha384-u6aeetuaXnQ38mYT8rp6sbXaQe3NL9t+IBXmnYxwkUI2Hw4bsp2Wvmx4yRQF1uAm" crossorigin="anonymous"></script>
+<script src="https://unpkg.com/@babel/standalone@7.29.0/babel.min.js" integrity="sha384-m08KidiNqLdpJqLq95G/LEi8Qvjl/xUYll3QILypMoQ65QorJ9Lvtp2RXYGBFj1y" crossorigin="anonymous"></script>
+<script type="text/babel" src="design-canvas.jsx"></script>
+<script type="text/babel" src="tweaks-panel.jsx"></script>
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+body{background:#0c0b0f}
+::-webkit-scrollbar{display:none}
+@keyframes tabPulse{0%,100%{opacity:.7}50%{opacity:1}}
+</style>
+<template id="__bundler_thumbnail" data-bg-color="#020208">
+  <svg viewBox="0 0 393 120" xmlns="http://www.w3.org/2000/svg">
+    <rect width="393" height="120" fill="#020208"/>
+    <rect width="393" height="1" y="0" fill="rgba(255,255,255,0.06)"/>
+    <!-- 7 tab icons in a row -->
+    <!-- MAP: concentric irregular rings -->
+    <circle cx="28" cy="52" r="14" fill="none" stroke="rgba(245,226,214,0.55)" stroke-width="1.2"/>
+    <circle cx="28" cy="52" r="7" fill="none" stroke="rgba(245,226,214,0.35)" stroke-width=".8"/>
+    <circle cx="28" cy="52" r="2.5" fill="rgba(245,226,214,0.8)"/>
+    <!-- FIELD: fibonacci spiral -->
+    <path d="M84,52 Q90,40 96,52 Q90,64 84,52" fill="none" stroke="rgba(245,226,214,0.45)" stroke-width="1.2"/>
+    <circle cx="90" cy="52" r="2" fill="rgba(245,226,214,0.6)"/>
+    <!-- ORACLE: void circle with inner silence -->
+    <circle cx="150" cy="52" r="14" fill="none" stroke="rgba(245,226,214,0.4)" stroke-width=".8" stroke-dasharray="2 3"/>
+    <circle cx="150" cy="52" r="2" fill="rgba(245,226,214,0.9)"/>
+    <!-- SPACE: breath ring open on top -->
+    <path d="M222,38 Q236,38 236,52 Q236,66 222,66 Q208,66 208,52 Q208,44 216,40" fill="none" stroke="rgba(245,226,214,0.45)" stroke-width="1.2" stroke-linecap="round"/>
+    <!-- LAB: waveform + node -->
+    <path d="M268,52 Q272,44 276,52 Q280,60 284,52 Q288,44 292,52" fill="none" stroke="rgba(245,226,214,0.45)" stroke-width="1.2"/>
+    <circle cx="280" cy="52" r="2" fill="rgba(245,226,214,0.7)"/>
+    <!-- ARCHIVE: layered pages -->
+    <rect x="333" y="44" width="14" height="12" rx="1" fill="none" stroke="rgba(245,226,214,0.3)" stroke-width=".8"/>
+    <rect x="336" y="42" width="14" height="12" rx="1" fill="none" stroke="rgba(245,226,214,0.45)" stroke-width=".8"/>
+    <line x1="339" y1="46" x2="347" y2="46" stroke="rgba(245,226,214,0.3)" stroke-width=".7"/>
+    <line x1="339" y1="49" x2="345" y2="49" stroke="rgba(245,226,214,0.3)" stroke-width=".7"/>
+    <!-- LETTER: sound wave envelope -->
+    <path d="M366,44 L366,60 L380,60 L380,44 Z" fill="none" stroke="rgba(245,226,214,0.35)" stroke-width=".8"/>
+    <path d="M366,44 L373,52 L380,44" fill="none" stroke="rgba(245,226,214,0.45)" stroke-width=".8"/>
+  </svg>
+</template>
+</head>
+<body>
+<script type="text/babel">
+const { useState } = React;
+const SERIF = "'Lora', Georgia, serif";
+const MONO  = "'DM Mono','SF Mono',ui-monospace,monospace";
+const CREAM = '#F5E2D6';
+const BG    = '#020208';
+
+// ── ICON DEFINITIONS ──────────────────────────────────────────────────
+// Each icon is an SVG path/group rendered in a 28×28 viewBox.
+// Design language: concentric geometry, sparse, no fills — only strokes
+// and points. Every icon is a VERB or PRESENCE, not a noun-object.
+
+const ICONS = [
+  {
+    id: 'map',
+    label: 'MAP',
+    sfCurrent: 'circle.dotted',
+    concept: 'The 33 chakras as concentric rings — a nested map of consciousness',
+    render: (active, scale=1) => (
+      <svg viewBox="0 0 28 28" width={28*scale} height={28*scale} fill="none">
+        {/* Three concentric irregular orbits — the tree within the point */}
+        <circle cx="14" cy="14" r="12.5" stroke="currentColor" strokeWidth=".9" strokeOpacity={active?.65:.35}/>
+        <circle cx="14" cy="14" r="7.5" stroke="currentColor" strokeWidth=".8" strokeOpacity={active?.5:.28}/>
+        <circle cx="14" cy="14" r="3.2" stroke="currentColor" strokeWidth=".9" strokeOpacity={active?.7:.4}/>
+        {/* The dot — Bindu at center */}
+        <circle cx="14" cy="14" r="1.5" fill="currentColor" fillOpacity={active?1:.6}/>
+        {/* Four subtle cardinal marks on outer ring */}
+        {[0,90,180,270].map(a => {
+          const rad=a*Math.PI/180;
+          return <line key={a}
+            x1={14+11.8*Math.cos(rad)} y1={14+11.8*Math.sin(rad)}
+            x2={14+13.5*Math.cos(rad)} y2={14+13.5*Math.sin(rad)}
+            stroke="currentColor" strokeWidth=".8" strokeOpacity={active?.5:.25}
+          />;
+        })}
+      </svg>
+    ),
+  },
+  {
+    id: 'field',
+    label: 'FIELD',
+    sfCurrent: 'circle.dotted',
+    concept: 'The constellation — a sparse star field with one bright node. The catalog as sky.',
+    render: (active, scale=1) => (
+      <svg viewBox="0 0 28 28" width={28*scale} height={28*scale} fill="none">
+        {/* Star field — 7 deterministic stars */}
+        {[[5,6],[22,5],[8,20],[21,19],[13,9],[6,14],[20,13]].map(([x,y],i)=>(
+          <circle key={i} cx={x} cy={y} r={i===4?1.8:.9}
+            fill="currentColor" fillOpacity={i===4?(active?1:.7):(active?.45:.22)}/>
+        ))}
+        {/* Central constellation node — slightly larger */}
+        <circle cx="14" cy="14" r="2.5" fill="currentColor" fillOpacity={active?.85:.5}/>
+        {/* A few connecting lines */}
+        <line x1="14" y1="14" x2="13" y2="9" stroke="currentColor" strokeWidth=".5" strokeOpacity={active?.25:.12}/>
+        <line x1="14" y1="14" x2="22" y2="5" stroke="currentColor" strokeWidth=".5" strokeOpacity={active?.2:.1}/>
+        <line x1="14" y1="14" x2="8" y2="20" stroke="currentColor" strokeWidth=".5" strokeOpacity={active?.2:.1}/>
+      </svg>
+    ),
+  },
+  {
+    id: 'oracle',
+    label: 'ORACLE',
+    sfCurrent: 'ear',
+    concept: 'The void circle — a ring open at the top, as if listening. The question mark rewritten as presence.',
+    render: (active, scale=1) => (
+      <svg viewBox="0 0 28 28" width={28*scale} height={28*scale} fill="none">
+        {/* Outer ring — open at top, suggesting listening */}
+        <path d="M14 2 A12 12 0 1 1 13.99 2"
+          stroke="currentColor" strokeWidth="1" strokeOpacity={active?.6:.3}
+          strokeLinecap="round"
+        />
+        {/* Gap at top — the opening */}
+        <path d="M10.5 3.5 A12 12 0 0 0 14 2"
+          stroke="currentColor" strokeWidth="1" strokeOpacity="0"
+        />
+        {/* Inner ring */}
+        <circle cx="14" cy="14" r="6.5" stroke="currentColor" strokeWidth=".75" strokeOpacity={active?.45:.22}/>
+        {/* The listening center */}
+        <circle cx="14" cy="14" r="2" fill="currentColor" fillOpacity={active?1:.6}/>
+        {/* Opening at top — a gap in outer ring */}
+        <path d="M11.8 2.8 A12 12 0 0 1 16.2 2.8"
+          stroke={BG} strokeWidth="2.5"
+        />
+      </svg>
+    ),
+  },
+  {
+    id: 'space',
+    label: 'SPACE',
+    sfCurrent: 'moon.stars',
+    concept: 'The breath ring — the ceremonial circle you sit inside. Open at the top, not closed.',
+    render: (active, scale=1) => (
+      <svg viewBox="0 0 28 28" width={28*scale} height={28*scale} fill="none">
+        {/* Breath ring — large, thin, open at very top */}
+        <path d="M14 2.5 A11.5 11.5 0 1 0 14 25.5 A11.5 11.5 0 0 0 14 2.5"
+          stroke="currentColor" strokeWidth="1" strokeOpacity={active?.65:.32} strokeLinecap="round"
+        />
+        {/* Inner breath — smaller ring */}
+        <circle cx="14" cy="14" r="6" stroke="currentColor" strokeWidth=".75" strokeOpacity={active?.4:.2}/>
+        {/* Three small marks at 4/8/12 o'clock — breath timing */}
+        {[60,180,300].map(a=>{
+          const r=a*Math.PI/180;
+          return <circle key={a} cx={14+10.8*Math.cos(r)} cy={14+10.8*Math.sin(r)} r=".9"
+            fill="currentColor" fillOpacity={active?.5:.25}/>;
+        })}
+        {/* Center */}
+        <circle cx="14" cy="14" r="1.5" fill="currentColor" fillOpacity={active?.8:.45}/>
+      </svg>
+    ),
+  },
+  {
+    id: 'lab',
+    label: 'LAB',
+    sfCurrent: 'waveform.path',
+    concept: 'A single binaural waveform — two frequencies meeting at a carrier node. The tuning fork rewritten.',
+    render: (active, scale=1) => (
+      <svg viewBox="0 0 28 28" width={28*scale} height={28*scale} fill="none">
+        {/* Carrier wave — sine path */}
+        <path d="M2 14 Q5 8 8 14 Q11 20 14 14 Q17 8 20 14 Q23 20 26 14"
+          stroke="currentColor" strokeWidth="1.1" strokeOpacity={active?.75:.4} strokeLinecap="round"
+        />
+        {/* Node at center — the beat frequency */}
+        <circle cx="14" cy="14" r="2.5" fill={BG}/>
+        <circle cx="14" cy="14" r="2.5" stroke="currentColor" strokeWidth="1" strokeOpacity={active?.9:.5}/>
+        <circle cx="14" cy="14" r="1" fill="currentColor" fillOpacity={active?1:.7}/>
+        {/* Frequency tick marks above/below */}
+        <line x1="14" y1="2" x2="14" y2="5" stroke="currentColor" strokeWidth=".8" strokeOpacity={active?.4:.2}/>
+        <line x1="14" y1="23" x2="14" y2="26" stroke="currentColor" strokeWidth=".8" strokeOpacity={active?.4:.2}/>
+      </svg>
+    ),
+  },
+  {
+    id: 'archive',
+    label: 'ARCHIVE',
+    sfCurrent: 'book.closed',
+    concept: 'The constellation of memory — a sphere of offered words. The archive as a field of light, not a shelf.',
+    render: (active, scale=1) => (
+      <svg viewBox="0 0 28 28" width={28*scale} height={28*scale} fill="none">
+        {/* Outer ellipse — the memory sphere */}
+        <ellipse cx="14" cy="14" rx="12" ry="9" stroke="currentColor" strokeWidth=".9" strokeOpacity={active?.55:.28}/>
+        {/* Equatorial ring */}
+        <ellipse cx="14" cy="14" rx="12" ry="3.5" stroke="currentColor" strokeWidth=".7" strokeOpacity={active?.35:.18}/>
+        {/* Vertical axis */}
+        <line x1="14" y1="5" x2="14" y2="23" stroke="currentColor" strokeWidth=".7" strokeOpacity={active?.3:.15}/>
+        {/* Memory stars */}
+        {[[9,10],[18,11],[12,17],[19,17],[7,15]].map(([x,y],i)=>(
+          <circle key={i} cx={x} cy={y} r={i===0?1.4:.85}
+            fill="currentColor" fillOpacity={active?(i===0?.9:.5):(i===0?.5:.22)}/>
+        ))}
+      </svg>
+    ),
+  },
+  {
+    id: 'letter',
+    label: 'LETTER',
+    sfCurrent: 'envelope',
+    concept: 'The sound wave carried in a breath — a voice letter redrawn as an outgoing wave, not a postal container.',
+    render: (active, scale=1) => (
+      <svg viewBox="0 0 28 28" width={28*scale} height={28*scale} fill="none">
+        {/* Outgoing arc — the voice radiating outward */}
+        <path d="M8 14 Q14 6 20 14" stroke="currentColor" strokeWidth="1" strokeOpacity={active?.7:.35} strokeLinecap="round"/>
+        <path d="M5 14 Q14 3 23 14" stroke="currentColor" strokeWidth=".75" strokeOpacity={active?.45:.22} strokeLinecap="round"/>
+        <path d="M3 14 Q14 0.5 25 14" stroke="currentColor" strokeWidth=".6" strokeOpacity={active?.28:.13} strokeLinecap="round"/>
+        {/* Source point */}
+        <circle cx="14" cy="14" r="2.2" fill="currentColor" fillOpacity={active?.9:.5}/>
+        {/* Receiving point — below, like the ground listening */}
+        <line x1="14" y1="17" x2="14" y2="25" stroke="currentColor" strokeWidth=".8" strokeOpacity={active?.35:.18}/>
+        <circle cx="14" cy="25.5" r=".9" fill="currentColor" fillOpacity={active?.4:.2}/>
+      </svg>
+    ),
+  },
+];
+
+// ── ICON CHIP ─────────────────────────────────────────────────────────
+function IconChip({ icon, active, scale=1.8, showLabel=true }) {
+  const [hover, setHover] = useState(false);
+  const isActive = active || hover;
+  return (
+    <div
+      onMouseEnter={()=>setHover(true)}
+      onMouseLeave={()=>setHover(false)}
+      style={{
+        display:'flex', flexDirection:'column', alignItems:'center', gap:6,
+        cursor:'pointer',
+      }}
+    >
+      <div style={{
+        color: isActive ? CREAM : 'rgba(245,226,214,0.45)',
+        transition:'color .2s',
+      }}>
+        {icon.render(isActive, scale)}
+      </div>
+      {showLabel && (
+        <div style={{
+          fontFamily:MONO, fontSize:7, letterSpacing:'0.18em',
+          color: isActive ? 'rgba(245,226,214,0.75)' : 'rgba(245,226,214,0.28)',
+          transition:'color .2s',
+        }}>{icon.label}</div>
+      )}
+    </div>
+  );
+}
+
+// ── TAB BAR MOCKUP ────────────────────────────────────────────────────
+function TabBarMockup({ activeTab='map', bg='dark' }) {
+  const isDark = bg==='dark';
+  return (
+    <div style={{
+      width: 393, background: isDark ? 'rgba(2,2,8,0.97)' : 'rgba(245,242,238,0.97)',
+      borderTop:`1px solid ${isDark?'rgba(255,255,255,0.06)':'rgba(0,0,0,0.08)'}`,
+      padding:'10px 8px 14px',
+      display:'flex', alignItems:'flex-start', justifyContent:'space-around',
+    }}>
+      {ICONS.map(icon=>(
+        <div key={icon.id} style={{
+          display:'flex', flexDirection:'column', alignItems:'center', gap:3,
+          opacity:icon.id===activeTab?1:.38,
+        }}>
+          <div style={{color: isDark?CREAM:'#29261b'}}>
+            {icon.render(icon.id===activeTab, 1)}
+          </div>
+          <div style={{
+            fontFamily:MONO, fontSize:6.5, letterSpacing:'0.16em',
+            color: isDark
+              ? (icon.id===activeTab?'rgba(245,226,214,0.75)':'rgba(245,226,214,0.3)')
+              : (icon.id===activeTab?'rgba(41,38,27,0.8)':'rgba(41,38,27,0.35)'),
+          }}>{icon.label}</div>
+        </div>
+      ))}
+    </div>
+  );
+}
+
+// ── ICON SPEC CARD ────────────────────────────────────────────────────
+function IconSpecCard({ icon }) {
+  const [activeState, setActiveState] = useState(false);
+  return (
+    <div style={{
+      background:'rgba(255,255,255,0.025)',
+      border:'1px solid rgba(255,255,255,0.07)',
+      padding:'20px 18px', borderRadius:2,
+      display:'flex', flexDirection:'column', gap:14,
+      cursor:'pointer',
+    }} onClick={()=>setActiveState(s=>!s)}>
+      {/* Icon at 3 sizes */}
+      <div style={{display:'flex', gap:20, alignItems:'flex-end'}}>
+        <div style={{color:CREAM, opacity:activeState?1:.55}}>
+          {icon.render(activeState, 1.0)}
+        </div>
+        <div style={{color:CREAM, opacity:activeState?1:.55}}>
+          {icon.render(activeState, 1.6)}
+        </div>
+        <div style={{color:CREAM, opacity:activeState?1:.55}}>
+          {icon.render(activeState, 2.4)}
+        </div>
+        <div style={{
+          fontFamily:MONO, fontSize:7, letterSpacing:'0.2em',
+          color:'rgba(245,226,214,0.25)', alignSelf:'center', marginLeft:4,
+        }}>28 · 45 · 67px</div>
+      </div>
+      {/* Label + SF comparison */}
+      <div>
+        <div style={{fontFamily:MONO, fontSize:9, letterSpacing:'0.2em', color:'rgba(245,226,214,0.7)', marginBottom:5}}>
+          {icon.label}
+        </div>
+        <div style={{fontFamily:MONO, fontSize:7.5, letterSpacing:'0.12em', color:'rgba(245,226,214,0.3)', marginBottom:8}}>
+          replaces: {icon.sfCurrent}
+        </div>
+        <div style={{
+          fontFamily:SERIF, fontStyle:'italic', fontSize:12,
+          color:'rgba(245,226,214,0.45)', lineHeight:1.6,
+        }}>{icon.concept}</div>
+      </div>
+      <div style={{
+        fontFamily:MONO, fontSize:6.5, letterSpacing:'0.16em',
+        color:'rgba(245,226,214,0.18)',
+      }}>{activeState?'ACTIVE':'INACTIVE'} · click to toggle</div>
+    </div>
+  );
+}
+
+// ── FULL ICON GRID ────────────────────────────────────────────────────
+function IconGrid({ activeTab='map' }) {
+  const [active, setActive] = useState(activeTab);
+  return (
+    <div style={{
+      width:560, background:BG, padding:'32px 28px',
+      display:'flex', flexDirection:'column', gap:0,
+    }}>
+      <div style={{
+        fontFamily:MONO, fontSize:7.5, letterSpacing:'0.28em',
+        color:'rgba(245,226,214,0.25)', marginBottom:24,
+      }}>TAB BAR ICON SET · 7 ICONS</div>
+      <div style={{
+        display:'grid', gridTemplateColumns:'repeat(7,1fr)', gap:0,
+        marginBottom:32,
+      }}>
+        {ICONS.map(icon=>(
+          <div key={icon.id}
+            onClick={()=>setActive(icon.id)}
+            style={{
+              display:'flex', flexDirection:'column', alignItems:'center',
+              gap:6, padding:'14px 4px', cursor:'pointer',
+              borderBottom:`1px solid ${icon.id===active?'rgba(245,226,214,0.25)':'rgba(255,255,255,0.05)'}`,
+              transition:'border-color .2s',
+            }}
+          >
+            <div style={{color:CREAM,opacity:icon.id===active?1:.4,transition:'opacity .2s'}}>
+              {icon.render(icon.id===active, 1)}
+            </div>
+            <div style={{
+              fontFamily:MONO, fontSize:6, letterSpacing:'0.14em',
+              color:icon.id===active?'rgba(245,226,214,0.75)':'rgba(245,226,214,0.28)',
+              transition:'color .2s',
+            }}>{icon.label}</div>
+          </div>
+        ))}
+      </div>
+      {/* Active icon detail */}
+      {active && (()=>{
+        const icon=ICONS.find(i=>i.id===active);
+        return (
+          <div style={{
+            padding:'20px 0', borderTop:'1px solid rgba(255,255,255,0.06)',
+          }}>
+            <div style={{fontFamily:MONO,fontSize:8,letterSpacing:'0.22em',color:'rgba(245,226,214,0.35)',marginBottom:10}}>
+              {icon.label} · CONCEPT
+            </div>
+            <div style={{fontFamily:SERIF,fontStyle:'italic',fontSize:14,color:'rgba(245,226,214,0.55)',lineHeight:1.65}}>
+              {icon.concept}
+            </div>
+            <div style={{marginTop:12,fontFamily:MONO,fontSize:7.5,letterSpacing:'0.15em',color:'rgba(245,226,214,0.2)'}}>
+              replaces SF Symbol: {icon.sfCurrent}
+            </div>
+          </div>
+        );
+      })()}
+    </div>
+  );
+}
+
+// ── TWEAK DEFAULTS ────────────────────────────────────────────────────
+const TWEAK_DEFAULTS = /*EDITMODE-BEGIN*/{
+  "activeTab": "map",
+  "iconSize": 1.8
+}/*EDITMODE-END*/;
+
+// ── ROOT ──────────────────────────────────────────────────────────────
+function Root() {
+  const [tweaks, setTweak] = useTweaks(TWEAK_DEFAULTS);
+  const tabOptions = ICONS.map(i=>({value:i.id, label:i.label}));
+
+  return (
+    <DesignCanvas>
+      <DCSection id="icons" title="Tab Bar Icons" subtitle="7 custom glyphs · concentric geometry · presence over object">
+
+        <DCArtboard id="icon-set" label="Full set · click to activate" width={560} height={420}>
+          <IconGrid activeTab={tweaks.activeTab} />
+        </DCArtboard>
+
+        <DCArtboard id="tab-bar-dark" label="In tab bar · void black" width={393} height={80}>
+          <div style={{background:BG, width:393, height:80, display:'flex', alignItems:'center'}}>
+            <TabBarMockup activeTab={tweaks.activeTab} bg="dark" />
+          </div>
+        </DCArtboard>
+
+        <DCArtboard id="tab-bar-all-active" label="All tabs · active states" width={393} height={80}>
+          <div style={{background:BG, width:393, height:80, display:'flex', alignItems:'center'}}>
+            <div style={{width:393, padding:'10px 8px 14px', display:'flex', justifyContent:'space-around', alignItems:'flex-start'}}>
+              {ICONS.map(icon=>(
+                <div key={icon.id} style={{display:'flex',flexDirection:'column',alignItems:'center',gap:3}}>
+                  <div style={{color:CREAM}}>{icon.render(true,1)}</div>
+                  <div style={{fontFamily:MONO,fontSize:6.5,letterSpacing:'0.16em',color:'rgba(245,226,214,0.75)'}}>{icon.label}</div>
+                </div>
+              ))}
+            </div>
+          </div>
+        </DCArtboard>
+
+        <DCArtboard id="tab-bar-all-inactive" label="All tabs · inactive states" width={393} height={80}>
+          <div style={{background:BG, width:393, height:80, display:'flex', alignItems:'center'}}>
+            <div style={{width:393, padding:'10px 8px 14px', display:'flex', justifyContent:'space-around', alignItems:'flex-start'}}>
+              {ICONS.map(icon=>(
+                <div key={icon.id} style={{display:'flex',flexDirection:'column',alignItems:'center',gap:3}}>
+                  <div style={{color:CREAM}}>{icon.render(false,1)}</div>
+                  <div style={{fontFamily:MONO,fontSize:6.5,letterSpacing:'0.16em',color:'rgba(245,226,214,0.3)'}}>{icon.label}</div>
+                </div>
+              ))}
+            </div>
+          </div>
+        </DCArtboard>
+
+      </DCSection>
+
+      <DCSection id="specs" title="Icon Specs" subtitle="Each icon with concept rationale and size comparison">
+        {ICONS.map(icon=>(
+          <DCArtboard key={icon.id} id={`spec-${icon.id}`} label={icon.label} width={280} height={180}>
+            <div style={{width:280,height:180,background:BG,padding:0}}>
+              <IconSpecCard icon={icon} />
+            </div>
+          </DCArtboard>
+        ))}
+      </DCSection>
+
+      <TweaksPanel>
+        <TweakSection label="Active tab" />
+        <TweakSelect label="Which tab is active" value={tweaks.activeTab} options={tabOptions}
+          onChange={v=>setTweak('activeTab',v)} />
+      </TweaksPanel>
+    </DesignCanvas>
+  );
+}
+
+ReactDOM.createRoot(document.getElementById('root')).render(<Root />);
+</script>
+<div id="root"></div>
+</body>
+</html>

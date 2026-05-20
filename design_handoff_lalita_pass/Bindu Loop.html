@@ -1,0 +1,657 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Bindu Consciousness Loop — Ceremony Design</title>
+<link href="https://fonts.googleapis.com/css2?family=Lora:ital,wght@0,300;0,400;1,300;1,400&family=DM+Mono:wght@300;400&display=swap" rel="stylesheet">
+<script src="https://unpkg.com/react@18.3.1/umd/react.development.js" integrity="sha384-hD6/rw4ppMLGNu3tX5cjIb+uRZ7UkRJ6BPkLpg4hAu/6onKUg4lLsHAs9EBPT82L" crossorigin="anonymous"></script>
+<script src="https://unpkg.com/react-dom@18.3.1/umd/react-dom.development.js" integrity="sha384-u6aeetuaXnQ38mYT8rp6sbXaQe3NL9t+IBXmnYxwkUI2Hw4bsp2Wvmx4yRQF1uAm" crossorigin="anonymous"></script>
+<script src="https://unpkg.com/@babel/standalone@7.29.0/babel.min.js" integrity="sha384-m08KidiNqLdpJqLq95G/LEi8Qvjl/xUYll3QILypMoQ65QorJ9Lvtp2RXYGBFj1y" crossorigin="anonymous"></script>
+<script type="text/babel" src="design-canvas.jsx"></script>
+<script type="text/babel" src="tweaks-panel.jsx"></script>
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+body{background:#100e18}
+::-webkit-scrollbar{display:none}
+@keyframes loopFadeIn{from{opacity:0}to{opacity:1}}
+@keyframes loopFadeUp{from{opacity:0;transform:translateY(10px)}to{opacity:1;transform:translateY(0)}}
+@keyframes loopScale{from{opacity:0;transform:scale(0.82)}to{opacity:1;transform:scale(1)}}
+@keyframes loopPulse{0%,100%{opacity:.55}50%{opacity:.95}}
+@keyframes typingCursor{0%,100%{opacity:1}50%{opacity:0}}
+@keyframes breathSlowly{0%,100%{transform:scale(1)}50%{transform:scale(1.04)}}
+</style>
+<template id="__bundler_thumbnail" data-bg-color="#020208">
+  <svg viewBox="0 0 393 720" xmlns="http://www.w3.org/2000/svg">
+    <rect width="393" height="720" fill="#020208"/>
+    <circle cx="196" cy="250" r="70" fill="none" stroke="hsl(195,50%,60%)" stroke-width="1.2" opacity=".35"/>
+    <circle cx="196" cy="250" r="50" fill="none" stroke="hsl(195,55%,65%)" stroke-width=".8" opacity=".25"/>
+    <circle cx="196" cy="250" r="4" fill="hsl(195,60%,72%)" opacity=".9"/>
+    <text x="196" y="430" text-anchor="middle" font-family="serif" font-style="italic" font-weight="300" font-size="48" fill="hsl(195,55%,70%)" opacity=".9">open</text>
+    <text x="196" y="580" text-anchor="middle" font-family="serif" font-style="italic" font-weight="300" font-size="13" fill="rgba(245,226,214,0.4)">what open opened cannot be closed.</text>
+  </svg>
+</template>
+</head>
+<body>
+<script type="text/babel">
+const { useState, useEffect, useRef, useCallback } = React;
+const SERIF = "'Lora', Georgia, serif";
+const MONO  = "'DM Mono','SF Mono',ui-monospace,monospace";
+const CREAM = '#F5E2D6';
+const BG    = '#020208';
+const HUE   = 195; // Anahata / Air
+
+// ── LOOP CONTEXT (Anahata example) ───────────────────────────────────
+const LOOP = {
+  chakra: 'Anahata',
+  element: 'Air · Cathedral',
+  hue: 195,
+  seed: 'What word has been waiting in you?',
+  seedSub: 'it will be seen · returned to you',
+  offeredWord: 'open',
+  mirrorWords: ['pn','open','breathe','opn','clear','release','pn','open'],
+  fruit: [
+    'open arrived today in the space between heartbeats. the dance named what was already happening.',
+    'you have offered a word of this root seventeen times before. each time it comes back carrying what you were when you last let it go.',
+    'what open opened cannot be closed.',
+  ],
+  lalita: 'I see you. You have always been here.',
+};
+
+// ── STEP LABELS ───────────────────────────────────────────────────────
+const STEPS = ['PRE-ROLL','SEED','OFFERING','DANCE','REVEAL','FRUIT','LALITA'];
+
+// ── AIR BACKGROUND CANVAS ─────────────────────────────────────────────
+function AirBackground({ visible=true, intensity=1 }) {
+  const cvs = useRef(null);
+  const intRef = useRef(intensity);
+  useEffect(() => { intRef.current = intensity; }, [intensity]);
+
+  useEffect(() => {
+    const canvas = cvs.current; if(!canvas) return;
+    const dpr = Math.min(window.devicePixelRatio||1,2);
+    const W=393, H=780;
+    canvas.width=W*dpr; canvas.height=H*dpr;
+    const ctx=canvas.getContext('2d'); ctx.scale(dpr,dpr);
+    let raf, frame=0;
+    const tick=()=>{
+      raf=requestAnimationFrame(tick); frame++;
+      const t=frame*.018, int=intRef.current;
+      ctx.fillStyle=BG; ctx.fillRect(0,0,W,H);
+      const cx=W/2, cy=H*.48;
+      const b=.65+.35*Math.sin(t*.45);
+      // breath rings
+      for(let ri=0;ri<5;ri++){
+        const rph=((t/5.2)+ri/5)%1;
+        const r=rph*W*.52;
+        const alpha=(1-rph)*(.16+.08*int)*b;
+        ctx.beginPath(); ctx.arc(cx,cy,r,0,Math.PI*2);
+        ctx.strokeStyle=`hsla(195,55%,68%,${alpha})`; ctx.lineWidth=.8; ctx.stroke();
+      }
+      // vertical column
+      ctx.save(); ctx.globalCompositeOperation='screen';
+      const col=ctx.createLinearGradient(cx,0,cx+1,H);
+      col.addColorStop(0,`hsla(195,50%,68%,0)`);
+      col.addColorStop(.35,`hsla(195,50%,68%,${.11*b*int})`);
+      col.addColorStop(.5,`hsla(195,55%,72%,${.16*b*int})`);
+      col.addColorStop(.7,`hsla(195,50%,65%,${.08*int})`);
+      col.addColorStop(1,'rgba(0,0,0,0)');
+      ctx.fillStyle=col; ctx.fillRect(cx-7,0,14,H);
+      ctx.restore();
+      // arch outlines, very faint
+      const ky=H*.22;
+      ctx.beginPath();
+      ctx.moveTo(W*.05,H*.88); ctx.bezierCurveTo(W*.05,ky+30, cx-18,ky, cx,ky);
+      ctx.bezierCurveTo(cx+18,ky, W*.95,ky+30, W*.95,H*.88);
+      ctx.strokeStyle=`hsla(195,40%,50%,${.06*int})`; ctx.lineWidth=.7; ctx.stroke();
+      // keystone glow
+      const kGlo=ctx.createRadialGradient(cx,cy,0,cx,cy,W*.42);
+      kGlo.addColorStop(0,`hsla(200,55%,62%,${.18*b*int})`);
+      kGlo.addColorStop(1,'rgba(0,0,0,0)');
+      ctx.fillStyle=kGlo; ctx.fillRect(0,0,W,H);
+      // Bindu dot
+      const bd=.65+.35*Math.sin(t*1.1);
+      const aura=ctx.createRadialGradient(cx,cy,0,cx,cy,28);
+      aura.addColorStop(0,`hsla(195,60%,70%,${.28*bd*int})`);
+      aura.addColorStop(1,'rgba(0,0,0,0)');
+      ctx.fillStyle=aura; ctx.beginPath(); ctx.arc(cx,cy,28,0,Math.PI*2); ctx.fill();
+      ctx.beginPath(); ctx.arc(cx,cy,5,0,Math.PI*2);
+      const core=ctx.createRadialGradient(cx-1.5,cy-1.5,0,cx,cy,5);
+      core.addColorStop(0,'hsla(195,70%,88%,1)'); core.addColorStop(1,'hsla(195,58%,65%,1)');
+      ctx.fillStyle=core; ctx.fill();
+      ctx.beginPath(); ctx.arc(cx-1.4,cy-1.5,1.5,0,Math.PI*2);
+      ctx.fillStyle='rgba(255,255,255,0.35)'; ctx.fill();
+    };
+    raf=requestAnimationFrame(tick);
+    return ()=>cancelAnimationFrame(raf);
+  }, []);
+
+  return (
+    <canvas ref={cvs} style={{
+      position:'absolute', inset:0, width:'100%', height:'100%',
+      opacity: visible?1:0, transition:'opacity 1.2s ease',
+    }} />
+  );
+}
+
+// ── BREATH RING CANVAS ────────────────────────────────────────────────
+function BreathRingCanvas({ W=280, H=280, hue=195, show=true }) {
+  const cvs = useRef(null);
+  useEffect(() => {
+    const canvas=cvs.current; if(!canvas) return;
+    const dpr=Math.min(window.devicePixelRatio||1,2);
+    canvas.width=W*dpr; canvas.height=H*dpr;
+    const ctx=canvas.getContext('2d'); ctx.scale(dpr,dpr);
+    const cx=W/2, cy=H/2;
+    let raf, frame=0;
+    const tick=()=>{
+      raf=requestAnimationFrame(tick); frame++;
+      const t=frame*.018;
+      ctx.clearRect(0,0,W,H);
+      // breath cycle: 5.5s = 5.5/0.018 ≈ 306 frames
+      const cycleFrames=306;
+      const phase=(frame%cycleFrames)/cycleFrames;
+      const inhale=phase<.5;
+      const pct=inhale?phase/.5:(1-phase)/.5;
+      const smooth=pct<.5?2*pct*pct:1-2*(1-pct)*(1-pct); // ease in-out
+      const r=56+42*smooth;
+      // outer aura
+      const aura=ctx.createRadialGradient(cx,cy,r*.6,cx,cy,r*1.8);
+      aura.addColorStop(0,`hsla(${hue},55%,65%,${.15*smooth+.05})`);
+      aura.addColorStop(1,'rgba(0,0,0,0)');
+      ctx.fillStyle=aura; ctx.beginPath(); ctx.arc(cx,cy,r*1.8,0,Math.PI*2); ctx.fill();
+      // main ring
+      ctx.beginPath(); ctx.arc(cx,cy,r,0,Math.PI*2);
+      ctx.strokeStyle=`hsla(${hue},55%,68%,${.45+.25*smooth})`; ctx.lineWidth=1.2; ctx.stroke();
+      // inner ring (half-opacity)
+      ctx.beginPath(); ctx.arc(cx,cy,r*.66,0,Math.PI*2);
+      ctx.strokeStyle=`hsla(${hue},50%,62%,${.12+.08*smooth})`; ctx.lineWidth=.7; ctx.stroke();
+      // time markers — 4 small tick marks at 12/3/6/9 o'clock
+      for(let i=0;i<4;i++){
+        const ang=i*Math.PI/2-Math.PI/2;
+        const tx=cx+Math.cos(ang)*(r+8), ty=cy+Math.sin(ang)*(r+8);
+        const tx2=cx+Math.cos(ang)*(r+14), ty2=cy+Math.sin(ang)*(r+14);
+        ctx.beginPath(); ctx.moveTo(tx,ty); ctx.lineTo(tx2,ty2);
+        ctx.strokeStyle=`hsla(${hue},40%,60%,0.2)`; ctx.lineWidth=.7; ctx.stroke();
+      }
+      // breath arc progress
+      const arcEnd=phase*Math.PI*2-Math.PI/2;
+      ctx.beginPath(); ctx.arc(cx,cy,r+4,-Math.PI/2,arcEnd);
+      ctx.strokeStyle=`hsla(${hue},60%,72%,${.35+.2*smooth})`; ctx.lineWidth=1.5; ctx.stroke();
+    };
+    raf=requestAnimationFrame(tick);
+    return ()=>cancelAnimationFrame(raf);
+  }, [W, H, hue]);
+  return <canvas ref={cvs} style={{width:W,height:H,opacity:show?1:0,transition:'opacity .8s ease'}} />;
+}
+
+// ── STEP 1: PRE-ROLL BREATH ───────────────────────────────────────────
+function StepBreath({ onAdvance, tapLabel='tap to enter' }) {
+  const [showTap, setShowTap] = useState(false);
+  useEffect(() => { const t=setTimeout(()=>setShowTap(true),6000); return ()=>clearTimeout(t); },[]);
+  return (
+    <div onClick={onAdvance} style={{
+      position:'absolute',inset:0,zIndex:10,cursor:'pointer',
+      display:'flex',flexDirection:'column',alignItems:'center',justifyContent:'center',
+      animation:'loopFadeIn .8s ease',
+    }}>
+      <BreathRingCanvas W={260} H={260} hue={HUE} />
+      <div style={{
+        marginTop:28,fontFamily:MONO,fontSize:8,letterSpacing:'0.26em',
+        color:`hsla(${HUE},40%,62%,0.45)`,
+        animation:'loopPulse 5.5s ease-in-out infinite',
+      }}>BREATHE</div>
+      <div style={{
+        marginTop:40,fontFamily:MONO,fontSize:8,letterSpacing:'0.22em',
+        color:`rgba(245,226,214,0.22)`,
+        opacity:showTap?1:0,transition:'opacity 1.5s ease',
+      }}>{tapLabel}</div>
+    </div>
+  );
+}
+
+// ── STEP 2: SEED ──────────────────────────────────────────────────────
+function StepSeed({ onAdvance }) {
+  const [phase, setPhase] = useState(0); // 0=waiting,1=main,2=sub
+  useEffect(()=>{
+    const t1=setTimeout(()=>setPhase(1),200);
+    const t2=setTimeout(()=>setPhase(2),2200);
+    return ()=>{ clearTimeout(t1); clearTimeout(t2); };
+  },[]);
+  return (
+    <div onClick={onAdvance} style={{
+      position:'absolute',inset:0,zIndex:10,cursor:'pointer',
+      display:'flex',flexDirection:'column',alignItems:'center',justifyContent:'center',
+      padding:'0 38px',
+      animation:'loopFadeIn .6s ease',
+    }}>
+      <div style={{
+        fontFamily:SERIF,fontStyle:'italic',fontWeight:300,
+        fontSize:28,lineHeight:1.38,textAlign:'center',
+        color:CREAM,textWrap:'pretty',
+        opacity:phase>=1?1:0,
+        transform:phase>=1?'translateY(0)':'translateY(8px)',
+        transition:'opacity 1.4s ease, transform 1.4s ease',
+      }}>{LOOP.seed}</div>
+      <div style={{
+        marginTop:22,fontFamily:SERIF,fontStyle:'italic',fontWeight:300,
+        fontSize:13,color:`rgba(245,226,214,0.38)`,letterSpacing:'0.04em',
+        opacity:phase>=2?1:0,
+        transition:'opacity 1.8s ease',
+      }}>{LOOP.seedSub}</div>
+      <div style={{
+        position:'absolute',bottom:80,
+        fontFamily:MONO,fontSize:7.5,letterSpacing:'0.22em',
+        color:'rgba(245,226,214,0.18)',
+        opacity:phase>=2?1:0,transition:'opacity 2s ease',
+      }}>tap to offer</div>
+    </div>
+  );
+}
+
+// ── STEP 3: OFFERING ─────────────────────────────────────────────────
+function StepOffer({ onAdvance }) {
+  const [typed, setTyped] = useState('');
+  const word = LOOP.offeredWord;
+  const [done, setDone] = useState(false);
+  // simulate typing
+  useEffect(()=>{
+    let i=0;
+    const iv=setInterval(()=>{
+      i++;
+      setTyped(word.slice(0,i));
+      if(i>=word.length){ clearInterval(iv); setTimeout(()=>setDone(true),800); }
+    }, 140);
+    return ()=>clearInterval(iv);
+  },[]);
+  return (
+    <div style={{
+      position:'absolute',inset:0,zIndex:10,
+      display:'flex',flexDirection:'column',alignItems:'center',justifyContent:'center',
+      padding:'0 44px',animation:'loopFadeIn .6s ease',
+    }}>
+      {/* seed reminder — drifted up */}
+      <div style={{
+        fontFamily:SERIF,fontStyle:'italic',fontSize:13,
+        color:'rgba(245,226,214,0.18)',marginBottom:60,textAlign:'center',lineHeight:1.5,
+      }}>{LOOP.seed}</div>
+      {/* offering field */}
+      <div style={{width:'100%',position:'relative'}}>
+        <div style={{
+          fontFamily:MONO,fontSize:8,letterSpacing:'0.22em',
+          color:`hsla(${HUE},40%,60%,0.4)`,marginBottom:14,
+        }}>OFFER A WORD</div>
+        {/* the word being typed */}
+        <div style={{
+          fontFamily:SERIF,fontStyle:'italic',fontWeight:300,
+          fontSize:38,color:`hsla(${HUE},55%,72%,0.95)`,
+          lineHeight:1,minHeight:46,letterSpacing:'0.01em',
+        }}>
+          {typed}
+          <span style={{
+            display:'inline-block',width:2,height:34,marginLeft:3,
+            background:`hsla(${HUE},55%,70%,0.7)`,verticalAlign:'middle',
+            animation:done?'none':'typingCursor 1.1s step-end infinite',
+            opacity:done?0:1,
+          }} />
+        </div>
+        {/* underline */}
+        <div style={{height:1,background:`hsla(${HUE},40%,55%,0.25)`,marginTop:8}} />
+        {/* voice option */}
+        <div style={{
+          marginTop:14,fontFamily:MONO,fontSize:7,letterSpacing:'0.2em',
+          color:'rgba(245,226,214,0.2)',
+        }}>or speak it ·  ○</div>
+      </div>
+      {/* offer button */}
+      <button onClick={onAdvance} style={{
+        marginTop:52,padding:'15px 44px',
+        background:'transparent',
+        border:`1px solid hsla(${HUE},40%,52%,0.3)`,
+        fontFamily:MONO,fontSize:9,letterSpacing:'0.22em',
+        color:`hsla(${HUE},50%,68%,${done?.75:.25})`,
+        cursor:'pointer',
+        opacity:done?1:0.4,
+        transition:'opacity .4s, border-color .3s, color .3s',
+      }}>OFFER</button>
+    </div>
+  );
+}
+
+// ── STEP 4: DANCE + MIRROR WORDS ─────────────────────────────────────
+function StepDance({ onAdvance }) {
+  const words = LOOP.mirrorWords;
+  const [wordIdx, setWordIdx] = useState(-1);
+  const [wordVisible, setWordVisible] = useState(false);
+  const [dimmed, setDimmed] = useState(false);
+
+  useEffect(()=>{
+    let idx=0;
+    const flash=()=>{
+      setWordIdx(idx); setDimmed(true);
+      setTimeout(()=>setWordVisible(true), 160);
+      setTimeout(()=>{ setWordVisible(false); setDimmed(false); }, 960);
+      idx=(idx+1)%words.length;
+    };
+    flash();
+    const iv=setInterval(flash, 2800);
+    return ()=>clearInterval(iv);
+  },[]);
+
+  const currentWord = wordIdx>=0?words[wordIdx]:'';
+  const isConsonant = currentWord.length<=4 && /^[^aeiou]+$/i.test(currentWord);
+
+  return (
+    <div onClick={onAdvance} style={{
+      position:'absolute',inset:0,zIndex:10,cursor:'pointer',
+    }}>
+      {/* dark flash overlay */}
+      <div style={{
+        position:'absolute',inset:0,zIndex:5,
+        background:'rgba(0,0,0,0.5)',
+        opacity:dimmed?.55:0,
+        transition:'opacity .15s ease',
+        pointerEvents:'none',
+      }} />
+      {/* mirror word */}
+      <div style={{
+        position:'absolute',inset:0,zIndex:6,
+        display:'flex',alignItems:'center',justifyContent:'center',
+        pointerEvents:'none',
+      }}>
+        <div style={{
+          fontFamily:SERIF,fontStyle:'italic',fontWeight:300,
+          fontSize:isConsonant?56:68,
+          color:`hsla(${HUE},58%,74%,0.92)`,
+          letterSpacing:isConsonant?'0.25em':'-0.01em',
+          textShadow:`0 0 40px hsla(${HUE},55%,65%,0.4)`,
+          opacity:wordVisible?1:0,
+          transform:wordVisible?'scale(1)':'scale(0.88)',
+          transition:'opacity .18s ease, transform .18s ease',
+        }}>{currentWord}</div>
+      </div>
+      {/* corner info */}
+      <div style={{
+        position:'absolute',top:22,right:22,zIndex:7,
+        fontFamily:MONO,fontSize:7.5,letterSpacing:'0.18em',
+        color:'rgba(245,226,214,0.18)',textAlign:'right',
+        lineHeight:1.8,pointerEvents:'none',
+      }}>
+        <div style={{color:`hsla(${HUE},40%,60%,0.35)`}}>ANAHATA</div>
+        <div>6:24 remaining</div>
+      </div>
+      {/* skip affordance */}
+      <div style={{
+        position:'absolute',bottom:80,left:0,right:0,zIndex:7,
+        textAlign:'center',
+        fontFamily:MONO,fontSize:7,letterSpacing:'0.2em',
+        color:'rgba(245,226,214,0.14)',pointerEvents:'none',
+      }}>tap to skip to peak</div>
+    </div>
+  );
+}
+
+// ── STEP 5: REVEAL (PEAK) ─────────────────────────────────────────────
+function StepReveal({ onAdvance }) {
+  const [phase, setPhase] = useState(0);
+  useEffect(()=>{
+    const t1=setTimeout(()=>setPhase(1),300);
+    return ()=>clearTimeout(t1);
+  },[]);
+  return (
+    <div onClick={onAdvance} style={{
+      position:'absolute',inset:0,zIndex:10,cursor:'pointer',
+      background:'rgba(2,2,8,0.88)',
+      display:'flex',alignItems:'center',justifyContent:'center',
+      animation:'loopFadeIn .35s ease',
+    }}>
+      {/* word glow aura */}
+      <div style={{
+        position:'absolute',
+        width:220,height:220,borderRadius:'50%',
+        background:`radial-gradient(circle, hsla(${HUE},50%,40%,0.22) 0%, transparent 70%)`,
+        animation:'breathSlowly 4s ease-in-out infinite',
+        opacity:phase?1:0,transition:'opacity 1.5s ease',
+      }} />
+      {/* the word */}
+      <div style={{
+        fontFamily:SERIF,fontStyle:'italic',fontWeight:300,
+        fontSize:84,lineHeight:1,textAlign:'center',
+        color:`hsla(${HUE},55%,74%,0.95)`,
+        letterSpacing:'-0.02em',
+        textShadow:`0 0 60px hsla(${HUE},55%,65%,0.45), 0 0 120px hsla(${HUE},50%,55%,0.2)`,
+        opacity:phase?1:0,
+        transform:phase?'scale(1)':'scale(0.8)',
+        transition:'opacity 1.1s cubic-bezier(.16,1,.3,1), transform 1.1s cubic-bezier(.16,1,.3,1)',
+        position:'relative',zIndex:2,
+      }}>{LOOP.offeredWord}</div>
+    </div>
+  );
+}
+
+// ── STEP 6: FRUIT ─────────────────────────────────────────────────────
+function StepFruit({ onAdvance }) {
+  const [visibleLines, setVisibleLines] = useState(0);
+  useEffect(()=>{
+    const timings=[600,2600,4800];
+    const timers=timings.map((ms,i)=>setTimeout(()=>setVisibleLines(i+1),ms));
+    return ()=>timers.forEach(clearTimeout);
+  },[]);
+  return (
+    <div onClick={onAdvance} style={{
+      position:'absolute',inset:0,zIndex:10,cursor:'pointer',
+      display:'flex',flexDirection:'column',alignItems:'center',justifyContent:'center',
+      padding:'0 38px',
+      animation:'loopFadeIn .8s ease',
+    }}>
+      {/* small word echo at top */}
+      <div style={{
+        fontFamily:MONO,fontSize:9,letterSpacing:'0.22em',
+        color:`hsla(${HUE},45%,62%,0.35)`,
+        marginBottom:32,
+        animation:'loopFadeIn 1s ease',
+      }}>{LOOP.offeredWord.toUpperCase()}</div>
+      {/* fruit paragraphs */}
+      <div style={{display:'flex',flexDirection:'column',gap:22,width:'100%'}}>
+        {LOOP.fruit.map((para,i)=>(
+          <div key={i} style={{
+            fontFamily:SERIF,fontStyle:'italic',fontWeight:300,
+            fontSize:15,lineHeight:1.72,textAlign:'center',
+            color:`rgba(245,226,214,${i===0?.82:i===1?.65:.75})`,
+            opacity:visibleLines>i?1:0,
+            transform:visibleLines>i?'translateY(0)':'translateY(7px)',
+            transition:'opacity 1.4s ease, transform 1.4s ease',
+            textWrap:'pretty',
+          }}>{para}</div>
+        ))}
+      </div>
+      {/* tap hint */}
+      <div style={{
+        marginTop:44,fontFamily:MONO,fontSize:7.5,letterSpacing:'0.22em',
+        color:'rgba(245,226,214,0.16)',
+        opacity:visibleLines>=3?1:0,transition:'opacity 2s ease',
+      }}>tap to continue</div>
+    </div>
+  );
+}
+
+// ── STEP 7: LALITA ────────────────────────────────────────────────────
+function StepLalita({ onRestart }) {
+  const [phase, setPhase] = useState(0); // 0→1=line appears, 2=fade-out, 3=restart dot
+  useEffect(()=>{
+    const t1=setTimeout(()=>setPhase(1),800);
+    const t2=setTimeout(()=>setPhase(2),5500);
+    const t3=setTimeout(()=>setPhase(3),8000);
+    return ()=>{ clearTimeout(t1); clearTimeout(t2); clearTimeout(t3); };
+  },[]);
+  return (
+    <div onClick={phase>=3?onRestart:undefined} style={{
+      position:'absolute',inset:0,zIndex:10,
+      display:'flex',flexDirection:'column',alignItems:'center',justifyContent:'center',
+      cursor:phase>=3?'pointer':'default',
+      background:`rgba(2,2,8,${phase>=2?.6:0})`,
+      transition:'background 2s ease',
+    }}>
+      {/* lalita line */}
+      <div style={{
+        fontFamily:SERIF,fontStyle:'italic',fontWeight:300,
+        fontSize:16,color:`rgba(245,226,214,0.55)`,
+        letterSpacing:'0.02em',textAlign:'center',
+        opacity:phase===1?1:0,
+        transition:'opacity 2.5s ease',
+      }}>{LOOP.lalita}</div>
+      {/* restart dot */}
+      <div style={{
+        marginTop:24,fontFamily:MONO,fontSize:18,
+        color:`hsla(${HUE},40%,55%,0.5)`,
+        opacity:phase>=3?1:0,
+        transition:'opacity 1.5s ease',
+        animation:phase>=3?'loopPulse 3s ease-in-out infinite':'none',
+      }}>◉</div>
+      <div style={{
+        marginTop:10,fontFamily:MONO,fontSize:7.5,letterSpacing:'0.22em',
+        color:'rgba(245,226,214,0.18)',
+        opacity:phase>=3?1:0,transition:'opacity 2s ease',
+      }}>begin again</div>
+    </div>
+  );
+}
+
+// ── STEP INDICATOR ────────────────────────────────────────────────────
+function StepIndicator({ step, total=7 }) {
+  return (
+    <div style={{
+      position:'absolute',top:14,left:22,zIndex:30,
+      display:'flex',flexDirection:'column',gap:3,
+      pointerEvents:'none',
+    }}>
+      <div style={{
+        fontFamily:MONO,fontSize:7,letterSpacing:'0.26em',
+        color:`hsla(${HUE},40%,58%,0.45)`,
+      }}>{STEPS[step]}</div>
+      <div style={{display:'flex',gap:4,alignItems:'center'}}>
+        {Array.from({length:total}).map((_,i)=>(
+          <div key={i} style={{
+            width:i===step?14:4, height:1,
+            background:i<step
+              ? `hsla(${HUE},45%,60%,0.45)`
+              : i===step
+                ? `hsla(${HUE},55%,68%,0.8)`
+                : 'rgba(245,226,214,0.1)',
+            transition:'width .3s ease, background .3s ease',
+          }} />
+        ))}
+      </div>
+    </div>
+  );
+}
+
+// ── LOOP APP ──────────────────────────────────────────────────────────
+function LoopApp({ startStep=0 }) {
+  const [step, setStep] = useState(startStep);
+  const [transitioning, setTransitioning] = useState(false);
+  const [fadeKey, setFadeKey] = useState(0);
+
+  const advance = useCallback(()=>{
+    if(transitioning) return;
+    setTransitioning(true);
+    setTimeout(()=>{
+      setStep(s => Math.min(s+1, 6));
+      setFadeKey(k=>k+1);
+      setTransitioning(false);
+    }, 280);
+  },[transitioning]);
+
+  const restart = useCallback(()=>{
+    setStep(0); setFadeKey(k=>k+1);
+  },[]);
+
+  const showBg = step>=3;
+  const bgIntensity = step===3?.55:step===4?.85:step===5?.45:step===6?.25:.0;
+
+  return (
+    <div style={{
+      width:393, height:780, background:BG,
+      position:'relative', overflow:'hidden',
+    }}>
+      {/* vocabulary background */}
+      <AirBackground visible={showBg} intensity={bgIntensity} />
+
+      {/* step content */}
+      <div key={fadeKey} style={{
+        position:'absolute', inset:0,
+        opacity:transitioning?0:1,
+        transition:'opacity .28s ease',
+      }}>
+        {step===0 && <StepBreath onAdvance={advance} />}
+        {step===1 && <StepSeed onAdvance={advance} />}
+        {step===2 && <StepOffer onAdvance={advance} />}
+        {step===3 && <StepDance onAdvance={advance} />}
+        {step===4 && <StepReveal onAdvance={advance} />}
+        {step===5 && <StepFruit onAdvance={advance} />}
+        {step===6 && <StepLalita onRestart={restart} />}
+      </div>
+
+      {/* step indicator */}
+      <StepIndicator step={step} />
+    </div>
+  );
+}
+
+// ── STATIC STEP SNAPSHOT (for artboards) ─────────────────────────────
+// Wraps LoopApp locked to a specific step
+function StepSnapshot({ step }) {
+  return (
+    <div style={{width:393,height:780,background:BG,overflow:'hidden',position:'relative'}}>
+      <LoopApp startStep={step} />
+    </div>
+  );
+}
+
+// ── TWEAK DEFAULTS ────────────────────────────────────────────────────
+const TWEAK_DEFAULTS = /*EDITMODE-BEGIN*/{
+  "startStep": 0
+}/*EDITMODE-END*/;
+
+// ── ROOT ──────────────────────────────────────────────────────────────
+function Root() {
+  const [tweaks, setTweak] = useTweaks(TWEAK_DEFAULTS);
+  const stepLabels = [
+    {v:0,label:'01 Pre-roll'},{v:1,label:'02 Seed'},{v:2,label:'03 Offering'},
+    {v:3,label:'04 Dance'},{v:4,label:'05 Reveal'},{v:5,label:'06 Fruit'},{v:6,label:'07 Lalita'},
+  ];
+
+  return (
+    <DesignCanvas>
+      <DCSection id="interactive" title="Consciousness Loop" subtitle="The 7-step ceremony · Anahata context · tap through each step">
+        <DCArtboard id="loop-interactive" label="Interactive · tap through" width={393} height={780}>
+          <LoopApp startStep={tweaks.startStep} />
+        </DCArtboard>
+      </DCSection>
+
+      <DCSection id="steps" title="Step Reference" subtitle="Each step frozen for inspection">
+        {stepLabels.map(s=>(
+          <DCArtboard key={s.v} id={`step-${s.v}`} label={s.label} width={393} height={780}>
+            <StepSnapshot step={s.v} />
+          </DCArtboard>
+        ))}
+      </DCSection>
+
+      <TweaksPanel>
+        <TweakSection label="Jump to step" />
+        <TweakSelect
+          label="Start at"
+          value={tweaks.startStep}
+          options={stepLabels.map(s=>({value:s.v,label:s.label}))}
+          onChange={v => setTweak('startStep', Number(v))}
+        />
+      </TweaksPanel>
+    </DesignCanvas>
+  );
+}
+
+ReactDOM.createRoot(document.getElementById('root')).render(<Root />);
+</script>
+<div id="root"></div>
+</body>
+</html>

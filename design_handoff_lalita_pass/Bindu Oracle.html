@@ -1,0 +1,471 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Bindu Oracle — Redesign</title>
+<link href="https://fonts.googleapis.com/css2?family=Lora:ital,wght@0,300;0,400;1,300;1,400&family=DM+Mono:wght@300;400&display=swap" rel="stylesheet">
+<script src="https://unpkg.com/react@18.3.1/umd/react.development.js" integrity="sha384-hD6/rw4ppMLGNu3tX5cjIb+uRZ7UkRJ6BPkLpg4hAu/6onKUg4lLsHAs9EBPT82L" crossorigin="anonymous"></script>
+<script src="https://unpkg.com/react-dom@18.3.1/umd/react-dom.development.js" integrity="sha384-u6aeetuaXnQ38mYT8rp6sbXaQe3NL9t+IBXmnYxwkUI2Hw4bsp2Wvmx4yRQF1uAm" crossorigin="anonymous"></script>
+<script src="https://unpkg.com/@babel/standalone@7.29.0/babel.min.js" integrity="sha384-m08KidiNqLdpJqLq95G/LEi8Qvjl/xUYll3QILypMoQ65QorJ9Lvtp2RXYGBFj1y" crossorigin="anonymous"></script>
+<script type="text/babel" src="design-canvas.jsx"></script>
+<script type="text/babel" src="tweaks-panel.jsx"></script>
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+body{background:#0c0b0f}
+::-webkit-scrollbar{display:none}
+@keyframes oFadeIn{from{opacity:0}to{opacity:1}}
+@keyframes oFadeUp{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:translateY(0)}}
+@keyframes oFadeDown{from{opacity:1;transform:translateY(0)}to{opacity:0;transform:translateY(-10px)}}
+@keyframes oPulse{0%,100%{opacity:.45}50%{opacity:.85}}
+@keyframes oCursor{0%,100%{opacity:1}50%{opacity:0}}
+@keyframes oVerbArrive{0%{opacity:0;transform:scale(.84) translateY(10px)}100%{opacity:1;transform:scale(1) translateY(0)}}
+@keyframes oWaitDot{0%,100%{transform:scale(.6);opacity:.3}50%{transform:scale(1);opacity:.8}}
+</style>
+<template id="__bundler_thumbnail" data-bg-color="#020208">
+  <svg viewBox="0 0 393 720" xmlns="http://www.w3.org/2000/svg">
+    <rect width="393" height="720" fill="#020208"/>
+    <radialGradient id="og" cx="48%" cy="44%" r="40%">
+      <stop offset="0%" stop-color="rgba(245,226,214,0.06)"/>
+      <stop offset="100%" stop-color="rgba(0,0,0,0)"/>
+    </radialGradient>
+    <rect width="393" height="720" fill="url(#og)"/>
+    <text x="196" y="340" text-anchor="middle" font-family="serif" font-style="italic" font-weight="300" font-size="52" fill="hsl(210,55%,68%)" opacity=".9">dissolve</text>
+    <text x="196" y="420" text-anchor="middle" font-family="serif" font-style="italic" font-weight="300" font-size="16" fill="rgba(245,226,214,0.55)">A Strange Game</text>
+    <text x="196" y="680" text-anchor="middle" font-family="'DM Mono',monospace" font-size="7" fill="rgba(245,226,214,0.2)" letter-spacing="4">THE ORACLE</text>
+  </svg>
+</template>
+</head>
+<body>
+<script type="text/babel">
+const { useState, useEffect, useRef, useCallback } = React;
+const SERIF = "'Lora', Georgia, serif";
+const MONO  = "'DM Mono','SF Mono',ui-monospace,monospace";
+const CREAM = '#F5E2D6';
+const BG    = '#020208';
+
+// ── MOCK ORACLE RESPONSES ─────────────────────────────────────────────
+const RESPONSES = [
+  { verb:'dissolve', track:'A Strange Game', hue:210,
+    why:'You're holding something that needs water, not fire. Let this one take the edges off what you're carrying.' },
+  { verb:'descend', track:'Ground State', hue:15,
+    why:'The question in you is a root question. This track lives at the frequency of the earth you're standing on.' },
+  { verb:'listen', track:'Void Chorus', hue:185,
+    why:'The field has already answered. This track will help you hear what you already know is true.' },
+  { verb:'open', track:'Cross', hue:195,
+    why:'You are at the threshold between what was known and what is arriving. The heart is the door.' },
+  { verb:'ascend', track:'Crown Point', hue:280,
+    why:'What you're asking about wants to be larger than the frame you've put it in. Let this one lift the ceiling.' },
+];
+
+// ── LISTENING PRESENCE CANVAS ─────────────────────────────────────────
+// A near-invisible breathing presence — the Oracle already listening
+function ListeningPresence({ active=true, responseHue=null }) {
+  const cvs = useRef(null);
+  const aRef = useRef(active);
+  const hRef = useRef(responseHue);
+  useEffect(() => { aRef.current = active; }, [active]);
+  useEffect(() => { hRef.current = responseHue; }, [responseHue]);
+
+  useEffect(() => {
+    const canvas = cvs.current; if(!canvas) return;
+    const dpr = Math.min(window.devicePixelRatio||1,2);
+    const W=393, H=780;
+    canvas.width=W*dpr; canvas.height=H*dpr;
+    const ctx=canvas.getContext('2d'); ctx.scale(dpr,dpr);
+    let raf, frame=0;
+    const tick=()=>{
+      raf=requestAnimationFrame(tick); frame++;
+      const t=frame*.014;
+      ctx.clearRect(0,0,W,H);
+      if(!aRef.current) return;
+      // drift center — very slow parametric path
+      const dx=38*Math.sin(t*.11)*Math.sin(t*.073);
+      const dy=24*Math.cos(t*.088)*Math.cos(t*.051);
+      const cx=W/2+dx, cy=H*.44+dy;
+      // breathing cycle 14s
+      const breathe=.5+.5*Math.sin(t*(Math.PI*2/14)*.5);
+      const hue=hRef.current ?? 30; // warm neutral when no response
+      const fogAlpha=hRef.current
+        ? (.06+.04*breathe)    // visible during response
+        : (.032+.018*breathe); // nearly subliminal when idle
+      const fogR=W*(hRef.current?.55:.45);
+      const fog=ctx.createRadialGradient(cx,cy,0,cx,cy,fogR);
+      fog.addColorStop(0,`hsla(${hue},${hRef.current?30:15}%,${hRef.current?60:72}%,${fogAlpha})`);
+      fog.addColorStop(.55,`hsla(${hue},${hRef.current?25:10}%,${hRef.current?50:60}%,${fogAlpha*.3})`);
+      fog.addColorStop(1,'rgba(0,0,0,0)');
+      ctx.fillStyle=fog;
+      ctx.fillRect(0,0,W,H);
+    };
+    raf=requestAnimationFrame(tick);
+    return ()=>cancelAnimationFrame(raf);
+  },[]);
+
+  return <canvas ref={cvs} style={{position:'absolute',inset:0,width:'100%',height:'100%',pointerEvents:'none'}} />;
+}
+
+// ── ORACLE STATE MACHINE ──────────────────────────────────────────────
+// States: idle → typing → waiting → response
+// The user types a question, the Oracle waits, then responds with a verb + track + why
+
+// ── IDLE STATE ────────────────────────────────────────────────────────
+function IdleState({ onActivate }) {
+  const [showAffordance, setShowAffordance] = useState(false);
+  useEffect(()=>{ const t=setTimeout(()=>setShowAffordance(true),2200); return()=>clearTimeout(t); },[]);
+
+  return (
+    <div onClick={onActivate} style={{
+      position:'absolute',inset:0,cursor:'text',
+      display:'flex',flexDirection:'column',
+      alignItems:'center',justifyContent:'center',
+      animation:'oFadeIn .8s ease',
+    }}>
+      {/* Center — barely anything. Just the presence. */}
+      <div style={{
+        fontFamily:MONO,fontSize:7,letterSpacing:'0.32em',
+        color:'rgba(245,226,214,0.14)',
+        marginTop:260,
+        opacity:showAffordance?1:0,
+        transition:'opacity 2s ease',
+        animation:showAffordance?'oPulse 6s ease-in-out infinite':'none',
+      }}>THE ORACLE</div>
+      <div style={{
+        position:'absolute',bottom:92,
+        fontFamily:MONO,fontSize:9,letterSpacing:'0.16em',
+        color:'rgba(245,226,214,0.1)',
+        opacity:showAffordance?1:0,
+        transition:'opacity 2s .5s ease',
+      }}>◌</div>
+    </div>
+  );
+}
+
+// ── TYPING STATE ──────────────────────────────────────────────────────
+function TypingState({ onSubmit, mockQuestion }) {
+  const [typed, setTyped] = useState('');
+  const [done, setDone] = useState(false);
+  const question = mockQuestion || 'what do I need right now?';
+
+  useEffect(()=>{
+    let i=0;
+    const iv=setInterval(()=>{
+      i++;
+      setTyped(question.slice(0,i));
+      if(i>=question.length){ clearInterval(iv); setTimeout(()=>setDone(true),900); }
+    }, 58);
+    return ()=>clearInterval(iv);
+  },[question]);
+
+  return (
+    <div style={{
+      position:'absolute',inset:0,
+      display:'flex',flexDirection:'column',alignItems:'center',justifyContent:'center',
+      padding:'0 40px',
+      animation:'oFadeIn .4s ease',
+    }}>
+      {/* top label */}
+      <div style={{
+        position:'absolute',top:22,left:24,
+        fontFamily:MONO,fontSize:7.5,letterSpacing:'0.26em',
+        color:'rgba(245,226,214,0.2)',
+      }}>THE ORACLE</div>
+
+      {/* question being typed */}
+      <div style={{
+        fontFamily:SERIF,fontStyle:'italic',fontWeight:300,
+        fontSize:26,lineHeight:1.42,textAlign:'center',
+        color:CREAM,letterSpacing:'-0.01em',
+        textWrap:'pretty',
+      }}>
+        {typed}
+        <span style={{
+          display:'inline-block',width:1.5,height:22,marginLeft:3,
+          background:'rgba(245,226,214,0.65)',verticalAlign:'middle',
+          animation:done?'none':'oCursor 1s step-end infinite',
+          opacity:done?0:1,
+        }}/>
+      </div>
+
+      {/* ask button */}
+      <button onClick={onSubmit} style={{
+        marginTop:52,padding:'14px 40px',
+        background:'transparent',
+        border:'1px solid rgba(245,226,214,0.12)',
+        fontFamily:MONO,fontSize:9,letterSpacing:'0.22em',
+        color:`rgba(245,226,214,${done?.55:.2})`,
+        cursor:'pointer',
+        opacity:done?1:0.3,
+        transition:'opacity .5s, border-color .3s, color .3s',
+      }}>ASK</button>
+    </div>
+  );
+}
+
+// ── WAITING STATE ─────────────────────────────────────────────────────
+function WaitingState({ question }) {
+  return (
+    <div style={{
+      position:'absolute',inset:0,
+      display:'flex',flexDirection:'column',alignItems:'center',justifyContent:'center',
+      padding:'0 40px',
+      animation:'oFadeIn .3s ease',
+    }}>
+      {/* question dissolving */}
+      <div style={{
+        fontFamily:SERIF,fontStyle:'italic',fontWeight:300,
+        fontSize:20,lineHeight:1.5,textAlign:'center',
+        color:'rgba(245,226,214,0.22)',
+        marginBottom:52,
+        animation:'oFadeDown 1.8s 0.3s forwards',
+        textWrap:'pretty',
+      }}>{question}</div>
+      {/* three wait dots */}
+      <div style={{display:'flex',gap:10,alignItems:'center'}}>
+        {[0,1,2].map(i=>(
+          <div key={i} style={{
+            width:4,height:4,borderRadius:'50%',
+            background:'rgba(245,226,214,0.35)',
+            animation:`oWaitDot 1.6s ${i*.25}s ease-in-out infinite`,
+          }}/>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+// ── RESPONSE STATE ────────────────────────────────────────────────────
+function ResponseState({ response, onReset }) {
+  const [phase, setPhase] = useState(0); // 0→1=verb, 2=track, 3=why, 4=cta
+  const {verb, track, hue, why} = response;
+  const accentColor = `hsl(${hue},55%,68%)`;
+  const accentFaint = `hsla(${hue},50%,60%,0.15)`;
+  const accentBorder = `hsla(${hue},45%,55%,0.22)`;
+
+  useEffect(()=>{
+    const t1=setTimeout(()=>setPhase(1),400);
+    const t2=setTimeout(()=>setPhase(2),2200);
+    const t3=setTimeout(()=>setPhase(3),3400);
+    const t4=setTimeout(()=>setPhase(4),5600);
+    return ()=>{ [t1,t2,t3,t4].forEach(clearTimeout); };
+  },[response]);
+
+  return (
+    <div style={{
+      position:'absolute',inset:0,
+      display:'flex',flexDirection:'column',
+      alignItems:'center',justifyContent:'center',
+      padding:'0 36px',
+      animation:'oFadeIn .5s ease',
+    }}>
+      {/* top label */}
+      <div style={{
+        position:'absolute',top:22,left:24,
+        fontFamily:MONO,fontSize:7.5,letterSpacing:'0.26em',
+        color:'rgba(245,226,214,0.2)',
+      }}>THE ORACLE</div>
+
+      {/* VERB — the core answer, arrives first, largest */}
+      <div style={{
+        fontFamily:SERIF,fontStyle:'italic',fontWeight:300,
+        fontSize:72,lineHeight:1,letterSpacing:'-0.02em',
+        color:accentColor,
+        textShadow:`0 0 60px hsla(${hue},55%,60%,0.35)`,
+        opacity:phase>=1?1:0,
+        animation:phase>=1?'oVerbArrive .9s cubic-bezier(.16,1,.3,1) forwards':'none',
+        textAlign:'center',
+        marginBottom:28,
+      }}>{verb}</div>
+
+      {/* TRACK NAME */}
+      <div style={{
+        fontFamily:SERIF,fontStyle:'italic',fontWeight:300,
+        fontSize:20,color:'rgba(245,226,214,0.7)',letterSpacing:'0.01em',
+        marginBottom:8,
+        opacity:phase>=2?1:0,
+        transform:phase>=2?'translateY(0)':'translateY(6px)',
+        transition:'opacity 1s ease, transform 1s ease',
+      }}>{track}</div>
+
+      {/* divider */}
+      <div style={{
+        width:40,height:1,
+        background:`linear-gradient(to right, transparent, ${accentBorder}, transparent)`,
+        margin:'18px 0',
+        opacity:phase>=3?1:0,transition:'opacity 1s ease',
+      }}/>
+
+      {/* WHY — the Oracle's reasoning */}
+      <div style={{
+        fontFamily:SERIF,fontStyle:'italic',fontWeight:300,
+        fontSize:15,lineHeight:1.75,textAlign:'center',
+        color:'rgba(245,226,214,0.52)',
+        maxWidth:310,textWrap:'pretty',
+        opacity:phase>=3?1:0,
+        transform:phase>=3?'translateY(0)':'translateY(5px)',
+        transition:'opacity 1.4s ease, transform 1.4s ease',
+      }}>{why}</div>
+
+      {/* CTA */}
+      <div style={{
+        marginTop:42,display:'flex',gap:16,alignItems:'center',
+        opacity:phase>=4?1:0,
+        transform:phase>=4?'translateY(0)':'translateY(4px)',
+        transition:'opacity 1s ease, transform 1s ease',
+      }}>
+        <button onClick={onReset} style={{
+          padding:'14px 36px',
+          background:'transparent',
+          border:`1px solid ${accentBorder}`,
+          fontFamily:MONO,fontSize:9,letterSpacing:'0.22em',
+          color:accentColor,cursor:'pointer',
+          transition:'background .2s',
+        }}
+        onMouseEnter={e=>e.currentTarget.style.background=accentFaint}
+        onMouseLeave={e=>e.currentTarget.style.background='transparent'}
+        >ENTER THE FIELD</button>
+        <button onClick={onReset} style={{
+          background:'transparent',border:'none',
+          fontFamily:MONO,fontSize:8,letterSpacing:'0.18em',
+          color:'rgba(245,226,214,0.3)',cursor:'pointer',
+        }}>ask again</button>
+      </div>
+    </div>
+  );
+}
+
+// ── ORACLE APP ────────────────────────────────────────────────────────
+function OracleApp({ mockResponseIdx=0, mockQuestion='what do I need right now?', startState='idle' }) {
+  const [state, setState] = useState(startState); // idle|typing|waiting|response
+  const [question, setQuestion] = useState(mockQuestion);
+  const [fadeKey, setFadeKey] = useState(0);
+  const response = RESPONSES[mockResponseIdx % RESPONSES.length];
+
+  const activate = useCallback(()=>{
+    if(state!=='idle') return;
+    setFadeKey(k=>k+1); setState('typing');
+  },[state]);
+
+  const submit = useCallback(()=>{
+    if(state!=='typing') return;
+    setFadeKey(k=>k+1); setState('waiting');
+    setTimeout(()=>{ setFadeKey(k=>k+1); setState('response'); }, 3200);
+  },[state]);
+
+  const reset = useCallback(()=>{
+    setFadeKey(k=>k+1); setState('idle');
+  },[]);
+
+  return (
+    <div style={{width:393,height:780,background:BG,position:'relative',overflow:'hidden'}}>
+      {/* listening presence — always on */}
+      <ListeningPresence
+        active={true}
+        responseHue={state==='response'?response.hue:null}
+      />
+
+      {/* state layer */}
+      <div key={fadeKey} style={{position:'absolute',inset:0}}>
+        {state==='idle'    && <IdleState onActivate={activate} />}
+        {state==='typing'  && <TypingState onSubmit={submit} mockQuestion={mockQuestion} />}
+        {state==='waiting' && <WaitingState question={question} />}
+        {state==='response'&& <ResponseState response={response} onReset={reset} />}
+      </div>
+
+      {/* tab bar */}
+      <div style={{
+        position:'absolute',bottom:0,left:0,right:0,height:50,
+        background:'rgba(2,2,8,0.96)',
+        borderTop:'1px solid rgba(255,255,255,0.06)',
+        display:'flex',alignItems:'center',justifyContent:'space-around',
+        padding:'0 8px',
+      }}>
+        {[
+          {label:'MAP',icon:'◉',active:false},{label:'FIELD',icon:'⊙',active:false},
+          {label:'ORACLE',icon:'◌',active:true},{label:'SPACE',icon:'◎',active:false},
+          {label:'LAB',icon:'⊡',active:false},
+        ].map(tab=>(
+          <div key={tab.label} style={{
+            display:'flex',flexDirection:'column',alignItems:'center',gap:3,
+            opacity:tab.active?1:0.32,
+          }}>
+            <div style={{fontFamily:MONO,fontSize:11,color:tab.active?CREAM:'rgba(245,226,214,0.5)',lineHeight:1}}>{tab.icon}</div>
+            <div style={{fontFamily:MONO,fontSize:7,letterSpacing:'0.16em',color:tab.active?'rgba(245,226,214,0.7)':'rgba(245,226,214,0.3)'}}>{tab.label}</div>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+// ── TWEAK DEFAULTS ────────────────────────────────────────────────────
+const TWEAK_DEFAULTS = /*EDITMODE-BEGIN*/{
+  "responseIdx": 0,
+  "startState": "idle"
+}/*EDITMODE-END*/;
+
+// ── ROOT ──────────────────────────────────────────────────────────────
+function Root() {
+  const [tweaks, setTweak] = useTweaks(TWEAK_DEFAULTS);
+
+  const stateOptions = [
+    {value:'idle',label:'Idle — listening'},
+    {value:'typing',label:'Typing — question forming'},
+    {value:'waiting',label:'Waiting — Oracle processing'},
+    {value:'response',label:'Response — arrived'},
+  ];
+  const responseOptions = RESPONSES.map((r,i)=>({value:i,label:`${r.verb} · ${r.track}`}));
+
+  return (
+    <DesignCanvas>
+      <DCSection id="oracle" title="Oracle Screen" subtitle="The field already listening · speaking into the void">
+        {/* Interactive prototype */}
+        <DCArtboard id="oracle-interactive" label="Interactive · tap to enter" width={393} height={780}>
+          <OracleApp
+            mockResponseIdx={Number(tweaks.responseIdx)}
+            mockQuestion="what do I need right now?"
+            startState={tweaks.startState}
+          />
+        </DCArtboard>
+
+        {/* All 4 states side by side */}
+        <DCArtboard id="oracle-idle" label="Idle — the void listening" width={393} height={780}>
+          <OracleApp mockResponseIdx={0} mockQuestion="what do I need right now?" startState="idle" />
+        </DCArtboard>
+
+        <DCArtboard id="oracle-typing" label="Typing — question forming" width={393} height={780}>
+          <OracleApp mockResponseIdx={0} mockQuestion="what do I need right now?" startState="typing" />
+        </DCArtboard>
+
+        <DCArtboard id="oracle-waiting" label="Waiting — Oracle processing" width={393} height={780}>
+          <OracleApp mockResponseIdx={0} mockQuestion="what do I need right now?" startState="waiting" />
+        </DCArtboard>
+
+        <DCArtboard id="oracle-resp-water" label="Response — dissolve (Water)" width={393} height={780}>
+          <OracleApp mockResponseIdx={0} mockQuestion="what do I need right now?" startState="response" />
+        </DCArtboard>
+
+        <DCArtboard id="oracle-resp-earth" label="Response — descend (Earth)" width={393} height={780}>
+          <OracleApp mockResponseIdx={1} mockQuestion="what do I need right now?" startState="response" />
+        </DCArtboard>
+
+        <DCArtboard id="oracle-resp-crown" label="Response — ascend (Crown)" width={393} height={780}>
+          <OracleApp mockResponseIdx={4} mockQuestion="what do I need right now?" startState="response" />
+        </DCArtboard>
+      </DCSection>
+
+      <TweaksPanel>
+        <TweakSection label="Interactive artboard" />
+        <TweakSelect label="Start state" value={tweaks.startState} options={stateOptions}
+          onChange={v=>setTweak('startState',v)} />
+        <TweakSelect label="Oracle response" value={tweaks.responseIdx} options={responseOptions}
+          onChange={v=>setTweak('responseIdx',Number(v))} />
+      </TweaksPanel>
+    </DesignCanvas>
+  );
+}
+
+ReactDOM.createRoot(document.getElementById('root')).render(<Root />);
+</script>
+<div id="root"></div>
+</body>
+</html>

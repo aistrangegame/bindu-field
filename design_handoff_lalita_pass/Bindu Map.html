@@ -1,0 +1,895 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Bindu Map — 33-Chakra Tree of Life</title>
+<link href="https://fonts.googleapis.com/css2?family=Lora:ital,wght@0,300;0,400;1,300;1,400&family=DM+Mono:wght@300;400&display=swap" rel="stylesheet">
+<script src="https://unpkg.com/react@18.3.1/umd/react.development.js" integrity="sha384-hD6/rw4ppMLGNu3tX5cjIb+uRZ7UkRJ6BPkLpg4hAu/6onKUg4lLsHAs9EBPT82L" crossorigin="anonymous"></script>
+<script src="https://unpkg.com/react-dom@18.3.1/umd/react-dom.development.js" integrity="sha384-u6aeetuaXnQ38mYT8rp6sbXaQe3NL9t+IBXmnYxwkUI2Hw4bsp2Wvmx4yRQF1uAm" crossorigin="anonymous"></script>
+<script src="https://unpkg.com/@babel/standalone@7.29.0/babel.min.js" integrity="sha384-m08KidiNqLdpJqLq95G/LEi8Qvjl/xUYll3QILypMoQ65QorJ9Lvtp2RXYGBFj1y" crossorigin="anonymous"></script>
+<script type="text/babel" src="design-canvas.jsx"></script>
+<script type="text/babel" src="tweaks-panel.jsx"></script>
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+body{background:#0c0b0f;font-family:-apple-system,sans-serif}
+::-webkit-scrollbar{display:none}
+@keyframes shimmerLine{0%{stroke-dashoffset:200}100%{stroke-dashoffset:0}}
+@keyframes breatheNode{0%,100%{opacity:.7;transform:scale(1)}50%{opacity:1;transform:scale(1.12)}}
+@keyframes orbitRing{0%{transform:rotate(0deg)}100%{transform:rotate(360deg)}}
+@keyframes cardUp{from{opacity:0;transform:translateY(24px)}to{opacity:1;transform:translateY(0)}}
+@keyframes fadeIn{from{opacity:0}to{opacity:1}}
+@keyframes pulseGlow{0%,100%{opacity:.45}50%{opacity:.85}}
+@keyframes enterButton{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:translateY(0)}}
+</style>
+<template id="__bundler_thumbnail" data-bg-color="#020208">
+  <svg viewBox="0 0 393 720" xmlns="http://www.w3.org/2000/svg">
+    <rect width="393" height="720" fill="#020208"/>
+    <line x1="196" y1="80" x2="196" y2="640" stroke="rgba(245,226,214,0.08)" stroke-width="1"/>
+    <circle cx="196" cy="100" r="10" fill="none" stroke="hsl(280,50%,68%)" stroke-width="1" opacity=".7"/>
+    <circle cx="196" cy="175" r="8" fill="none" stroke="hsl(50,55%,65%)" stroke-width="1" opacity=".6"/>
+    <circle cx="196" cy="340" r="12" fill="hsl(195,50%,65%)" opacity=".8"/>
+    <circle cx="196" cy="415" r="8" fill="none" stroke="hsl(25,65%,60%)" stroke-width="1" opacity=".6"/>
+    <circle cx="196" cy="580" r="10" fill="hsl(15,55%,62%)" opacity=".7"/>
+    <circle cx="80" cy="440" r="6" fill="none" stroke="hsl(190,45%,60%)" stroke-width="1" opacity=".5"/>
+    <circle cx="312" cy="440" r="6" fill="none" stroke="hsl(265,45%,65%)" stroke-width="1" opacity=".5"/>
+    <text x="196" y="680" text-anchor="middle" font-family="serif" font-style="italic" font-weight="300" font-size="11" fill="rgba(245,226,214,0.3)" letter-spacing="5">THE MAP</text>
+  </svg>
+</template>
+</head>
+<body>
+<script type="text/babel">
+const { useState, useEffect, useRef, useCallback, useMemo } = React;
+
+// ── TOKENS ─────────────────────────────────────────────────────────────
+const BG     = '#020208';
+const CREAM  = '#F5E2D6';
+const MUTED  = 'rgba(245,226,214,0.55)';
+const SUBTLE = 'rgba(245,226,214,0.28)';
+const FAINT  = 'rgba(245,226,214,0.10)';
+const BORDER = 'rgba(255,255,255,0.07)';
+const SERIF  = "'Lora', Georgia, serif";
+const MONO   = "'DM Mono', 'SF Mono', ui-monospace, monospace";
+
+// element hues → hsl color
+function elColor(hue, sat=55, lit=65, alpha=1) {
+  return alpha < 1 ? `hsla(${hue},${sat}%,${lit}%,${alpha})` : `hsl(${hue},${sat}%,${lit}%)`;
+}
+
+// ── 33 CHAKRAS ─────────────────────────────────────────────────────────
+// Canvas is 393×780 (phone content area minus status bar)
+// Four systems: energy (7) · body (10) · mind (9) · tree (7)
+// Nine composed dances: energy(7) + maya + aatma
+// States: danced · available · locked
+
+const CHAKRAS = [
+  // ─── ENERGY SYSTEM (7) — the living spine ───────────────────────────
+  {id:'sahasrara',  name:'Sahasrara',    sys:'energy', hue:280, x:196, y:108,
+   state:'available', essence:'thousand-petalled · the open above',             skt:'सहस्रार',     tier:1},
+  {id:'ajna',       name:'Ajna',         sys:'energy', hue:50,  x:196, y:192,
+   state:'available', essence:'the command · the eye that sees through both',   skt:'आज्ञा',       tier:1},
+  {id:'vishuddha',  name:'Vishuddha',    sys:'energy', hue:185, x:196, y:278,
+   state:'available', essence:'the purified · what speaks from within',         skt:'विशुद्ध',     tier:1},
+  {id:'anahata',    name:'Anahata',      sys:'energy', hue:195, x:196, y:364,
+   state:'danced',    essence:'the unstruck sound · the heart that knows',      skt:'अनाहत',       tier:1},
+  {id:'manipura',   name:'Manipura',     sys:'energy', hue:25,  x:196, y:448,
+   state:'available', essence:'the jewel city · the sun within',                skt:'मणिपूर',      tier:1},
+  {id:'svadhisthana',name:'Svadhisthana',sys:'energy', hue:210, x:196, y:532,
+   state:'available', essence:'one\'s own dwelling · the sacred tide',          skt:'स्वाधिष्ठान', tier:1},
+  {id:'muladhara',  name:'Muladhara',    sys:'energy', hue:15,  x:196, y:616,
+   state:'danced',    essence:'the root support · the ground you stand on',     skt:'मूलाधार',     tier:1},
+
+  // ─── BODY SYSTEM (10) — the extended subtle body ────────────────────
+  {id:'bindu',      name:'Bindu',        sys:'body', hue:265, x:196, y:52,
+   state:'locked', essence:'the seed drop · where form and formless meet',      skt:'बिन्दु',      tier:2},
+  {id:'soma',       name:'Soma',         sys:'body', hue:280, x:130, y:84,
+   state:'locked', essence:'the moon gate · nectar of pure knowing',             skt:'सोम',         tier:2},
+  {id:'guru',       name:'Guru',         sys:'body', hue:280, x:262, y:84,
+   state:'locked', essence:'the inner teacher · remover of darkness',            skt:'गुरु',        tier:2},
+  {id:'manas',      name:'Manas',        sys:'body', hue:50,  x:118, y:163,
+   state:'locked', essence:'the sense-mind · where impressions gather',          skt:'मनस',         tier:2},
+  {id:'lalana',     name:'Lalana',       sys:'body', hue:185, x:274, y:163,
+   state:'locked', essence:'the taste center · the secondary palate',            skt:'ललना',        tier:2},
+  {id:'brahmarandhra',name:'Brahmarandhra',sys:'body',hue:280,x:88,y:116,
+   state:'locked', essence:'the gate of brahman · the crown opening',            skt:'ब्रह्मरन्ध्र',tier:2},
+  {id:'nirvana',    name:'Nirvana',      sys:'body', hue:190, x:305, y:116,
+   state:'locked', essence:'liberation · the flame that does not burn',          skt:'निर्वाण',     tier:2},
+  {id:'pada',       name:'Pada',         sys:'body', hue:15,  x:130, y:630,
+   state:'locked', essence:'the sole ground · the foot print of the body',       skt:'पद',          tier:2},
+  {id:'musti',      name:'Musti',        sys:'body', hue:25,  x:262, y:630,
+   state:'locked', essence:'the fist · the strength held in form',               skt:'मुष्टि',      tier:2},
+  {id:'kanda',      name:'Kanda',        sys:'body', hue:15,  x:196, y:688,
+   state:'locked', essence:'the root bulb · where all nadis begin',              skt:'कन्द',        tier:2},
+
+  // ─── MIND SYSTEM (9) — the mental field ─────────────────────────────
+  {id:'atichandra', name:'Atichandra',   sys:'mind', hue:280, x:54,  y:124,
+   state:'locked', essence:'beyond moon · the super-lunar field',                skt:'अतिचन्द्र',   tier:3},
+  {id:'vyapini',    name:'Vyapini',      sys:'mind', hue:280, x:340, y:124,
+   state:'locked', essence:'the pervader · all-present awareness',               skt:'व्यापिनी',    tier:3},
+  {id:'mahanada',   name:'Mahanada',     sys:'mind', hue:185, x:42,  y:208,
+   state:'locked', essence:'the great sound · primordial resonance',             skt:'महानाद',      tier:3},
+  {id:'nada',       name:'Nada',         sys:'mind', hue:185, x:352, y:208,
+   state:'locked', essence:'inner sound · the unstruck tone within',             skt:'नाद',         tier:3},
+  {id:'samanai',    name:'Samanai',      sys:'mind', hue:195, x:48,  y:330,
+   state:'locked', essence:'equanimity · the balanced witness field',            skt:'समनाई',       tier:3},
+  {id:'unmani',     name:'Unmani',       sys:'mind', hue:190, x:346, y:330,
+   state:'locked', essence:'beyond mind · the unconditioned field',              skt:'उन्मनी',      tier:3},
+  {id:'nadi',       name:'Nadi',         sys:'mind', hue:210, x:56,  y:472,
+   state:'locked', essence:'the channel · energy pathways through form',         skt:'नाडी',        tier:3},
+  {id:'binduvisarga',name:'Bindu Visarga',sys:'mind',hue:265, x:337, y:472,
+   state:'locked', essence:'the falling drop · the release point',               skt:'बिन्दु विसर्ग',tier:3},
+  {id:'chandra',    name:'Chandra',      sys:'mind', hue:50,  x:196, y:748,
+   state:'locked', essence:'the moon mind · cooling, reflecting, receiving',     skt:'चन्द्र',      tier:3},
+
+  // ─── TREE OF LIFE (7) — the structural spine ────────────────────────
+  {id:'kether',     name:'Kether',       sys:'tree', hue:280, x:196, y:20,
+   state:'locked', essence:'the crown · the first and final light',              skt:'केतर',        tier:4},
+  {id:'chokmah',    name:'Chokmah',      sys:'tree', hue:50,  x:72,  y:54,
+   state:'locked', essence:'wisdom · the flash before thought',                  skt:'चोकमाह',      tier:4},
+  {id:'binah',      name:'Binah',        sys:'tree', hue:265, x:321, y:54,
+   state:'locked', essence:'understanding · form receiving formless',             skt:'बिनाह',       tier:4},
+  {id:'maya',       name:'Maya',         sys:'tree', hue:190, x:80,  y:462,
+   state:'available', essence:'the veil · what dissolves when truly seen',       skt:'माया',        tier:4},
+  {id:'aatma',      name:'Aatma',        sys:'tree', hue:265, x:313, y:462,
+   state:'available', essence:'the soul · the witness behind every witness',     skt:'आत्मा',       tier:4},
+  {id:'yesod',      name:'Yesod',        sys:'tree', hue:210, x:88,  y:548,
+   state:'locked', essence:'foundation · the dream layer of form',               skt:'येसोद',       tier:4},
+  {id:'malkuth',    name:'Malkuth',      sys:'tree', hue:15,  x:305, y:548,
+   state:'locked', essence:'kingdom · the sacred in the ordinary',               skt:'मलकुत',       tier:4},
+];
+
+const CHAKRA_MAP = Object.fromEntries(CHAKRAS.map(c => [c.id, c]));
+
+// ── CONNECTIONS ─────────────────────────────────────────────────────────
+const CONNECTIONS = [
+  // Tree of Life crown
+  ['kether','chokmah'],['kether','binah'],['kether','bindu'],
+  ['chokmah','soma'],['binah','guru'],
+  ['chokmah','brahmarandhra'],['binah','nirvana'],
+  ['chokmah','atichandra'],['binah','vyapini'],
+  // Crown cluster
+  ['bindu','sahasrara'],['soma','sahasrara'],['guru','sahasrara'],
+  ['brahmarandhra','sahasrara'],['nirvana','sahasrara'],
+  ['atichandra','brahmarandhra'],['vyapini','nirvana'],
+  // Crown → Third Eye
+  ['sahasrara','ajna'],
+  ['manas','sahasrara'],['lalana','sahasrara'],
+  ['atichandra','manas'],['vyapini','lalana'],
+  ['manas','ajna'],['lalana','ajna'],
+  ['mahanada','ajna'],['nada','ajna'],
+  // Third Eye → Throat
+  ['ajna','vishuddha'],
+  ['mahanada','samanai'],['nada','unmani'],
+  // Throat → Heart
+  ['vishuddha','anahata'],
+  ['samanai','vishuddha'],['unmani','vishuddha'],
+  ['samanai','anahata'],['unmani','anahata'],
+  // Heart → Solar
+  ['anahata','manipura'],
+  ['maya','manipura'],['aatma','manipura'],
+  ['nadi','maya'],['binduvisarga','aatma'],
+  // Solar → Sacral
+  ['manipura','svadhisthana'],
+  ['yesod','svadhisthana'],['malkuth','svadhisthana'],
+  ['nadi','yesod'],['binduvisarga','malkuth'],
+  // Sacral → Root
+  ['svadhisthana','muladhara'],
+  ['yesod','pada'],['malkuth','musti'],
+  // Root cluster
+  ['muladhara','pada'],['muladhara','musti'],['muladhara','kanda'],
+  ['pada','kanda'],['musti','kanda'],
+  ['kanda','chandra'],
+];
+
+// ── JOURNEY STATE PRESETS ──────────────────────────────────────────────
+const JOURNEY_PRESETS = {
+  seeker: { label:'Seeker', desc:'You have just arrived', danced:[] },
+  student: { label:'Student', desc:'Two dances complete', danced:['muladhara','anahata'] },
+  traveler: { label:'Traveler', desc:'Five dances complete', danced:['muladhara','svadhisthana','manipura','anahata','vishuddha'] },
+  dancer: { label:'Dancer', desc:'All nine dances complete', danced:['muladhara','svadhisthana','manipura','anahata','vishuddha','ajna','sahasrara','maya','aatma'] },
+};
+
+// ── SYSTEM LABELS ──────────────────────────────────────────────────────
+const SYSTEMS = {
+  energy: { label:'ENERGY', color:'rgba(245,226,214,0.45)' },
+  body:   { label:'BODY',   color:'rgba(245,226,214,0.30)' },
+  mind:   { label:'MIND',   color:'rgba(245,226,214,0.25)' },
+  tree:   { label:'TREE',   color:'rgba(245,226,214,0.28)' },
+};
+
+// ── MAP CANVAS ─────────────────────────────────────────────────────────
+function MapCanvas({ chakras, selected, onSelect, showNames, t }) {
+  const canvasRef = useRef(null);
+  const animRef = useRef(null);
+  const phaseRef = useRef(0);
+
+  const draw = useCallback((phase) => {
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+    const dpr = Math.min(window.devicePixelRatio || 1, 2);
+    const W = canvas.width / dpr;
+    const H = canvas.height / dpr;
+    const ctx = canvas.getContext('2d');
+    ctx.clearRect(0, 0, W * dpr, H * dpr);
+
+    // ─ Draw connections ─────────────────────────────────────────────
+    CONNECTIONS.forEach(([aId, bId]) => {
+      const a = chakras.find(c => c.id === aId);
+      const b = chakras.find(c => c.id === bId);
+      if (!a || !b) return;
+      const aLit = a.state !== 'locked';
+      const bLit = b.state !== 'locked';
+      const bothLit = aLit && bLit;
+      const eitherLit = aLit || bLit;
+
+      const opacity = bothLit ? 0.18 : eitherLit ? 0.09 : 0.045;
+      const lineWidth = bothLit ? 0.7 : 0.5;
+
+      ctx.save();
+      if (bothLit) {
+        // subtle element-blended gradient
+        const grad = ctx.createLinearGradient(a.x, a.y, b.x, b.y);
+        grad.addColorStop(0, `hsla(${a.hue},50%,65%,${opacity})`);
+        grad.addColorStop(1, `hsla(${b.hue},50%,65%,${opacity})`);
+        ctx.strokeStyle = grad;
+      } else {
+        ctx.strokeStyle = `rgba(245,226,214,${opacity})`;
+      }
+      ctx.lineWidth = lineWidth;
+
+      // gentle curve — midpoint offset
+      const mx = (a.x + b.x) / 2;
+      const my = (a.y + b.y) / 2;
+      const dx = b.x - a.x;
+      const dy = b.y - a.y;
+      const len = Math.sqrt(dx * dx + dy * dy);
+      const curvature = Math.min(len * 0.12, 18);
+      const nx = -dy / len * curvature;
+      const ny = dx / len * curvature;
+
+      ctx.beginPath();
+      ctx.moveTo(a.x, a.y);
+      ctx.quadraticCurveTo(mx + nx, my + ny, b.x, b.y);
+      ctx.stroke();
+      ctx.restore();
+    });
+
+    // ─ Draw nodes ───────────────────────────────────────────────────
+    chakras.forEach(chakra => {
+      const { x, y, state, hue, id, tier } = chakra;
+      const isSelected = selected === id;
+      const isDanced = state === 'danced';
+      const isAvailable = state === 'available';
+      const isLit = isDanced || isAvailable;
+
+      ctx.save();
+
+      if (isLit) {
+        const breathe = 0.6 + 0.4 * Math.sin(phase * (isDanced ? 0.8 : 1.1) + (x + y) * 0.005);
+        const baseR = isDanced ? 11 : 9;
+        const r = baseR;
+
+        // outer aura
+        const auraR = isSelected ? r * 3.5 : r * 2.8;
+        const glowGrad = ctx.createRadialGradient(x, y, 0, x, y, auraR);
+        const auraAlpha = isDanced ? 0.28 * breathe : 0.2 * breathe;
+        glowGrad.addColorStop(0, `hsla(${hue},60%,68%,${auraAlpha})`);
+        glowGrad.addColorStop(0.4, `hsla(${hue},55%,65%,${auraAlpha * 0.5})`);
+        glowGrad.addColorStop(1, `hsla(${hue},50%,62%,0)`);
+        ctx.beginPath();
+        ctx.arc(x, y, auraR, 0, Math.PI * 2);
+        ctx.fillStyle = glowGrad;
+        ctx.fill();
+
+        // danced ring
+        if (isDanced) {
+          ctx.beginPath();
+          ctx.arc(x, y, r + 5 + breathe * 2, 0, Math.PI * 2);
+          ctx.strokeStyle = `hsla(${hue},55%,68%,${0.25 * breathe})`;
+          ctx.lineWidth = 0.8;
+          ctx.stroke();
+          // second orbit ring
+          ctx.beginPath();
+          ctx.arc(x, y, r + 9 + breathe, 0, Math.PI * 2);
+          ctx.strokeStyle = `hsla(${hue},50%,65%,${0.12 * breathe})`;
+          ctx.lineWidth = 0.5;
+          ctx.stroke();
+        }
+
+        // selection highlight
+        if (isSelected) {
+          ctx.beginPath();
+          ctx.arc(x, y, r + 7, 0, Math.PI * 2);
+          ctx.strokeStyle = `hsla(${hue},65%,75%,0.55)`;
+          ctx.lineWidth = 1;
+          ctx.stroke();
+        }
+
+        // core dot
+        const dotGrad = ctx.createRadialGradient(x - r * 0.25, y - r * 0.25, 0, x, y, r);
+        dotGrad.addColorStop(0, `hsla(${hue},70%,82%,1)`);
+        dotGrad.addColorStop(0.5, `hsla(${hue},60%,70%,1)`);
+        dotGrad.addColorStop(1, `hsla(${hue},55%,58%,1)`);
+        ctx.beginPath();
+        ctx.arc(x, y, r, 0, Math.PI * 2);
+        ctx.fillStyle = dotGrad;
+        ctx.fill();
+
+        // inner shine
+        ctx.beginPath();
+        ctx.arc(x - r * 0.28, y - r * 0.28, r * 0.3, 0, Math.PI * 2);
+        ctx.fillStyle = `rgba(255,255,255,0.25)`;
+        ctx.fill();
+
+      } else {
+        // locked node — very small dim cream dot
+        const lockR = tier === 2 ? 2.8 : tier === 3 ? 2.2 : 2.5;
+        ctx.beginPath();
+        ctx.arc(x, y, lockR, 0, Math.PI * 2);
+        ctx.fillStyle = 'rgba(245,226,214,0.18)';
+        ctx.fill();
+      }
+
+      ctx.restore();
+    });
+
+    // ─ Node labels for composed chakras ────────────────────────────
+    if (showNames) {
+      chakras.forEach(chakra => {
+        const { x, y, name, state, id, tier } = chakra;
+        if (state === 'locked') return;
+        const isDanced = state === 'danced';
+        const isSelected = selected === id;
+        const baseR = isDanced ? 11 : 9;
+        const labelY = y + baseR + 14;
+
+        ctx.save();
+        ctx.font = `300 8.5px ${MONO}`;
+        ctx.letterSpacing = '0.18em';
+        ctx.textAlign = 'center';
+        ctx.fillStyle = isSelected
+          ? `hsla(${chakra.hue},60%,78%,0.95)`
+          : isDanced
+            ? `hsla(${chakra.hue},55%,72%,0.75)`
+            : `hsla(${chakra.hue},50%,70%,0.58)`;
+        ctx.fillText(name.toUpperCase(), x, labelY);
+        ctx.restore();
+      });
+    }
+
+    // ─ System zone faint labels ─────────────────────────────────────
+    ctx.save();
+    ctx.font = `300 7px ${MONO}`;
+    ctx.letterSpacing = '0.22em';
+    ctx.textAlign = 'left';
+    ctx.fillStyle = 'rgba(245,226,214,0.10)';
+    ctx.fillText('ENERGY', 8, 364);
+    ctx.fillText('TREE · BODY', 8, 462);
+    ctx.restore();
+
+  }, [chakras, selected, showNames]);
+
+  useEffect(() => {
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+    const dpr = Math.min(window.devicePixelRatio || 1, 2);
+    canvas.width = 393 * dpr;
+    canvas.height = 780 * dpr;
+    const ctx = canvas.getContext('2d');
+    ctx.scale(dpr, dpr);
+  }, []);
+
+  useEffect(() => {
+    let frame = 0;
+    const animate = () => {
+      frame++;
+      phaseRef.current = frame * 0.022;
+      draw(phaseRef.current);
+      animRef.current = requestAnimationFrame(animate);
+    };
+    animRef.current = requestAnimationFrame(animate);
+    return () => cancelAnimationFrame(animRef.current);
+  }, [draw]);
+
+  // Hit areas
+  const handleClick = (e) => {
+    const canvas = canvasRef.current;
+    const rect = canvas.getBoundingClientRect();
+    const scaleX = 393 / rect.width;
+    const scaleY = 780 / rect.height;
+    const px = (e.clientX - rect.left) * scaleX;
+    const py = (e.clientY - rect.top) * scaleY;
+
+    let closest = null;
+    let closestDist = Infinity;
+    chakras.forEach(c => {
+      const dist = Math.sqrt((c.x - px) ** 2 + (c.y - py) ** 2);
+      const hitR = c.state !== 'locked' ? 22 : 10;
+      if (dist < hitR && dist < closestDist) {
+        closest = c;
+        closestDist = dist;
+      }
+    });
+    if (closest) onSelect(closest.id === selected ? null : closest.id);
+  };
+
+  return (
+    <canvas
+      ref={canvasRef}
+      onClick={handleClick}
+      style={{ width: '100%', height: '100%', cursor: 'crosshair', display: 'block' }}
+    />
+  );
+}
+
+// ── SYSTEM TAG ─────────────────────────────────────────────────────────
+function SystemTag({ sys }) {
+  const labels = { energy:'ENERGY SYSTEM', body:'BODY SYSTEM', mind:'MIND FIELD', tree:'TREE OF LIFE' };
+  const colors = { energy:'rgba(245,226,214,0.5)', body:'rgba(245,226,214,0.35)', mind:'rgba(245,226,214,0.3)', tree:'rgba(245,226,214,0.38)' };
+  return (
+    <span style={{
+      fontFamily: MONO, fontSize: 8, letterSpacing: '0.2em',
+      color: colors[sys] || SUBTLE, fontWeight: 300,
+    }}>{labels[sys] || sys.toUpperCase()}</span>
+  );
+}
+
+// ── CHAKRA DETAIL CARD ─────────────────────────────────────────────────
+function ChakraCard({ chakra, onClose, onEnter }) {
+  if (!chakra) return null;
+  const { name, sys, hue, state, essence, skt } = chakra;
+  const isDanced = state === 'danced';
+  const isAvailable = state === 'available';
+  const isLocked = state === 'locked';
+  const accentColor = elColor(hue, 55, 70);
+  const accentFaint = elColor(hue, 50, 65, 0.12);
+  const accentBorder = elColor(hue, 50, 60, 0.25);
+
+  return (
+    <div style={{
+      position: 'absolute', inset: 0, zIndex: 40,
+      display: 'flex', flexDirection: 'column', justifyContent: 'flex-end',
+      animation: 'fadeIn 0.2s ease',
+    }} onClick={onClose}>
+      {/* backdrop */}
+      <div style={{
+        position: 'absolute', inset: 0,
+        background: 'linear-gradient(to top, rgba(2,2,8,0.92) 0%, rgba(2,2,8,0.3) 60%, transparent 100%)',
+      }} />
+
+      {/* card */}
+      <div
+        onClick={e => e.stopPropagation()}
+        style={{
+          position: 'relative', zIndex: 2,
+          margin: '0 0 34px',
+          padding: '28px 28px 32px',
+          background: `rgba(12,10,18,0.95)`,
+          borderTop: `1px solid ${accentBorder}`,
+          animation: 'cardUp 0.35s cubic-bezier(0.16,1,0.3,1)',
+        }}
+      >
+        {/* top row */}
+        <div style={{ display:'flex', alignItems:'flex-start', justifyContent:'space-between', marginBottom:20 }}>
+          <div>
+            <div style={{ marginBottom:6 }}>
+              <SystemTag sys={sys} />
+            </div>
+            <div style={{
+              fontFamily: SERIF, fontStyle:'italic', fontWeight:300,
+              fontSize:28, color: CREAM, lineHeight:1.1, letterSpacing:'-0.01em',
+            }}>{name}</div>
+            <div style={{
+              fontFamily: MONO, fontWeight:300, fontSize:12,
+              color: elColor(hue, 45, 68, 0.7), marginTop:5, letterSpacing:'0.04em',
+            }}>{skt}</div>
+          </div>
+          {/* state indicator */}
+          <div style={{ display:'flex', flexDirection:'column', alignItems:'flex-end', gap:4 }}>
+            {isDanced && (
+              <div style={{
+                fontFamily: MONO, fontSize:7.5, letterSpacing:'0.2em',
+                color: elColor(hue, 55, 72, 0.85),
+                background: elColor(hue, 50, 60, 0.12),
+                border: `1px solid ${accentBorder}`,
+                padding:'4px 10px', borderRadius:2,
+              }}>DANCED</div>
+            )}
+            {isAvailable && (
+              <div style={{
+                fontFamily: MONO, fontSize:7.5, letterSpacing:'0.2em',
+                color: SUBTLE, border: `1px solid ${BORDER}`,
+                padding:'4px 10px', borderRadius:2,
+              }}>AVAILABLE</div>
+            )}
+            {isLocked && (
+              <div style={{
+                fontFamily: MONO, fontSize:7.5, letterSpacing:'0.2em',
+                color: 'rgba(245,226,214,0.2)', border: `1px solid rgba(255,255,255,0.05)`,
+                padding:'4px 10px', borderRadius:2,
+              }}>NOT YET</div>
+            )}
+          </div>
+        </div>
+
+        {/* divider */}
+        <div style={{ height:1, background:`linear-gradient(to right, ${accentBorder}, transparent)`, marginBottom:20 }} />
+
+        {/* essence */}
+        <div style={{
+          fontFamily: SERIF, fontStyle:'italic', fontWeight:300,
+          fontSize:15, color: MUTED, lineHeight:1.6, marginBottom:24,
+        }}>{essence}</div>
+
+        {/* CTA */}
+        {(isDanced || isAvailable) && (
+          <button
+            onClick={onEnter}
+            style={{
+              width:'100%', padding:'16px 24px',
+              background: isDanced ? elColor(hue, 45, 18, 0.8) : 'transparent',
+              border: `1px solid ${accentBorder}`,
+              borderRadius:0,
+              fontFamily: MONO, fontSize:10, letterSpacing:'0.22em',
+              color: isDanced ? elColor(hue, 55, 76) : elColor(hue, 50, 70, 0.8),
+              cursor:'pointer',
+              animation: 'enterButton 0.4s 0.15s both',
+              transition: 'background 0.2s, border-color 0.2s',
+            }}
+            onMouseEnter={e => { e.currentTarget.style.background = elColor(hue, 45, 22, 0.9); e.currentTarget.style.borderColor = elColor(hue, 55, 65, 0.45); }}
+            onMouseLeave={e => { e.currentTarget.style.background = isDanced ? elColor(hue, 45, 18, 0.8) : 'transparent'; e.currentTarget.style.borderColor = accentBorder; }}
+          >
+            {isDanced ? 'DANCE AGAIN' : 'ENTER THIS DANCE'}
+          </button>
+        )}
+        {isLocked && (
+          <div style={{
+            padding:'14px 24px',
+            border:`1px solid rgba(255,255,255,0.05)`,
+            fontFamily: MONO, fontSize:9.5, letterSpacing:'0.18em',
+            color:'rgba(245,226,214,0.18)', textAlign:'center',
+          }}>
+            THIS DANCE HAS NOT YET BEEN COMPOSED
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
+// ── JOURNEY STAT ───────────────────────────────────────────────────────
+function JourneyStat({ danced, total }) {
+  const pct = total > 0 ? danced / total : 0;
+  return (
+    <div style={{ display:'flex', alignItems:'center', gap:10 }}>
+      <div style={{ flex:1, height:1, background:'rgba(255,255,255,0.06)', position:'relative' }}>
+        <div style={{
+          position:'absolute', left:0, top:0, height:'100%',
+          width:`${pct * 100}%`,
+          background:'rgba(245,226,214,0.25)',
+          transition:'width 0.6s ease',
+        }} />
+      </div>
+      <div style={{
+        fontFamily: MONO, fontSize:9, letterSpacing:'0.18em',
+        color:'rgba(245,226,214,0.35)', whiteSpace:'nowrap',
+      }}>{danced}/{total}</div>
+    </div>
+  );
+}
+
+// ── ROOT MAP APP ───────────────────────────────────────────────────────
+function MapApp({ journey, showNames }) {
+  const [selected, setSelected] = useState(null);
+  const [enterAnim, setEnterAnim] = useState(null);
+
+  const preset = JOURNEY_PRESETS[journey] || JOURNEY_PRESETS.student;
+
+  // build live chakra data from journey preset
+  const COMPOSED = ['sahasrara','ajna','vishuddha','anahata','manipura','svadhisthana','muladhara','maya','aatma'];
+  const chakras = useMemo(() => CHAKRAS.map(c => {
+    if (preset.danced.includes(c.id)) return { ...c, state:'danced' };
+    if (COMPOSED.includes(c.id)) return { ...c, state:'available' };
+    return { ...c, state:'locked' };
+  }), [journey]);
+
+  const selectedChakra = selected ? chakras.find(c => c.id === selected) : null;
+  const dancedCount = chakras.filter(c => c.state === 'danced').length;
+  const composedCount = COMPOSED.length;
+
+  const handleEnter = () => {
+    if (!selectedChakra) return;
+    setEnterAnim(selectedChakra.id);
+    setTimeout(() => setEnterAnim(null), 1200);
+  };
+
+  return (
+    <div style={{
+      width:'100%', height:'100%',
+      background: BG,
+      display:'flex', flexDirection:'column',
+      position:'relative', overflow:'hidden',
+    }}>
+      {/* ambient radial — breathes from heart center */}
+      <div style={{
+        position:'absolute', inset:0, pointerEvents:'none',
+        background:`radial-gradient(ellipse 65% 55% at 50% 47%, rgba(195,90,60,0.04) 0%, transparent 70%)`,
+      }} />
+
+      {/* header */}
+      <div style={{
+        padding:'18px 24px 0',
+        display:'flex', alignItems:'center', justifyContent:'space-between',
+        position:'relative', zIndex:10,
+      }}>
+        <div>
+          <div style={{
+            fontFamily: MONO, fontSize:8.5, letterSpacing:'0.28em',
+            color:'rgba(245,226,214,0.3)', marginBottom:3,
+          }}>THE MAP</div>
+          <div style={{
+            fontFamily: SERIF, fontStyle:'italic', fontWeight:300,
+            fontSize:14, color:'rgba(245,226,214,0.5)',
+          }}>33 Chakras · Tree of Life</div>
+        </div>
+        <div style={{ textAlign:'right' }}>
+          <div style={{
+            fontFamily: MONO, fontSize:8, letterSpacing:'0.2em',
+            color:'rgba(245,226,214,0.25)', marginBottom:4,
+          }}>YOUR JOURNEY</div>
+          <div style={{ width:100 }}>
+            <JourneyStat danced={dancedCount} total={composedCount} />
+          </div>
+        </div>
+      </div>
+
+      {/* map canvas */}
+      <div style={{ flex:1, position:'relative', overflow:'hidden' }}>
+        <MapCanvas
+          chakras={chakras}
+          selected={selected}
+          onSelect={setSelected}
+          showNames={showNames}
+          t={Date.now()}
+        />
+        <ChakraCard
+          chakra={selectedChakra}
+          onClose={() => setSelected(null)}
+          onEnter={handleEnter}
+        />
+        {/* enter flash */}
+        {enterAnim && (
+          <div style={{
+            position:'absolute', inset:0, pointerEvents:'none',
+            background: selectedChakra ? elColor(selectedChakra.hue, 45, 20, 0.35) : 'transparent',
+            animation:'fadeIn 0.3s ease, fadeIn 0.3s 0.9s reverse forwards',
+          }} />
+        )}
+      </div>
+
+      {/* tab bar hint */}
+      <div style={{
+        height:1, background:'rgba(255,255,255,0.05)', marginBottom:0,
+      }} />
+      <div style={{
+        height:50, display:'flex', alignItems:'center', justifyContent:'space-around',
+        padding:'0 8px',
+        background:'rgba(2,2,8,0.96)',
+        borderTop:'1px solid rgba(255,255,255,0.06)',
+      }}>
+        {[
+          { label:'MAP', active:true, icon:'◉' },
+          { label:'FIELD', active:false, icon:'⊙' },
+          { label:'ORACLE', active:false, icon:'◌' },
+          { label:'SPACE', active:false, icon:'◎' },
+          { label:'LAB', active:false, icon:'⊡' },
+        ].map(tab => (
+          <div key={tab.label} style={{
+            display:'flex', flexDirection:'column', alignItems:'center', gap:3,
+            opacity: tab.active ? 1 : 0.35,
+          }}>
+            <div style={{
+              fontFamily: MONO, fontSize:11,
+              color: tab.active ? CREAM : 'rgba(245,226,214,0.5)',
+              lineHeight:1,
+            }}>{tab.icon}</div>
+            <div style={{
+              fontFamily: MONO, fontSize:7, letterSpacing:'0.16em',
+              color: tab.active ? 'rgba(245,226,214,0.7)' : 'rgba(245,226,214,0.3)',
+            }}>{tab.label}</div>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+// ── PHONE SHELL ────────────────────────────────────────────────────────
+function PhoneShell({ children, scale = 0.72 }) {
+  return (
+    <div style={{
+      width: 393 * scale, height: 852 * scale,
+      borderRadius: 54 * scale,
+      background:'#0a0a0e',
+      boxShadow:`0 0 0 ${1.2*scale}px #1a1820, 0 0 0 ${2.5*scale}px #0d0c12, 0 ${30*scale}px ${80*scale}px rgba(0,0,0,0.9)`,
+      overflow:'hidden', position:'relative',
+      flexShrink: 0,
+    }}>
+      {/* status bar */}
+      <div style={{
+        position:'absolute', top:0, left:0, right:0, zIndex:50,
+        height: 59 * scale,
+        display:'flex', alignItems:'center', justifyContent:'space-between',
+        padding:`0 ${28*scale}px`,
+      }}>
+        <span style={{ fontFamily:'-apple-system', fontWeight:600, fontSize:16*scale, color:'rgba(245,226,214,0.75)' }}>9:41</span>
+        <div style={{ width:126*scale, height:36*scale, background:'#000', borderRadius:24*scale, position:'absolute', left:'50%', transform:'translateX(-50%)', top:9*scale }} />
+        <div style={{ display:'flex', gap:6*scale, alignItems:'center' }}>
+          <svg width={19*scale} height={12*scale} viewBox="0 0 19 12">
+            <rect x="0" y="7.5" width="3.2" height="4.5" rx="0.7" fill="rgba(245,226,214,0.7)"/>
+            <rect x="4.8" y="5" width="3.2" height="7" rx="0.7" fill="rgba(245,226,214,0.7)"/>
+            <rect x="9.6" y="2.5" width="3.2" height="9.5" rx="0.7" fill="rgba(245,226,214,0.7)"/>
+            <rect x="14.4" y="0" width="3.2" height="12" rx="0.7" fill="rgba(245,226,214,0.7)"/>
+          </svg>
+          <svg width={27*scale} height={13*scale} viewBox="0 0 27 13">
+            <rect x="0.5" y="0.5" width="23" height="12" rx="3.5" stroke="rgba(245,226,214,0.4)" fill="none"/>
+            <rect x="2" y="2" width="20" height="9" rx="2" fill="rgba(245,226,214,0.7)"/>
+          </svg>
+        </div>
+      </div>
+      {/* content — below status bar */}
+      <div style={{ position:'absolute', top:59*scale, left:0, right:0, bottom:0 }}>
+        <div style={{ transform:`scale(${scale})`, transformOrigin:'top left',
+          width:393, height:(852-59), }}>
+          {children}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ── TWEAK DEFAULTS ─────────────────────────────────────────────────────
+const TWEAK_DEFAULTS = /*EDITMODE-BEGIN*/{
+  "journey": "student",
+  "showNames": true,
+  "showDetail": "auto"
+}/*EDITMODE-END*/;
+
+// ── ROOT ───────────────────────────────────────────────────────────────
+function Root() {
+  const [tweaks, setTweak] = useTweaks(TWEAK_DEFAULTS);
+
+  return (
+    <DesignCanvas>
+      <DCSection id="map" title="The Map" subtitle="33-Chakra Tree of Life · front door of the Ensemble Engine">
+        <DCArtboard id="map-main" label="Living Map" width={393} height={780}>
+          <div style={{ width:393, height:780, background:BG, overflow:'hidden' }}>
+            <MapApp journey={tweaks.journey} showNames={tweaks.showNames} />
+          </div>
+        </DCArtboard>
+
+        <DCArtboard id="map-detail-heart" label="Detail — Anahata (danced)" width={393} height={780}>
+          <MapDetailStatic
+            chakraId="anahata"
+            journey="student"
+          />
+        </DCArtboard>
+
+        <DCArtboard id="map-detail-locked" label="Detail — Bindu (locked)" width={393} height={780}>
+          <MapDetailStatic
+            chakraId="bindu"
+            journey="student"
+          />
+        </DCArtboard>
+
+        <DCArtboard id="map-dancer" label="Dancer journey (all 9)" width={393} height={780}>
+          <div style={{ width:393, height:780, background:BG, overflow:'hidden' }}>
+            <MapApp journey="dancer" showNames={tweaks.showNames} />
+          </div>
+        </DCArtboard>
+
+        <DCArtboard id="map-seeker" label="Seeker (day one)" width={393} height={780}>
+          <div style={{ width:393, height:780, background:BG, overflow:'hidden' }}>
+            <MapApp journey="seeker" showNames={tweaks.showNames} />
+          </div>
+        </DCArtboard>
+      </DCSection>
+
+      <DCSection id="phone" title="In context" subtitle="How the Map sits on the device">
+        <DCArtboard id="phone-student" label="Student journey" width={320} height={680}>
+          <div style={{
+            width:320, height:680, background:'#080610',
+            display:'flex', alignItems:'center', justifyContent:'center',
+          }}>
+            <PhoneShell scale={0.72}>
+              <MapApp journey={tweaks.journey} showNames={tweaks.showNames} />
+            </PhoneShell>
+          </div>
+        </DCArtboard>
+
+        <DCArtboard id="phone-dancer" label="Dancer journey" width={320} height={680}>
+          <div style={{
+            width:320, height:680, background:'#080610',
+            display:'flex', alignItems:'center', justifyContent:'center',
+          }}>
+            <PhoneShell scale={0.72}>
+              <MapApp journey="dancer" showNames={tweaks.showNames} />
+            </PhoneShell>
+          </div>
+        </DCArtboard>
+      </DCSection>
+
+      <TweaksPanel>
+        <TweakSection label="Journey State">
+          <TweakSelect
+            label="Who is looking"
+            value={tweaks.journey}
+            options={[
+              { value:'seeker',   label:'Seeker — day one' },
+              { value:'student',  label:'Student — 2 danced' },
+              { value:'traveler', label:'Traveler — 5 danced' },
+              { value:'dancer',   label:'Dancer — all 9' },
+            ]}
+            onChange={v => setTweak('journey', v)}
+          />
+        </TweakSection>
+        <TweakSection label="Display">
+          <TweakToggle
+            label="Show node names"
+            value={tweaks.showNames}
+            onChange={v => setTweak('showNames', v)}
+          />
+        </TweakSection>
+      </TweaksPanel>
+    </DesignCanvas>
+  );
+}
+
+// ── STATIC DETAIL VIEW (for artboard previews) ────────────────────────
+function MapDetailStatic({ chakraId, journey }) {
+  const [selected, setSelected] = useState(chakraId);
+  const preset = JOURNEY_PRESETS[journey] || JOURNEY_PRESETS.student;
+  const COMPOSED = ['sahasrara','ajna','vishuddha','anahata','manipura','svadhisthana','muladhara','maya','aatma'];
+  const chakras = CHAKRAS.map(c => {
+    if (preset.danced.includes(c.id)) return { ...c, state:'danced' };
+    if (COMPOSED.includes(c.id)) return { ...c, state:'available' };
+    return { ...c, state:'locked' };
+  });
+  const selectedChakra = chakras.find(c => c.id === selected);
+  const dancedCount = chakras.filter(c => c.state === 'danced').length;
+
+  return (
+    <div style={{ width:393, height:780, background:BG, overflow:'hidden', position:'relative' }}>
+      <div style={{ position:'absolute', inset:0, background:`radial-gradient(ellipse 65% 55% at 50% 47%, rgba(195,90,60,0.04) 0%, transparent 70%)` }} />
+      <div style={{ padding:'18px 24px 0', display:'flex', alignItems:'center', justifyContent:'space-between', position:'relative', zIndex:10 }}>
+        <div>
+          <div style={{ fontFamily:MONO, fontSize:8.5, letterSpacing:'0.28em', color:'rgba(245,226,214,0.3)', marginBottom:3 }}>THE MAP</div>
+          <div style={{ fontFamily:SERIF, fontStyle:'italic', fontWeight:300, fontSize:14, color:'rgba(245,226,214,0.5)' }}>33 Chakras · Tree of Life</div>
+        </div>
+        <div style={{ textAlign:'right' }}>
+          <div style={{ fontFamily:MONO, fontSize:8, letterSpacing:'0.2em', color:'rgba(245,226,214,0.25)', marginBottom:4 }}>YOUR JOURNEY</div>
+          <div style={{ width:100 }}><JourneyStat danced={dancedCount} total={9} /></div>
+        </div>
+      </div>
+      <div style={{ flex:1, position:'relative', height:'calc(100% - 60px - 51px)' }}>
+        <MapCanvas chakras={chakras} selected={selected} onSelect={setSelected} showNames={true} t={0} />
+        <ChakraCard chakra={selectedChakra} onClose={() => setSelected(null)} onEnter={() => {}} />
+      </div>
+      <div style={{ height:1, background:'rgba(255,255,255,0.05)' }} />
+      <div style={{ height:50, display:'flex', alignItems:'center', justifyContent:'space-around', padding:'0 8px', background:'rgba(2,2,8,0.96)', borderTop:'1px solid rgba(255,255,255,0.06)' }}>
+        {[{ label:'MAP', active:true, icon:'◉' },{ label:'FIELD', active:false, icon:'⊙' },{ label:'ORACLE', active:false, icon:'◌' },{ label:'SPACE', active:false, icon:'◎' },{ label:'LAB', active:false, icon:'⊡' }].map(tab => (
+          <div key={tab.label} style={{ display:'flex', flexDirection:'column', alignItems:'center', gap:3, opacity:tab.active?1:0.35 }}>
+            <div style={{ fontFamily:MONO, fontSize:11, color:tab.active?CREAM:'rgba(245,226,214,0.5)', lineHeight:1 }}>{tab.icon}</div>
+            <div style={{ fontFamily:MONO, fontSize:7, letterSpacing:'0.16em', color:tab.active?'rgba(245,226,214,0.7)':'rgba(245,226,214,0.3)' }}>{tab.label}</div>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+ReactDOM.createRoot(document.getElementById('root')).render(<Root />);
+</script>
+<div id="root"></div>
+</body>
+</html>

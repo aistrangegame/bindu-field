@@ -1,0 +1,657 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Bindu Element Vocabularies</title>
+<link href="https://fonts.googleapis.com/css2?family=Lora:ital,wght@0,300;0,400;1,300;1,400&family=DM+Mono:wght@300;400&display=swap" rel="stylesheet">
+<script src="https://unpkg.com/react@18.3.1/umd/react.development.js" integrity="sha384-hD6/rw4ppMLGNu3tX5cjIb+uRZ7UkRJ6BPkLpg4hAu/6onKUg4lLsHAs9EBPT82L" crossorigin="anonymous"></script>
+<script src="https://unpkg.com/react-dom@18.3.1/umd/react-dom.development.js" integrity="sha384-u6aeetuaXnQ38mYT8rp6sbXaQe3NL9t+IBXmnYxwkUI2Hw4bsp2Wvmx4yRQF1uAm" crossorigin="anonymous"></script>
+<script src="https://unpkg.com/@babel/standalone@7.29.0/babel.min.js" integrity="sha384-m08KidiNqLdpJqLq95G/LEi8Qvjl/xUYll3QILypMoQ65QorJ9Lvtp2RXYGBFj1y" crossorigin="anonymous"></script>
+<script type="text/babel" src="design-canvas.jsx"></script>
+<script type="text/babel" src="tweaks-panel.jsx"></script>
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+body{background:#100e18}
+::-webkit-scrollbar{display:none}
+</style>
+<template id="__bundler_thumbnail" data-bg-color="#100e18">
+  <svg viewBox="0 0 800 300" xmlns="http://www.w3.org/2000/svg">
+    <rect width="800" height="300" fill="#100e18"/>
+    <!-- Earth glyph -->
+    <circle cx="80" cy="150" r="50" fill="none" stroke="hsl(15,45%,30%)" stroke-width=".5" opacity=".4"/>
+    <circle cx="80" cy="150" r="5" fill="hsl(15,55%,62%)"/>
+    <!-- Water ripples -->
+    <circle cx="200" cy="150" r="40" fill="none" stroke="hsl(210,50%,55%)" stroke-width=".6" opacity=".3"/>
+    <circle cx="200" cy="150" r="22" fill="none" stroke="hsl(210,50%,58%)" stroke-width=".7" opacity=".5"/>
+    <circle cx="200" cy="150" r="5" fill="hsl(210,55%,65%)"/>
+    <!-- Fire -->
+    <path d="M320,180 L300,100 L340,80 L330,140 L360,90 L350,170 Z" fill="hsl(25,60%,45%)" opacity=".5"/>
+    <circle cx="330" cy="170" r="5" fill="hsl(25,65%,62%)"/>
+    <!-- Constellation -->
+    <circle cx="450" cy="130" r="2" fill="hsl(50,60%,70%)" opacity=".8"/>
+    <circle cx="480" cy="155" r="1.5" fill="hsl(50,55%,65%)" opacity=".6"/>
+    <circle cx="430" cy="160" r="1" fill="hsl(50,50%,60%)" opacity=".5"/>
+    <circle cx="460" cy="170" r="5" fill="hsl(50,60%,72%)"/>
+    <!-- Crown petals -->
+    <path d="M590,150 Q600,120 610,150" fill="none" stroke="hsl(280,45%,58%)" stroke-width="1.2" opacity=".5"/>
+    <path d="M590,150 Q580,120 570,150" fill="none" stroke="hsl(280,45%,58%)" stroke-width="1.2" opacity=".5"/>
+    <circle cx="590" cy="150" r="5" fill="hsl(280,55%,68%)"/>
+    <!-- Triangle -->
+    <polygon points="720,100 680,180 760,180" fill="none" stroke="hsl(265,40%,50%)" stroke-width="1" opacity=".4"/>
+    <circle cx="720" cy="150" r="4" fill="hsl(265,50%,65%)"/>
+  </svg>
+</template>
+</head>
+<body>
+<script type="text/babel">
+const { useEffect, useRef, useState } = React;
+const SERIF = "'Lora', Georgia, serif";
+const MONO  = "'DM Mono','SF Mono',ui-monospace,monospace";
+const CREAM = '#F5E2D6';
+
+// ── DETERMINISTIC NOISE ───────────────────────────────────────────────
+function dn(s) { const x = Math.sin(s * 127.1 + 311.7) * 43758.5; return x - Math.floor(x); }
+function dn2(s) { const x = Math.sin(s * 269.5 + 183.3) * 43758.5; return x - Math.floor(x); }
+
+// ── SHARED BINDU DOT ──────────────────────────────────────────────────
+function drawBindu(ctx, x, y, hue, t, scale=1) {
+  const b = 0.65 + 0.35 * Math.sin(t * 1.15);
+  const r = 5.5 * scale;
+  const aura = ctx.createRadialGradient(x, y, 0, x, y, 32*scale);
+  aura.addColorStop(0, `hsla(${hue},60%,72%,${0.32*b})`);
+  aura.addColorStop(1, 'rgba(0,0,0,0)');
+  ctx.fillStyle = aura; ctx.beginPath(); ctx.arc(x, y, 32*scale, 0, Math.PI*2); ctx.fill();
+  ctx.beginPath(); ctx.arc(x, y, r, 0, Math.PI*2);
+  const core = ctx.createRadialGradient(x-r*.3, y-r*.3, 0, x, y, r);
+  core.addColorStop(0, `hsla(${hue},70%,88%,1)`);
+  core.addColorStop(1, `hsla(${hue},58%,65%,1)`);
+  ctx.fillStyle = core; ctx.fill();
+  ctx.beginPath(); ctx.arc(x-r*.28, y-r*.3, r*.3, 0, Math.PI*2);
+  ctx.fillStyle = 'rgba(255,255,255,0.35)'; ctx.fill();
+}
+
+// ── VOCABULARY DRAW FUNCTIONS ─────────────────────────────────────────
+
+// EARTH — Muladhara — seismic fractures, dust, amber ground ───────────
+function drawEarth(ctx, W, H, t, intens) {
+  ctx.fillStyle = '#080503'; ctx.fillRect(0,0,W,H);
+  const cx = W/2, cy = H*.67;
+  const b = 0.7 + 0.3*Math.sin(t*.38);
+  // ground gradient
+  const g = ctx.createLinearGradient(0, H*.5, 0, H);
+  g.addColorStop(0,'rgba(0,0,0,0)');
+  g.addColorStop(.5,`rgba(55,22,5,${0.5*intens})`);
+  g.addColorStop(1,`rgba(80,30,6,${0.75*intens})`);
+  ctx.fillStyle=g; ctx.fillRect(0,0,W,H);
+  // seismic cracks — deterministic zigzag
+  const cracks = [
+    {a:-80,l:.40,n:6,spread:.45},{a:-55,l:.44,n:7,spread:.52},
+    {a:-38,l:.36,n:5,spread:.35},{a:-105,l:.32,n:5,spread:.38},
+    {a:-125,l:.34,n:6,spread:.42},{a:-150,l:.24,n:4,spread:.28},
+  ];
+  const nCracks = 2 + Math.round(intens * (cracks.length-2));
+  cracks.slice(0, nCracks).forEach((c, i) => {
+    ctx.save(); ctx.translate(cx, cy); ctx.rotate(c.a*Math.PI/180);
+    const maxL = c.l * H * b;
+    const pulse = 0.25 + 0.15*Math.sin(t*.5+i*.7)*intens;
+    ctx.beginPath(); ctx.moveTo(0,0);
+    let px=0, py=0;
+    for(let s=1;s<=c.n;s++){
+      const jx = (dn(i*31+s*17)-.5)*c.spread*28;
+      const jy = (c.l*H/c.n)*b;
+      px+=jx; py-=jy;
+      ctx.lineTo(px,py);
+    }
+    ctx.strokeStyle=`hsla(18,50%,45%,${pulse})`; ctx.lineWidth=.8+intens*.5; ctx.stroke();
+    // hairline branches
+    if(intens>.4){
+      const bx=px*.6, by=py*.6;
+      ctx.beginPath(); ctx.moveTo(bx,by);
+      ctx.lineTo(bx+(dn(i*7+23)-.5)*30, by-18);
+      ctx.strokeStyle=`hsla(18,45%,38%,${pulse*.5})`; ctx.lineWidth=.4; ctx.stroke();
+    }
+    ctx.restore();
+  });
+  // amber center glow
+  const glo = ctx.createRadialGradient(cx,cy,0,cx,cy,W*.52*intens);
+  glo.addColorStop(0,`hsla(22,65%,40%,${.28*b*intens})`);
+  glo.addColorStop(.4,`hsla(18,55%,32%,${.12*intens})`);
+  glo.addColorStop(1,'rgba(0,0,0,0)');
+  ctx.fillStyle=glo; ctx.fillRect(0,0,W,H);
+  // dust particles
+  const nP = Math.round(20+30*intens);
+  for(let i=0;i<nP;i++){
+    const seed=i*1337;
+    const ox=(dn(seed)-.5)*W*.7;
+    const speed=8+dn2(seed)*14;
+    const px=cx+ox, py=cy-((t*speed+dn(seed*3)*H*.55)%(H*.58));
+    const alpha=(.08+.08*dn2(seed*2))*(1-py/cy*.4)*intens;
+    const sz=.5+dn(seed+7);
+    ctx.beginPath(); ctx.arc(px,py,sz,0,Math.PI*2);
+    ctx.fillStyle=`hsla(22,55%,68%,${alpha})`; ctx.fill();
+  }
+  drawBindu(ctx,cx,cy-8,15,t);
+}
+
+// WATER — Svadhisthana — interference ripples, flow lines ─────────────
+function drawWater(ctx, W, H, t, intens) {
+  ctx.fillStyle='#020508'; ctx.fillRect(0,0,W,H);
+  const cx=W/2, cy=H/2;
+  // interference ripple systems — 3 origin points
+  const origins = [{x:cx,y:cy,per:3.2},{x:cx-55,y:cy-30,per:4.1},{x:cx+42,y:cy+38,per:2.8}];
+  const nO = 1 + Math.round(intens*2);
+  origins.slice(0,nO).forEach((o,oi) => {
+    const phase = (t/o.per)%(1);
+    for(let ring=0;ring<7;ring++){
+      const rPhase = (phase + ring/7)%1;
+      const r = rPhase * Math.min(W,H)*.62;
+      const alpha = (1-rPhase)*(.18+.12*intens)*(oi===0?1:.65);
+      ctx.beginPath(); ctx.arc(o.x,o.y,r,0,Math.PI*2);
+      ctx.strokeStyle=`hsla(210,60%,68%,${alpha})`; ctx.lineWidth=.7; ctx.stroke();
+    }
+  });
+  // flow lines — horizontal sine paths
+  const nLines = 4+Math.round(intens*3);
+  for(let li=0;li<nLines;li++){
+    const yBase = H*.2 + li*(H*.65/nLines);
+    const amp=12+dn(li*11)*18;
+    const freq=.012+dn2(li*7)*.008;
+    const spd=t*(0.4+dn(li*3)*.3)*(li%2===0?1:-1);
+    ctx.beginPath();
+    for(let px=0;px<=W;px+=3){
+      const py=yBase+amp*Math.sin(px*freq+spd);
+      px===0?ctx.moveTo(px,py):ctx.lineTo(px,py);
+    }
+    const fl_alpha=(.06+.06*dn(li*13))*intens;
+    ctx.strokeStyle=`hsla(210,55%,72%,${fl_alpha})`; ctx.lineWidth=.6; ctx.stroke();
+  }
+  // deep glow
+  const glo=ctx.createRadialGradient(cx,cy,0,cx,cy,W*.5);
+  glo.addColorStop(0,`hsla(210,55%,40%,${.15*intens})`);
+  glo.addColorStop(1,'rgba(0,0,0,0)');
+  ctx.fillStyle=glo; ctx.fillRect(0,0,W,H);
+  drawBindu(ctx,cx,cy,210,t);
+}
+
+// FIRE — Manipura — ember particles, solar rings, radial expansion ─────
+function drawFire(ctx, W, H, t, intens) {
+  ctx.fillStyle='#080300'; ctx.fillRect(0,0,W,H);
+  const cx=W/2, cy=H*.58;
+  // inner sun glow
+  const sun=ctx.createRadialGradient(cx,cy,0,cx,cy,W*.44*intens);
+  sun.addColorStop(0,`hsla(38,80%,65%,${.35*intens})`);
+  sun.addColorStop(.3,`hsla(25,70%,45%,${.22*intens})`);
+  sun.addColorStop(.7,`hsla(15,60%,25%,${.08*intens})`);
+  sun.addColorStop(1,'rgba(0,0,0,0)');
+  ctx.fillStyle=sun; ctx.fillRect(0,0,W,H);
+  // solar ring pulses — every 2.5s
+  const ringPeriod=2.5;
+  for(let ri=0;ri<3;ri++){
+    const rPhase=((t/ringPeriod)+ri/3)%1;
+    const r=rPhase*W*.55;
+    const alpha=(1-rPhase)*(.25*intens);
+    ctx.beginPath(); ctx.arc(cx,cy,r,0,Math.PI*2);
+    ctx.strokeStyle=`hsla(28,70%,60%,${alpha})`; ctx.lineWidth=1.2-rPhase; ctx.stroke();
+  }
+  // geometric: upward triangle, faint
+  if(intens>.3){
+    const th=H*.38*intens, tw=th*.9;
+    ctx.beginPath();
+    ctx.moveTo(cx,cy-th); ctx.lineTo(cx-tw/2,cy+th*.12); ctx.lineTo(cx+tw/2,cy+th*.12);
+    ctx.closePath();
+    ctx.strokeStyle=`hsla(35,65%,55%,${.08*intens})`; ctx.lineWidth=.8; ctx.stroke();
+  }
+  // ember particles
+  const nP=Math.round(30+50*intens);
+  for(let i=0;i<nP;i++){
+    const seed=i*937;
+    const ox=(dn(seed)-.5)*W*.48;
+    const speed=22+dn2(seed)*38;
+    const lifespan=H*.7;
+    const age=(t*speed+dn(seed*3)*lifespan)%lifespan;
+    const px=cx+ox+Math.sin(t*.8+dn(seed)*6.28)*8;
+    const py=cy-age;
+    const pct=age/lifespan;
+    const alpha=(pct<.3?pct/.3:1-pct)*(0.55+.25*dn(seed+2))*intens;
+    const sz=(1.4+dn(seed+5)*2)*(1-pct*.7);
+    const hue=15+dn2(seed+1)*25;
+    ctx.beginPath(); ctx.arc(px,py,sz,0,Math.PI*2);
+    ctx.fillStyle=`hsla(${hue},80%,${55+pct*25}%,${alpha})`; ctx.fill();
+  }
+  drawBindu(ctx,cx,cy,25,t);
+}
+
+// AIR / CATHEDRAL — Anahata — gothic arches, breath rings, keystone ───
+function drawAir(ctx, W, H, t, intens) {
+  ctx.fillStyle='#020208'; ctx.fillRect(0,0,W,H);
+  const cx=W/2, cy=H*.48;
+  const b=0.6+0.4*Math.sin(t*.45);
+  // cathedral floor gradient
+  const floor=ctx.createLinearGradient(0,H*.7,0,H);
+  floor.addColorStop(0,'rgba(0,0,0,0)');
+  floor.addColorStop(1,`rgba(12,18,30,${.5*intens})`);
+  ctx.fillStyle=floor; ctx.fillRect(0,0,W,H);
+  // gothic arches — two curves from lower-sides meeting at keystone
+  if(intens>.2){
+    const ky=H*.22, lx=W*.08, rx=W*.92, by=H*.85;
+    ctx.beginPath();
+    ctx.moveTo(lx,by); ctx.bezierCurveTo(lx,ky+40, cx-20,ky, cx,ky);
+    ctx.bezierCurveTo(cx+20,ky, rx,ky+40, rx,by);
+    ctx.strokeStyle=`hsla(195,40%,45%,${.08+.06*intens})`; ctx.lineWidth=.8; ctx.stroke();
+    // inner arch
+    ctx.beginPath();
+    ctx.moveTo(W*.2,by); ctx.bezierCurveTo(W*.2,ky+70, cx-12,ky+28, cx,ky+28);
+    ctx.bezierCurveTo(cx+12,ky+28, W*.8,ky+70, W*.8,by);
+    ctx.strokeStyle=`hsla(195,40%,50%,${.06*intens})`; ctx.lineWidth=.6; ctx.stroke();
+  }
+  // vertical luminous column
+  const col=ctx.createLinearGradient(cx,0,cx+1,H);
+  col.addColorStop(0,`hsla(195,50%,70%,0)`);
+  col.addColorStop(.3,`hsla(195,50%,68%,${.12*b*intens})`);
+  col.addColorStop(.5,`hsla(195,55%,72%,${.18*b*intens})`);
+  col.addColorStop(.7,`hsla(195,50%,65%,${.1*intens})`);
+  col.addColorStop(1,'rgba(0,0,0,0)');
+  ctx.save(); ctx.globalCompositeOperation='screen';
+  ctx.fillStyle=col; ctx.fillRect(cx-8,0,16,H);
+  ctx.restore();
+  // breath rings
+  for(let ri=0;ri<4;ri++){
+    const rPhase=((t/4.8)+ri/4)%1;
+    const r=rPhase*W*.48;
+    const alpha=(1-rPhase)*(.18+.1*intens)*b;
+    ctx.beginPath(); ctx.arc(cx,cy,r,0,Math.PI*2);
+    ctx.strokeStyle=`hsla(195,55%,70%,${alpha})`; ctx.lineWidth=.8; ctx.stroke();
+  }
+  // keystone glow
+  const key=ctx.createRadialGradient(cx,cy,0,cx,cy,W*.38);
+  key.addColorStop(0,`hsla(200,55%,65%,${.2*b*intens})`);
+  key.addColorStop(1,'rgba(0,0,0,0)');
+  ctx.fillStyle=key; ctx.fillRect(0,0,W,H);
+  // chant haze — horizontal spread
+  const haze=ctx.createLinearGradient(0,cy,W,cy);
+  haze.addColorStop(0,'rgba(0,0,0,0)');
+  haze.addColorStop(.5,`hsla(195,50%,60%,${.06*intens})`);
+  haze.addColorStop(1,'rgba(0,0,0,0)');
+  ctx.fillStyle=haze; ctx.fillRect(0,cy-22,W,44);
+  drawBindu(ctx,cx,cy,195,t);
+}
+
+// ETHER — Vishuddha — sound waves as geometry, standing resonance ──────
+function drawEther(ctx, W, H, t, intens) {
+  ctx.fillStyle='#030809'; ctx.fillRect(0,0,W,H);
+  const cx=W/2, cy=H/2;
+  // standing sine wave bands
+  const bands=7;
+  for(let li=0;li<bands;li++){
+    const yBase=H*.18+li*(H*.66/bands);
+    const freq=.014+li*.001;
+    const amp=6+li*3+intens*12;
+    const spd=t*(.35+li*.04);
+    const direc=li%2===0?1:-1;
+    ctx.beginPath();
+    for(let px=0;px<=W;px+=2){
+      const py=yBase+amp*Math.sin(px*freq+spd*direc);
+      px===0?ctx.moveTo(px,py):ctx.lineTo(px,py);
+    }
+    const a=(.04+.05*(li===3?intens:0))*(.5+intens*.5);
+    ctx.strokeStyle=`hsla(185,60%,72%,${a})`; ctx.lineWidth=.7; ctx.stroke();
+    // nodal point glow at center x (where amplitude is ~0)
+    const nodeX=cx;
+    const nodeY=yBase; // approximate node
+    if(intens>.3){
+      const nodeGlo=ctx.createRadialGradient(nodeX,nodeY,0,nodeX,nodeY,5);
+      nodeGlo.addColorStop(0,`hsla(185,65%,80%,${.25*intens})`);
+      nodeGlo.addColorStop(1,'rgba(0,0,0,0)');
+      ctx.fillStyle=nodeGlo; ctx.beginPath(); ctx.arc(nodeX,nodeY,5,0,Math.PI*2); ctx.fill();
+    }
+  }
+  // mirror vocal pair — two sine waves symmetrically around center
+  for(let m=0;m<2;m++){
+    const sign=m===0?1:-1;
+    const vAmp=18+intens*22;
+    const vFreq=.02;
+    const vSpd=t*.55;
+    ctx.beginPath();
+    for(let px=0;px<=W;px+=2){
+      const py=cy+sign*vAmp*Math.sin(px*vFreq+vSpd);
+      px===0?ctx.moveTo(px,py):ctx.lineTo(px,py);
+    }
+    ctx.strokeStyle=`hsla(185,65%,78%,${.12+.08*intens})`; ctx.lineWidth=1; ctx.stroke();
+  }
+  // resonance glow at center
+  const res=ctx.createRadialGradient(cx,cy,0,cx,cy,W*.35*intens);
+  res.addColorStop(0,`hsla(185,55%,65%,${.18*intens})`);
+  res.addColorStop(1,'rgba(0,0,0,0)');
+  ctx.fillStyle=res; ctx.fillRect(0,0,W,H);
+  drawBindu(ctx,cx,cy,185,t);
+}
+
+// CONSTELLATION — Ajna — star field, depth, clarity-dot ───────────────
+function drawConstellation(ctx, W, H, t, intens) {
+  ctx.fillStyle='#020202'; ctx.fillRect(0,0,W,H);
+  const cx=W/2, cy=H/2;
+  // star field — 80 deterministic stars
+  const nStars=80;
+  for(let i=0;i<nStars;i++){
+    const sx=dn(i*13)*W, sy=dn(i*17)*H;
+    const brightness=dn2(i*11);
+    const sz=brightness>.85?2:brightness>.65?1.2:.7;
+    const twinkle=.5+.5*Math.sin(t*(1.2+dn(i*7))+i);
+    const alpha=(.15+.5*brightness)*twinkle*(.4+.6*intens);
+    ctx.beginPath(); ctx.arc(sx,sy,sz,0,Math.PI*2);
+    ctx.fillStyle=`hsla(50,${30+brightness*30}%,${60+brightness*20}%,${alpha})`;
+    ctx.fill();
+  }
+  // 5 bright focal stars with glow
+  const focals=[
+    {x:cx-80,y:cy-110},{x:cx+95,y:cy-85},{x:cx-110,y:cy+60},
+    {x:cx+70,y:cy+100},{x:cx-30,y:cy-155},
+  ];
+  focals.slice(0,2+Math.round(intens*3)).forEach((f,i) => {
+    const tw=.7+.3*Math.sin(t*(1+i*.3));
+    const glo=ctx.createRadialGradient(f.x,f.y,0,f.x,f.y,16);
+    glo.addColorStop(0,`hsla(50,70%,80%,${.45*tw*intens})`);
+    glo.addColorStop(1,'rgba(0,0,0,0)');
+    ctx.fillStyle=glo; ctx.beginPath(); ctx.arc(f.x,f.y,16,0,Math.PI*2); ctx.fill();
+    ctx.beginPath(); ctx.arc(f.x,f.y,1.8,0,Math.PI*2);
+    ctx.fillStyle=`hsla(50,80%,92%,${tw})`; ctx.fill();
+  });
+  // connection lines between nearby stars (first 30)
+  if(intens>.3){
+    for(let a=0;a<30;a++){
+      for(let b=a+1;b<30;b++){
+        const ax=dn(a*13)*W, ay=dn(a*17)*H;
+        const bx=dn(b*13)*W, by=dn(b*17)*H;
+        const d=Math.sqrt((ax-bx)**2+(ay-by)**2);
+        if(d<110){
+          ctx.beginPath(); ctx.moveTo(ax,ay); ctx.lineTo(bx,by);
+          ctx.strokeStyle=`hsla(50,40%,60%,${(.03+.03*intens)*(1-d/110)})`;
+          ctx.lineWidth=.4; ctx.stroke();
+        }
+      }
+    }
+  }
+  drawBindu(ctx,cx,cy,50,t);
+}
+
+// CROWN — Sahasrara — lotus petals, ascending light, violet ───────────
+function drawCrown(ctx, W, H, t, intens) {
+  ctx.fillStyle='#060408'; ctx.fillRect(0,0,W,H);
+  const cx=W/2, cy=H*.52;
+  const b=0.7+0.3*Math.sin(t*.4);
+  // central violet glow
+  const vGlo=ctx.createRadialGradient(cx,cy,0,cx,cy,W*.55);
+  vGlo.addColorStop(0,`hsla(280,55%,50%,${.22*b*intens})`);
+  vGlo.addColorStop(.5,`hsla(280,45%,35%,${.1*intens})`);
+  vGlo.addColorStop(1,'rgba(0,0,0,0)');
+  ctx.fillStyle=vGlo; ctx.fillRect(0,0,W,H);
+  // 12-petal lotus — bezier petals
+  const nPetals=12;
+  const outerR=W*.28*(0.85+0.15*b*intens);
+  for(let p=0;p<nPetals;p++){
+    const angle=p*(Math.PI*2/nPetals)-Math.PI/2;
+    const px=cx+outerR*Math.cos(angle);
+    const py=cy+outerR*Math.sin(angle);
+    const cp1x=cx+(outerR*.65)*Math.cos(angle-.22);
+    const cp1y=cy+(outerR*.65)*Math.sin(angle-.22);
+    const cp2x=cx+(outerR*.65)*Math.cos(angle+.22);
+    const cp2y=cy+(outerR*.65)*Math.sin(angle+.22);
+    ctx.beginPath(); ctx.moveTo(cx,cy);
+    ctx.bezierCurveTo(cp1x,cp1y,cp2x,cp2y,px,py);
+    ctx.bezierCurveTo(cp2x,cp2y,cp1x,cp1y,cx,cy);
+    const pAlpha=.10+.06*intens+.04*Math.sin(t*.5+p*.5);
+    ctx.fillStyle=`hsla(280,50%,65%,${pAlpha})`;
+    ctx.fill();
+    ctx.strokeStyle=`hsla(280,55%,72%,${pAlpha*.8})`;
+    ctx.lineWidth=.6; ctx.stroke();
+  }
+  // ascending light particles
+  const nP=Math.round(15+25*intens);
+  for(let i=0;i<nP;i++){
+    const seed=i*773;
+    const ox=(dn(seed)-.5)*W*.5;
+    const speed=14+dn2(seed)*18;
+    const py=cy-((t*speed+dn(seed*3)*H*.7)%(H*.75));
+    const px=cx+ox;
+    const pct=1-(py-(cy-H*.75))/(H*.75);
+    const alpha=(.2+.2*dn(seed+2))*(1-pct*.6)*intens;
+    ctx.beginPath(); ctx.arc(px,py,1+dn(seed+1)*.8,0,Math.PI*2);
+    ctx.fillStyle=`hsla(${280+dn(seed*2)*40},60%,${70+pct*20}%,${alpha})`; ctx.fill();
+  }
+  drawBindu(ctx,cx,cy,280,t);
+}
+
+// SOUL / TRIANGLE — Aatma — deep stillness, witness ───────────────────
+function drawSoul(ctx, W, H, t, intens) {
+  ctx.fillStyle='#030408'; ctx.fillRect(0,0,W,H);
+  const cx=W/2, cy=H*.5;
+  const b=0.92+0.08*Math.sin(t*.28); // barely breathing
+  // subtle field
+  const field=ctx.createRadialGradient(cx,cy,0,cx,cy,W*.5);
+  field.addColorStop(0,`hsla(265,40%,30%,${.12*intens})`);
+  field.addColorStop(1,'rgba(0,0,0,0)');
+  ctx.fillStyle=field; ctx.fillRect(0,0,W,H);
+  // outer triangle (upward-pointing)
+  const tr=W*.34*b;
+  const t1y=cy-tr*.92, t2x=cx-tr*.87, t2y=cy+tr*.46, t3x=cx+tr*.87, t3y=cy+tr*.46;
+  ctx.beginPath(); ctx.moveTo(cx,t1y); ctx.lineTo(t2x,t2y); ctx.lineTo(t3x,t3y); ctx.closePath();
+  ctx.strokeStyle=`hsla(265,42%,52%,${.22+.12*intens})`; ctx.lineWidth=.9; ctx.stroke();
+  ctx.fillStyle=`hsla(265,38%,28%,${.06*intens})`; ctx.fill();
+  // inner triangle (downward-pointing, very slow rotation ~60s)
+  const ir=tr*.52;
+  const rot=t*.016*(Math.PI*2/60); // one revolution per ~60s
+  ctx.save(); ctx.translate(cx,cy); ctx.rotate(rot+Math.PI);
+  ctx.beginPath(); ctx.moveTo(0,-ir*.92); ctx.lineTo(-ir*.87,ir*.46); ctx.lineTo(ir*.87,ir*.46); ctx.closePath();
+  ctx.strokeStyle=`hsla(265,38%,48%,${.15+.08*intens})`; ctx.lineWidth=.7; ctx.stroke();
+  ctx.restore();
+  // star of david center — a tiny glow where they overlap
+  const sGlo=ctx.createRadialGradient(cx,cy,0,cx,cy,18);
+  sGlo.addColorStop(0,`hsla(265,50%,60%,${.3*intens})`);
+  sGlo.addColorStop(1,'rgba(0,0,0,0)');
+  ctx.fillStyle=sGlo; ctx.beginPath(); ctx.arc(cx,cy,18,0,Math.PI*2); ctx.fill();
+  // a handful of deep-field witness stars
+  for(let i=0;i<12;i++){
+    ctx.beginPath(); ctx.arc(dn(i*41)*W, dn(i*53)*H, .6+dn2(i*7)*.5, 0, Math.PI*2);
+    ctx.fillStyle=`hsla(265,30%,55%,${.08*dn(i*19)*intens})`; ctx.fill();
+  }
+  drawBindu(ctx,cx,cy,265,t);
+}
+
+// DISSOLUTION / MAYA — veil cycle, form ↔ void ────────────────────────
+function drawDissolution(ctx, W, H, t, intens) {
+  ctx.fillStyle='#040209'; ctx.fillRect(0,0,W,H);
+  const cx=W/2, cy=H*.5;
+  const cycleLen=9; // seconds per half-cycle
+  const cyclePhase=(t%(cycleLen*2));
+  const dissolving=cyclePhase>cycleLen;
+  const cyclePct=dissolving?(cyclePhase-cycleLen)/cycleLen:cyclePhase/cycleLen;
+  const formPct=dissolving?(1-cyclePct):cyclePct; // 0=void, 1=full form
+  // deep field glow
+  const fg=ctx.createRadialGradient(cx,cy,0,cx,cy,W*.6);
+  fg.addColorStop(0,`hsla(195,35%,30%,${.12*intens*(1-formPct*.3)})`);
+  fg.addColorStop(1,'rgba(0,0,0,0)');
+  ctx.fillStyle=fg; ctx.fillRect(0,0,W,H);
+  // veil particles — 64 in 8×8 grid
+  const grid=8, spacing=W*.088;
+  const gx0=cx-(grid-1)*spacing/2, gy0=cy-(grid-1)*spacing/2;
+  for(let r=0;r<grid;r++){
+    for(let c=0;c<grid;c++){
+      const idx=r*grid+c;
+      const gPx=gx0+c*spacing, gPy=gy0+r*spacing;
+      const driftAng=(dn(idx*37)-0.5)*Math.PI*2;
+      const driftDist=dn2(idx*53)*W*.38*(1-formPct);
+      const px=gPx+Math.cos(driftAng)*driftDist*(1-formPct);
+      const py=gPy+Math.sin(driftAng)*driftDist*(1-formPct);
+      const alpha=formPct*(.25+.1*dn(idx*17))*intens;
+      const sz=.8+dn(idx*29)*.8;
+      ctx.beginPath(); ctx.arc(px,py,sz,0,Math.PI*2);
+      ctx.fillStyle=`hsla(195,45%,65%,${alpha})`; ctx.fill();
+    }
+  }
+  // veil overlay — what's behind the veil
+  if(formPct<.7){
+    const veiled=ctx.createRadialGradient(cx,cy,0,cx,cy,W*.45);
+    veiled.addColorStop(0,`hsla(280,40%,35%,${(.7-formPct)*.2*intens})`);
+    veiled.addColorStop(1,'rgba(0,0,0,0)');
+    ctx.fillStyle=veiled; ctx.fillRect(0,0,W,H);
+  }
+  // cycle text hint (very subtle)
+  ctx.save();
+  ctx.font=`300 8px ${MONO}`; ctx.textAlign='center';
+  ctx.fillStyle=`rgba(195,165,180,${.12*intens*(1-formPct*.6)})`;
+  ctx.fillText(dissolving?'DISSOLVING':'FORMING', cx, cy+H*.38);
+  ctx.restore();
+  drawBindu(ctx,cx,cy,190,t);
+}
+
+// ── VOCABULARY METADATA ───────────────────────────────────────────────
+const VOCABS = [
+  {id:'earth',         dance:'Muladhara',    element:'Earth',         hue:15,  bg:'#080503', draw:drawEarth},
+  {id:'water',         dance:'Svadhisthana', element:'Water',         hue:210, bg:'#020508', draw:drawWater},
+  {id:'fire',          dance:'Manipura',     element:'Fire',          hue:25,  bg:'#080300', draw:drawFire},
+  {id:'air',           dance:'Anahata',      element:'Air · Cathedral',hue:195,bg:'#020208', draw:drawAir},
+  {id:'ether',         dance:'Vishuddha',    element:'Ether',         hue:185, bg:'#030809', draw:drawEther},
+  {id:'constellation', dance:'Ajna',         element:'Constellation', hue:50,  bg:'#020202', draw:drawConstellation},
+  {id:'crown',         dance:'Sahasrara',    element:'Crown',         hue:280, bg:'#060408', draw:drawCrown},
+  {id:'soul',          dance:'Aatma',        element:'Soul · Triangle',hue:265,bg:'#030408', draw:drawSoul},
+  {id:'dissolution',   dance:'Maya',         element:'Dissolution · Veil',hue:190,bg:'#040209',draw:drawDissolution},
+];
+
+// ── CANVAS COMPONENT ──────────────────────────────────────────────────
+function VocabCanvas({ vocab, W=393, H=780, intensity=0.7 }) {
+  const cvs = useRef(null);
+  const intRef = useRef(intensity);
+  useEffect(() => { intRef.current = intensity; }, [intensity]);
+
+  useEffect(() => {
+    const canvas = cvs.current; if(!canvas) return;
+    const dpr = Math.min(window.devicePixelRatio||1,2);
+    canvas.width = W*dpr; canvas.height = H*dpr;
+    const ctx = canvas.getContext('2d'); ctx.scale(dpr,dpr);
+    let raf, frame=0;
+    const tick = () => {
+      raf = requestAnimationFrame(tick); frame++;
+      const t = frame * 0.018;
+      vocab.draw(ctx, W, H, t, intRef.current);
+    };
+    raf = requestAnimationFrame(tick);
+    return () => cancelAnimationFrame(raf);
+  }, [vocab, W, H]);
+
+  return <canvas ref={cvs} style={{width:'100%',height:'100%',display:'block'}} />;
+}
+
+// ── VOCABULARY PANEL ──────────────────────────────────────────────────
+function VocabPanel({ vocab, intensity=0.7, showLabel=true }) {
+  const W=393, H=780;
+  return (
+    <div style={{width:W, height:H, position:'relative', overflow:'hidden'}}>
+      <VocabCanvas vocab={vocab} W={W} H={H} intensity={intensity} />
+      {showLabel && (
+        <div style={{
+          position:'absolute', top:0, left:0, right:0, bottom:0,
+          pointerEvents:'none',
+          display:'flex', flexDirection:'column', justifyContent:'space-between',
+          padding:'22px 24px 36px',
+        }}>
+          {/* top label */}
+          <div>
+            <div style={{fontFamily:MONO,fontSize:7.5,letterSpacing:'0.26em',color:`hsla(${vocab.hue},50%,68%,0.5)`,marginBottom:5}}>
+              {vocab.element.toUpperCase()}
+            </div>
+            <div style={{fontFamily:SERIF,fontStyle:'italic',fontWeight:300,fontSize:18,color:`rgba(245,226,214,0.8)`}}>
+              {vocab.dance}
+            </div>
+          </div>
+          {/* bottom — tier hint */}
+          <div style={{display:'flex',alignItems:'center',gap:10}}>
+            {['CONTINUOUS','ENSEMBLE','CRESCENDO','CLIMAX'].map((tier,i) => (
+              <div key={tier} style={{
+                fontFamily:MONO,fontSize:6,letterSpacing:'0.16em',
+                color:`hsla(${vocab.hue},40%,62%,${intensity>(i/4)?0.55:0.15})`,
+              }}>{tier}</div>
+            ))}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ── TIER COMPARISON — 4-PANE GRID ─────────────────────────────────────
+function TierGrid({ vocab }) {
+  const tiers = [
+    {label:'CONTINUOUS', intens:0.18},
+    {label:'ENSEMBLE',   intens:0.45},
+    {label:'CRESCENDO',  intens:0.72},
+    {label:'CLIMAX',     intens:1.00},
+  ];
+  return (
+    <div style={{
+      display:'grid', gridTemplateColumns:'1fr 1fr',
+      width:786, height:440, gap:1, background:'#000',
+    }}>
+      {tiers.map(tier => (
+        <div key={tier.label} style={{position:'relative',overflow:'hidden'}}>
+          <VocabCanvas vocab={vocab} W={393} H={439} intensity={tier.intens} />
+          <div style={{
+            position:'absolute',bottom:10,left:0,right:0,textAlign:'center',
+            fontFamily:MONO,fontSize:7.5,letterSpacing:'0.22em',
+            color:`hsla(${vocab.hue},45%,65%,0.5)`,pointerEvents:'none',
+          }}>{tier.label}</div>
+        </div>
+      ))}
+    </div>
+  );
+}
+
+// ── TWEAK DEFAULTS ────────────────────────────────────────────────────
+const TWEAK_DEFAULTS = /*EDITMODE-BEGIN*/{
+  "intensity": 0.72,
+  "showLabels": true
+}/*EDITMODE-END*/;
+
+// ── ROOT ──────────────────────────────────────────────────────────────
+function Root() {
+  const [tweaks, setTweak] = useTweaks(TWEAK_DEFAULTS);
+  const earthVocab = VOCABS.find(v => v.id==='earth');
+
+  return (
+    <DesignCanvas>
+      <DCSection id="vocabs" title="Element Vocabularies" subtitle="Nine visual languages · one per chakra dance">
+        {VOCABS.map(v => (
+          <DCArtboard key={v.id} id={v.id} label={`${v.dance} · ${v.element}`} width={393} height={780}>
+            <VocabPanel vocab={v} intensity={tweaks.intensity} showLabel={tweaks.showLabels} />
+          </DCArtboard>
+        ))}
+      </DCSection>
+
+      <DCSection id="tiers" title="Tier System" subtitle="How one vocabulary transforms across the 4 performance tiers · Earth shown">
+        <DCArtboard id="earth-tiers" label="Earth · 4 Tiers" width={786} height={440}>
+          <TierGrid vocab={earthVocab} />
+        </DCArtboard>
+        <DCArtboard id="fire-tiers" label="Fire · 4 Tiers" width={786} height={440}>
+          <TierGrid vocab={VOCABS.find(v=>v.id==='fire')} />
+        </DCArtboard>
+        <DCArtboard id="crown-tiers" label="Crown · 4 Tiers" width={786} height={440}>
+          <TierGrid vocab={VOCABS.find(v=>v.id==='crown')} />
+        </DCArtboard>
+      </DCSection>
+
+      <TweaksPanel>
+        <TweakSection label="Intensity" />
+        <TweakSlider label="Performance tier" value={tweaks.intensity} min={0} max={1} step={0.01}
+          onChange={v => setTweak('intensity', v)} />
+        <TweakSection label="Display" />
+        <TweakToggle label="Show labels" value={tweaks.showLabels} onChange={v => setTweak('showLabels', v)} />
+      </TweaksPanel>
+    </DesignCanvas>
+  );
+}
+
+ReactDOM.createRoot(document.getElementById('root')).render(<Root />);
+</script>
+<div id="root"></div>
+</body>
+</html>
