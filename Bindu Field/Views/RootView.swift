@@ -9,6 +9,10 @@ struct RootView: View {
 
     var body: some View {
         ZStack {
+            // Inner ZStack(alignment: .bottom) anchors the MiniPlayer
+            // bar above the tab bar. Hidden when the full-screen Player
+            // is presented (the modal is the canonical surface then).
+            ZStack(alignment: .bottom) {
             TabView(selection: $nav.selectedTab) {
                 // MAP — the front door of the app. Tag 0.
                 MapView()
@@ -32,24 +36,27 @@ struct RootView: View {
                         }
                     }
                     .tag(2)
+                // Primary 5 finishes here: Space (renamed AKASH in the
+                // tabItem label) → Archive. iOS auto-collapses tabs 5–7
+                // into the More menu.
                 SpaceView()
                     .tabItem {
-                        Label { Text("Space") } icon: {
+                        Label { Text("AKASH") } icon: {
                             BinduTabIconImage(tab: .space, active: nav.selectedTab == 3)
                         }
                     }
                     .tag(3)
-                LabView()
-                    .tabItem {
-                        Label { Text("Lab") } icon: {
-                            BinduTabIconImage(tab: .lab, active: nav.selectedTab == 4)
-                        }
-                    }
-                    .tag(4)
                 ArchiveView()
                     .tabItem {
                         Label { Text("Archive") } icon: {
-                            BinduTabIconImage(tab: .archive, active: nav.selectedTab == 5)
+                            BinduTabIconImage(tab: .archive, active: nav.selectedTab == 4)
+                        }
+                    }
+                    .tag(4)
+                LabView()
+                    .tabItem {
+                        Label { Text("Lab") } icon: {
+                            BinduTabIconImage(tab: .lab, active: nav.selectedTab == 5)
                         }
                     }
                     .tag(5)
@@ -74,6 +81,16 @@ struct RootView: View {
                 if let track = store.currentTrack {
                     PlayerView(track: track)
                 }
+            }
+
+                // MiniPlayer floats 49pt up from the bottom so it sits
+                // above the tab bar's content area. It self-hides when
+                // there's no current track or when the modal is up.
+                VStack(spacing: 0) {
+                    MiniPlayerView()
+                    Spacer().frame(height: 49)
+                }
+                .allowsHitTesting(!store.isPresentingPlayer)
             }
 
             // Headphones tip — shown after birth sequence, only on first launch

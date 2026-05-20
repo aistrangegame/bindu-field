@@ -173,6 +173,24 @@ struct FieldView: View {
                                     with: .color(color.opacity(min(foggedOpacity * 1.2, 1.0))),
                                     lineWidth: 0.8
                                 )
+
+                                // Verb label below the orb — front-hemisphere
+                                // only so the back side stays calm. The 0.65
+                                // depthNorm cutoff matches roughly the
+                                // forward third of the sphere; verb opacity
+                                // tracks foggedOpacity so it dims with the
+                                // orb instead of floating loud above a
+                                // half-dim disc.
+                                if depthNorm < 0.65 {
+                                    let labelOpacity = min(0.65, foggedOpacity * 0.85)
+                                    ctx.draw(
+                                        Text(proj.track.verb)
+                                            .font(.system(size: 9, weight: .light, design: .serif).italic())
+                                            .foregroundColor(color.opacity(labelOpacity)),
+                                        at: CGPoint(x: proj.screen.x, y: proj.screen.y + radius + 10),
+                                        anchor: .top
+                                    )
+                                }
                             }
                         }
                     }
