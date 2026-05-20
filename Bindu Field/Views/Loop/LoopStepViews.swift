@@ -120,7 +120,7 @@ struct PreRollStepView: View {
 
                 Text("tap to enter")
                     .font(.system(size: 8, weight: .light, design: .serif).italic())
-                    .foregroundStyle(Color(hex: "#F5E2D6").opacity(showTap ? 0.22 : 0))
+                    .foregroundStyle(Color(hex: "#F5E2D6").opacity(showTap ? 0.32 : 0))
                     .padding(.bottom, 48)
             }
             .animation(.easeIn(duration: 1.5), value: showTap)
@@ -171,7 +171,7 @@ struct SeedStepView: View {
                     .font(.system(size: 7.5, weight: .light))
                     .tracking(3.0)
                     .textCase(.uppercase)
-                    .foregroundStyle(Color(hex: "#F5E2D6").opacity(phase >= 2 ? 0.18 : 0))
+                    .foregroundStyle(Color(hex: "#F5E2D6").opacity(phase >= 2 ? 0.30 : 0))
                     .padding(.bottom, 80)
                     .animation(.easeOut(duration: 2.0), value: phase)
             }
@@ -320,7 +320,7 @@ struct DanceStepView: View {
                     .font(.system(size: 7, weight: .light))
                     .tracking(3.0)
                     .textCase(.uppercase)
-                    .foregroundStyle(Color(hex: "#F5E2D6").opacity(hasFlashed ? 0.18 : 0))
+                    .foregroundStyle(Color(hex: "#F5E2D6").opacity(hasFlashed ? 0.30 : 0))
                     .animation(.easeOut(duration: 1.2), value: hasFlashed)
                     .padding(.bottom, 80)
             }
@@ -448,7 +448,7 @@ struct FruitStepView: View {
                     .textCase(.uppercase)
                     .foregroundStyle(
                         Color(hue: hue / 360, saturation: 0.45, brightness: 0.62)
-                            .opacity(0.35)
+                            .opacity(0.55)
                     )
                     .padding(.bottom, 10)
 
@@ -472,7 +472,7 @@ struct FruitStepView: View {
                     .tracking(3.0)
                     .textCase(.uppercase)
                     .foregroundStyle(
-                        Color(hex: "#F5E2D6").opacity(visibleLines >= paragraphs.count ? 0.16 : 0)
+                        Color(hex: "#F5E2D6").opacity(visibleLines >= paragraphs.count ? 0.30 : 0)
                     )
                     .animation(.easeOut(duration: 2.0), value: visibleLines)
                     .padding(.bottom, 80)
@@ -533,7 +533,7 @@ struct LalitaStepView: View {
                             .font(.system(size: 7.5, weight: .light))
                             .tracking(3.0)
                             .textCase(.uppercase)
-                            .foregroundStyle(Color(hex: "#F5E2D6").opacity(0.20))
+                            .foregroundStyle(Color(hex: "#F5E2D6").opacity(0.35))
                     }
                     .transition(.opacity)
                     .padding(.top, 12)

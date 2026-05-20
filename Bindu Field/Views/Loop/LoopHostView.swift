@@ -96,9 +96,17 @@ struct LoopHostView: View {
                     Spacer()
                     Button(action: close) {
                         Text("close")
-                            .font(.system(size: 9, weight: .light, design: .serif).italic())
-                            .foregroundStyle(Color(hex: "#F5E2D6").opacity(0.30))
+                            .font(.system(size: 12, weight: .light, design: .serif).italic())
+                            .foregroundStyle(Color(hex: "#F5E2D6").opacity(0.55))
                             .padding(.horizontal, 14).padding(.vertical, 8)
+                            .background(
+                                Capsule()
+                                    .fill(Color.black.opacity(0.30))
+                                    .overlay(
+                                        Capsule()
+                                            .stroke(Color(hex: "#F5E2D6").opacity(0.12), lineWidth: 0.5)
+                                    )
+                            )
                     }
                     .buttonStyle(.plain)
                     .padding(.trailing, 16)
@@ -148,8 +156,8 @@ private struct LoopStepIndicator: View {
                 .tracking(3.0)
                 .textCase(.uppercase)
                 .foregroundStyle(
-                    Color(hue: hue / 360, saturation: 0.40, brightness: 0.58)
-                        .opacity(0.45)
+                    Color(hue: hue / 360, saturation: 0.40, brightness: 0.65)
+                        .opacity(0.65)
                 )
             HStack(spacing: 4) {
                 ForEach(0..<7, id: \.self) { i in
@@ -188,14 +196,14 @@ private struct LoopCornerInfo: View {
                     .tracking(2.8)
                     .textCase(.uppercase)
                     .foregroundStyle(
-                        Color(hue: hue / 360, saturation: 0.40, brightness: 0.60)
-                            .opacity(0.35)
+                        Color(hue: hue / 360, saturation: 0.40, brightness: 0.62)
+                            .opacity(0.55)
                     )
             }
             if let track {
                 Text(track.song)
                     .font(.system(size: 7.5, weight: .light, design: .serif).italic())
-                    .foregroundStyle(Color(hex: "#F5E2D6").opacity(0.18))
+                    .foregroundStyle(Color(hex: "#F5E2D6").opacity(0.40))
             }
         }
     }

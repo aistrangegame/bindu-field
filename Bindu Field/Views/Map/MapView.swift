@@ -43,10 +43,10 @@ struct MapView: View {
                         .font(.system(size: 8, weight: .light))
                         .tracking(5.0)
                         .textCase(.uppercase)
-                        .foregroundStyle(theme.text.opacity(0.20))
+                        .foregroundStyle(theme.text.opacity(0.35))
                     Text("a body has thirty-three doors")
                         .font(.system(size: 11, weight: .light, design: .serif).italic())
-                        .foregroundStyle(theme.text.opacity(0.30))
+                        .foregroundStyle(theme.text.opacity(0.45))
                 }
                 .padding(.top, 18)
             }

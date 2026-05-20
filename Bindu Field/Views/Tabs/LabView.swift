@@ -350,7 +350,7 @@ struct LabView: View {
                         .font(.system(size: 9, weight: .light))
                         .tracking(1.6)
                         .textCase(.uppercase)
-                        .foregroundColor(theme.subtle.opacity(0.7))
+                        .foregroundColor(theme.muted)
                 }
                 .padding(.leading, 16)
                 .padding(.bottom, 10)
@@ -482,7 +482,7 @@ struct LabView: View {
                         Text(entry.name)
                             .font(.system(size: 7, weight: .light, design: .monospaced))
                             .tracking(0.4)
-                            .foregroundColor(isHit ? stateColor : theme.subtle.opacity(0.5))
+                            .foregroundColor(isHit ? stateColor : theme.subtle)
                     }
                     .position(x: x, y: 14)
                     .animation(.easeInOut(duration: 0.4), value: isHit)
@@ -510,7 +510,7 @@ struct LabView: View {
             Text("PRESETS")
                 .font(.system(size: 9, weight: .light))
                 .tracking(2.0)
-                .foregroundColor(theme.subtle.opacity(0.55))
+                .foregroundColor(theme.subtle)
                 .padding(.horizontal, 28)
 
             ScrollView(.horizontal, showsIndicators: false) {

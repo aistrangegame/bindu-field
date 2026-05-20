@@ -171,7 +171,7 @@ struct OracleView: View {
                 .font(.system(size: 8, weight: .light))
                 .tracking(4.0)
                 .textCase(.uppercase)
-                .foregroundStyle(Color(hex: "#F5E2D6").opacity(0.20))
+                .foregroundStyle(Color(hex: "#F5E2D6").opacity(0.40))
             Text("the Oracle awaits a key")
                 .font(.system(size: 16, design: .serif).italic())
                 .foregroundStyle(theme.muted)
@@ -215,7 +215,7 @@ private struct IdleContent: View {
                     .textCase(.uppercase)
                     .foregroundStyle(
                         Color(hex: "#F5E2D6")
-                            .opacity(showAffordance ? 0.14 : 0)
+                            .opacity(showAffordance ? 0.35 : 0)
                     )
                 Spacer()
             }
@@ -228,7 +228,7 @@ private struct IdleContent: View {
                     .font(.system(size: 9))
                     .foregroundStyle(
                         Color(hex: "#F5E2D6")
-                            .opacity(showAffordance ? 0.10 : 0)
+                            .opacity(showAffordance ? 0.28 : 0)
                     )
                     .padding(.bottom, 92)
             }
@@ -260,7 +260,7 @@ private struct TypingContent: View {
                     .font(.system(size: 7.5, weight: .light))
                     .tracking(4.0)
                     .textCase(.uppercase)
-                    .foregroundStyle(Color(hex: "#F5E2D6").opacity(0.20))
+                    .foregroundStyle(Color(hex: "#F5E2D6").opacity(0.35))
                     .padding(.leading, 24)
                     .padding(.top, 22)
                 Spacer()
@@ -363,7 +363,7 @@ private struct ResponseContent: View {
                     .font(.system(size: 7.5, weight: .light))
                     .tracking(4.0)
                     .textCase(.uppercase)
-                    .foregroundStyle(Color(hex: "#F5E2D6").opacity(0.20))
+                    .foregroundStyle(Color(hex: "#F5E2D6").opacity(0.35))
                     .padding(.leading, 24)
                     .padding(.top, 22)
                 Spacer()

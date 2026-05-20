@@ -127,16 +127,23 @@ struct PlayerView: View {
 
                 // Always-accessible close — visible in every mode, top
                 // trailing. Sits above the pill row so it isn't shadowed
-                // by the centred pill's hit area.
+                // by the centred pill's hit area. Backed by a subtle dark
+                // disc so the X stays legible against bright visualizer
+                // regions (rising arches, Shweta crystallization, etc.).
                 VStack(spacing: 0) {
                     HStack {
                         Spacer()
                         Button(action: { store.closePlayer() }) {
-                            Image(systemName: "xmark")
-                                .font(.system(size: 12, weight: .light))
-                                .foregroundStyle(theme.subtle)
-                                .frame(width: 36, height: 36)
-                                .contentShape(Rectangle())
+                            ZStack {
+                                Circle()
+                                    .fill(Color.black.opacity(0.25))
+                                    .frame(width: 28, height: 28)
+                                Image(systemName: "xmark")
+                                    .font(.system(size: 12, weight: .light))
+                                    .foregroundStyle(theme.text.opacity(0.55))
+                            }
+                            .frame(width: 36, height: 36)
+                            .contentShape(Rectangle())
                         }
                         .buttonStyle(.plain)
                         .padding(.top, 52)
@@ -269,7 +276,7 @@ struct PlayerView: View {
                     Text("\u{201C}\(rs)\u{201D}")
                         .font(.system(size: 13, design: .serif))
                         .italic()
-                        .foregroundColor(theme.text.opacity(0.12))
+                        .foregroundColor(theme.text.opacity(0.32))
                         .multilineTextAlignment(.center)
                         .lineSpacing(4)
                         .padding(.horizontal, 38)
@@ -282,15 +289,15 @@ struct PlayerView: View {
                 // taps still escalate to CONTROL.
                 Button(action: { presentLoop() }) {
                     Text("BEGIN THE LOOP")
-                        .font(.system(size: 8.5, weight: .light))
+                        .font(.system(size: 11, weight: .light))
                         .tracking(3.0)
                         .textCase(.uppercase)
-                        .foregroundColor(elementColor.opacity(0.55))
+                        .foregroundColor(elementColor.opacity(0.65))
                         .padding(.horizontal, 18)
                         .padding(.vertical, 10)
                         .overlay(
                             Capsule()
-                                .stroke(elementColor.opacity(0.25), lineWidth: 1)
+                                .stroke(elementColor.opacity(0.35), lineWidth: 1)
                         )
                 }
                 .buttonStyle(.plain)
@@ -376,7 +383,7 @@ struct PlayerView: View {
                 Text("\(Int(progress * 100))%")
                     .font(.system(size: 9, weight: .light, design: .monospaced))
                     .tracking(1.2)
-                    .foregroundColor(theme.subtle.opacity(0.55))
+                    .foregroundColor(theme.subtle)
             }
         }
     }
@@ -487,7 +494,7 @@ struct PlayerView: View {
                         Text("BINAURAL")
                             .font(.system(size: 9, weight: .light))
                             .tracking(2.2)
-                            .foregroundColor(theme.subtle.opacity(0.6))
+                            .foregroundColor(theme.subtle)
                         Spacer()
                     }
 
@@ -723,7 +730,7 @@ struct PlayerView: View {
                             let zPct = CGFloat((z.hz - beatMin) / (beatMax - beatMin))
                             Text(z.label)
                                 .font(.system(size: 8))
-                                .foregroundColor(theme.subtle.opacity(0.55))
+                                .foregroundColor(theme.subtle)
                                 .position(x: zPct * geo.size.width, y: 6)
                         }
                     }

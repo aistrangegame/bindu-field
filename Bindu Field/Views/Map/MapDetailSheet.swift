@@ -104,7 +104,7 @@ struct MapDetailSheet: View {
         switch state {
         case .danced:    return elementSoft.opacity(0.75)
         case .available: return Color(hex: "#F5E2D6").opacity(0.45)
-        case .locked:    return Color(hex: "#F5E2D6").opacity(0.25)
+        case .locked:    return Color(hex: "#F5E2D6").opacity(0.38)
         }
     }
 
