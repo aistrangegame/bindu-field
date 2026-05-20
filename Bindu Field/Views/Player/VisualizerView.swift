@@ -25,7 +25,9 @@ struct VisualizerView: View {
     @State private var trailPositions: [CGPoint] = []
     @State private var rings: [Ring] = []
     @State private var grain: [Grain] = []
+    @State private var ashreyTrail: [CGPoint] = []
     @State private var lastTrailSampleAt: Double = 0
+    @State private var lastAshreyTrailSampleAt: Double = 0
     @State private var lastGrainStepAt: Double = 0
     @State private var lastBeatPulseTrigger: Double = 0
     @State private var carrierPulse: CGFloat = 1.0
@@ -53,6 +55,8 @@ struct VisualizerView: View {
     private let ringMaxRadius: CGFloat = 110
     private let grainTarget: Int = 80
     private let grainStepInterval: Double = 1.0 / 30.0
+    private let ashreyTrailLength: Int = 40
+    private let ashreyTrailInterval: Double = 0.06   // ~17 Hz
 
     var body: some View {
         TimelineView(.animation(minimumInterval: 1.0 / 60.0)) { timeline in
@@ -77,6 +81,15 @@ struct VisualizerView: View {
                     drawGaiaGround(ctx: ctx, size: size, t: t,
                                    gaia: gaiaPresence)
 
+                    // ENSEMBLE · Karishma — silence's presence sits deep,
+                    // before the chanting ensemble so the arches and the
+                    // witness arc still read on top of it.
+                    let karishmaPresence = performer.archetypePresence[.karishma] ?? 0
+                    if karishmaPresence > 0.10 {
+                        drawKarishma(ctx: ctx, size: size, t: t,
+                                     presence: karishmaPresence)
+                    }
+
                     // TIER 2 — ensemble (presence-gated)
                     let archPresence = performer.archetypePresence[.arch] ?? 0
                     if archPresence > 0.1 {
@@ -87,6 +100,15 @@ struct VisualizerView: View {
                     if sakshiPresence > 0.1 {
                         drawSakshiGesture(ctx: ctx, size: size, t: t,
                                           presence: sakshiPresence)
+                    }
+
+                    // ENSEMBLE · Ashrey — synthesis. Sits above the chant
+                    // and witness; below the crescendo so peak visuals
+                    // still take the foreground.
+                    let ashreyPresence = performer.archetypePresence[.ashrey] ?? 0
+                    if ashreyPresence > 0.05 {
+                        drawAshrey(ctx: ctx, size: size, t: t,
+                                   presence: ashreyPresence)
                     }
 
                     // TIER 3 — crescendo (modulator > 0)
@@ -110,6 +132,15 @@ struct VisualizerView: View {
                                                   shweta: shwetaPresence)
                     }
 
+                    // ENSEMBLE · Neev — foundation. Bookends only.
+                    // Draws above the cathedral but below Bindu so the
+                    // descending rings settle in front of the architecture.
+                    let neevPresence = performer.archetypePresence[.neev] ?? 0
+                    if neevPresence > 0.10 {
+                        drawNeev(ctx: ctx, size: size, t: t,
+                                 presence: neevPresence)
+                    }
+
                     // BINDU — singular Lissajous on top
                     drawBindu(ctx: ctx, size: size, t: t,
                               energy: energy, beat: beat, mod: mod,
@@ -124,6 +155,15 @@ struct VisualizerView: View {
                         let dt = newT - lastGrainStepAt
                         lastGrainStepAt = newT
                         stepGrain(dt: dt, t: newT, in: geo.size)
+                    }
+                    // Sample Ashrey's centroid only when Ashrey is actually
+                    // present — no point spending cycles on a trail that
+                    // won't render.
+                    if (performer.archetypePresence[.ashrey] ?? 0) > 0.05,
+                       newT - lastAshreyTrailSampleAt >= ashreyTrailInterval {
+                        lastAshreyTrailSampleAt = newT
+                        let c = ashreyCentroid(t: newT, in: geo.size, bindu: bindu)
+                        appendAshreyTrail(c)
                     }
                     triggerBeatRingIfNeeded(t: newT)
                 }
@@ -806,6 +846,208 @@ struct VisualizerView: View {
                                    width: coreR * 2, height: coreR * 2)),
             with: .color(Color(red: 1, green: 1, blue: 1).opacity(0.97 * shweta))
         )
+    }
+
+    // MARK: - ENSEMBLE · Karishma (the silence)
+    //
+    // Paradox radial — light surrounds darkness. A dark center "swallows"
+    // the cathedral grain and grid around the upper-middle of the canvas
+    // while a faint element-color rim marks the boundary. Three concentric
+    // depth rings recede inward, drawing the eye into the void.
+    //
+    // Performer's `karishma` presence is highest inside score silence
+    // windows (0.85) and elsewhere ramps with inverse energy ((1−rms)×0.5).
+    // So the dark void deepens precisely when the music drops out.
+
+    private func drawKarishma(ctx: GraphicsContext, size: CGSize,
+                              t: Double, presence: Double) {
+        let W = size.width, H = size.height
+        guard W > 0, H > 0 else { return }
+        let center = CGPoint(x: W / 2, y: H * 0.45)
+        // The void radius grows with presence — silence is visually heavier.
+        let voidR = (W * 0.18 + W * 0.10 * CGFloat(presence))
+
+        // Dark center — radial gradient from a near-black center fading to
+        // transparent. The "subtractive" feel against the dim cathedral.
+        ctx.fill(
+            Path(ellipseIn: CGRect(x: center.x - voidR, y: center.y - voidR,
+                                   width: voidR * 2, height: voidR * 2)),
+            with: .radialGradient(
+                Gradient(colors: [
+                    Color.black.opacity(0.45 * presence),
+                    Color.black.opacity(0.18 * presence),
+                    Color.black.opacity(0)
+                ]),
+                center: center,
+                startRadius: 0,
+                endRadius: voidR
+            )
+        )
+
+        // Paradox rim — a faint element-color ring at the void's edge.
+        // Light marks where the darkness ends, which is the gesture.
+        let rimColor = Color(hue: elementHueDeg / 360,
+                             saturation: 0.50, brightness: 0.70)
+        let rimR = voidR * 0.92
+        ctx.stroke(
+            Path(ellipseIn: CGRect(x: center.x - rimR, y: center.y - rimR,
+                                   width: rimR * 2, height: rimR * 2)),
+            with: .color(rimColor.opacity(0.16 * presence)),
+            lineWidth: 0.8
+        )
+
+        // Depth rings — three concentric hairlines spiraling inward. Their
+        // radii breathe slowly so the void doesn't feel static.
+        let breath = sin(t * 0.18) * 0.5 + 0.5
+        for i in 1...3 {
+            let frac = CGFloat(i) / 4.0 + CGFloat(breath) * 0.04
+            let r = voidR * frac
+            ctx.stroke(
+                Path(ellipseIn: CGRect(x: center.x - r, y: center.y - r,
+                                       width: r * 2, height: r * 2)),
+                with: .color(rimColor.opacity(0.07 * presence)),
+                lineWidth: 0.5
+            )
+        }
+    }
+
+    // MARK: - ENSEMBLE · Ashrey (the synthesis)
+    //
+    // Lives at the *centroid* of the other positioned archetypes. As Bindu
+    // moves along its Lissajous and the witness's tip rotates, Ashrey
+    // wanders with them — synthesis follows the field. A multi-hue trail
+    // behind the head cycles through the spectrum, marking the path
+    // through all the other archetypes.
+
+    /// Computes the running centroid of six positioned archetypes for the
+    /// current frame. Bindu's current Lissajous head + both Sid columns'
+    /// midpoints + Arch's breathing apex + Sakshi's leading-edge tip +
+    /// Karishma's void center.
+    private func ashreyCentroid(t: Double, in size: CGSize, bindu: CGPoint) -> CGPoint {
+        let W = size.width, H = size.height
+        let leftSid  = CGPoint(x: W * 0.18, y: H * 0.32)
+        let rightSid = CGPoint(x: W * 0.82, y: H * 0.32)
+        let archYShift = sin(t * 0.35) * 8
+        let archApex = CGPoint(x: W * 0.50, y: H * 0.17 + CGFloat(archYShift))
+        // Sakshi tip: rotation phase matches drawSakshiGesture exactly.
+        let sakshiPhase = (t * 0.15).truncatingRemainder(dividingBy: 1.0)
+        let sakshiTipAngle = sakshiPhase * 2 * .pi + 0.72 * 2 * .pi
+        let sakshiCenter = CGPoint(x: W * 0.88, y: H * 0.42)
+        let sakshiRadius = W * 0.05
+        let sakshiTip = CGPoint(
+            x: sakshiCenter.x + sakshiRadius * CGFloat(cos(sakshiTipAngle)),
+            y: sakshiCenter.y + sakshiRadius * CGFloat(sin(sakshiTipAngle))
+        )
+        let karishmaCenter = CGPoint(x: W * 0.50, y: H * 0.45)
+
+        let points: [CGPoint] = [bindu, leftSid, rightSid, archApex, sakshiTip, karishmaCenter]
+        var sx: CGFloat = 0, sy: CGFloat = 0
+        for p in points { sx += p.x; sy += p.y }
+        let n = CGFloat(points.count)
+        return CGPoint(x: sx / n, y: sy / n)
+    }
+
+    private func appendAshreyTrail(_ p: CGPoint) {
+        ashreyTrail.append(p)
+        if ashreyTrail.count > ashreyTrailLength {
+            ashreyTrail.removeFirst(ashreyTrail.count - ashreyTrailLength)
+        }
+    }
+
+    private func drawAshrey(ctx: GraphicsContext, size: CGSize,
+                            t: Double, presence: Double) {
+        guard !ashreyTrail.isEmpty else { return }
+
+        // Multi-hue trail. Each dot's hue advances around the wheel by
+        // its position in the buffer; oldest = far behind, newest = head.
+        // Slow hue rotation with `t` so the spectrum rolls through over
+        // time instead of being phase-locked to the buffer's content.
+        let baseHueOffset = t * 18.0  // degrees per second
+        let n = ashreyTrail.count
+        for (i, p) in ashreyTrail.enumerated() {
+            let frac = Double(i + 1) / Double(n)
+            let hueDeg = (baseHueOffset + frac * 240).truncatingRemainder(dividingBy: 360)
+            let alpha = pow(frac, 1.8) * 0.55 * presence
+            let r: CGFloat = 1.2 + CGFloat(frac) * 2.4
+            let color = Color(hue: hueDeg / 360, saturation: 0.55, brightness: 0.92)
+            ctx.fill(
+                Path(ellipseIn: CGRect(x: p.x - r, y: p.y - r,
+                                       width: r * 2, height: r * 2)),
+                with: .color(color.opacity(alpha))
+            )
+        }
+
+        // Head — a small bright dot at the current centroid, with a soft
+        // halo so the synthesis feels like a held point, not a streak.
+        let head = ashreyTrail.last!
+        let haloR: CGFloat = 8
+        let haloHue = baseHueOffset.truncatingRemainder(dividingBy: 360) / 360
+        let halo = Color(hue: haloHue, saturation: 0.50, brightness: 0.95)
+        ctx.fill(
+            Path(ellipseIn: CGRect(x: head.x - haloR, y: head.y - haloR,
+                                   width: haloR * 2, height: haloR * 2)),
+            with: .radialGradient(
+                Gradient(colors: [
+                    halo.opacity(0.40 * presence),
+                    halo.opacity(0)
+                ]),
+                center: head,
+                startRadius: 0,
+                endRadius: haloR
+            )
+        )
+        let coreR: CGFloat = 2.5
+        ctx.fill(
+            Path(ellipseIn: CGRect(x: head.x - coreR, y: head.y - coreR,
+                                   width: coreR * 2, height: coreR * 2)),
+            with: .color(halo.opacity(0.85 * presence))
+        )
+    }
+
+    // MARK: - ENSEMBLE · Neev (the foundation)
+    //
+    // Bookends only — Performer presence is 0.8 for the first 4s and the
+    // last 2s of a scored session, and 0 otherwise. Five rings cycle
+    // continuously through a contract-and-descend lifecycle: each ring
+    // starts large near the upper cathedral and shrinks as it falls
+    // toward the floor. Hue is shifted -10° from the element to land
+    // in the grounding terracotta direction.
+
+    private func drawNeev(ctx: GraphicsContext, size: CGSize,
+                          t: Double, presence: Double) {
+        let W = size.width, H = size.height
+        guard W > 0, H > 0 else { return }
+        // Ring lifecycle period in seconds. 2s per ring with 5 staggered
+        // copies means a ring is always in transit.
+        let period = 2.0
+        let h = (elementHueDeg - 10 + 360).truncatingRemainder(dividingBy: 360) / 360
+        let col = Color(hue: h, saturation: 0.45, brightness: 0.70)
+
+        let yStart = H * 0.18
+        let yEnd = H * 0.85
+        let startR = CGFloat(min(W, H)) * 0.40
+        let endR: CGFloat = 8
+
+        for i in 0..<5 {
+            let phaseOffset = period * Double(i) / 5.0
+            let phase = ((t + phaseOffset).truncatingRemainder(dividingBy: period)) / period
+            let centerY = yStart + (yEnd - yStart) * CGFloat(phase)
+            // Quadratic contraction — slower at first, faster near floor.
+            let contractCurve = pow(phase, 0.85)
+            let radius = startR * (1.0 - CGFloat(contractCurve)) + endR * CGFloat(contractCurve)
+            // Alpha fades as the ring lands.
+            let alpha = (1.0 - phase) * 0.55 * presence
+            if alpha < 0.005 { continue }
+
+            ctx.stroke(
+                Path(ellipseIn: CGRect(x: W / 2 - radius,
+                                       y: centerY - radius,
+                                       width: radius * 2,
+                                       height: radius * 2)),
+                with: .color(col.opacity(alpha)),
+                lineWidth: 0.8
+            )
+        }
     }
 
     // MARK: - Bindu (singular Lissajous)
