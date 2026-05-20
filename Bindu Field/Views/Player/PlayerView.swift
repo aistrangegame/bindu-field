@@ -29,8 +29,9 @@ struct PlayerView: View {
     // Reading tab selection
     @State private var readingTab: ReadingTab = .words
 
-    // Binaural pill
-    @State private var pillExpanded: Bool = false
+    // Binaural pill breathing phase — flipped once on appear so the
+    // 6pt dot's repeatForever animation kicks off when the pill renders.
+    @State private var pillBreathePhase: Bool = false
 
     // Integration Chamber
     @State private var showingIntegration: Bool = false
@@ -823,101 +824,52 @@ struct PlayerView: View {
         }
     }
 
-    // MARK: - Binaural pill (always anchored top)
+    // MARK: - Binaural pill (status indicator, anchored top)
+    //
+    // The pill is purely a status indicator + an entry point into the
+    // CONTROL sheet where the real binaural controls live. It shows the
+    // 6pt breathing dot (filled element-color when binaural is on,
+    // outlined when off), the "BINAURAL" label, and a "›" chevron
+    // signalling "more elsewhere". Tapping anywhere on it enters
+    // CONTROL mode.
 
     private var binauralPill: some View {
         let on = wire.binauralEnabled
-        return VStack(spacing: 0) {
-            Button {
-                withAnimation(.easeInOut(duration: 0.25)) { pillExpanded.toggle() }
-            } label: {
-                HStack(spacing: 7) {
-                    Circle()
-                        .fill(on ? elementColor : theme.subtle)
-                        .frame(width: 6, height: 6)
-                        .shadow(color: on ? elementColor.opacity(0.45) : .clear, radius: 6)
-                    Text("BINAURAL")
-                        .font(.system(size: 9, weight: .light))
-                        .tracking(2.0)
-                        .foregroundColor(theme.subtle)
-                    Image(systemName: pillExpanded ? "chevron.up" : "chevron.down")
-                        .font(.system(size: 8, weight: .light))
-                        .foregroundColor(theme.subtle.opacity(0.5))
-                }
-                .padding(.horizontal, 14)
-                .padding(.vertical, 7)
+        return Button(action: { enterControl() }) {
+            HStack(spacing: 7) {
+                Circle()
+                    .fill(on ? elementColor : Color.clear)
+                    .overlay(
+                        Circle()
+                            .stroke(theme.subtle.opacity(on ? 0 : 0.65), lineWidth: 1)
+                    )
+                    .frame(width: 6, height: 6)
+                    .shadow(color: on ? elementColor.opacity(0.45) : .clear, radius: 6)
+                    .scaleEffect(on && pillBreathePhase ? 1.25 : 1.0)
+                    .opacity(on ? (pillBreathePhase ? 1.0 : 0.7) : 1.0)
+                Text("BINAURAL")
+                    .font(.system(size: 9, weight: .light))
+                    .tracking(2.0)
+                    .foregroundColor(theme.subtle)
+                Text("›")
+                    .font(.system(size: 12, weight: .light))
+                    .foregroundColor(theme.subtle.opacity(0.55))
             }
-            .buttonStyle(.plain)
-
-            if pillExpanded {
-                VStack(spacing: 12) {
-                    HStack(spacing: 10) {
-                        Toggle(isOn: Binding(
-                            get: { wire.binauralEnabled },
-                            set: { wire.binauralEnabled = $0 }
-                        )) {
-                            Text("BINAURAL")
-                                .font(.system(size: 9, weight: .light))
-                                .tracking(2.0)
-                                .foregroundColor(theme.subtle)
-                        }
-                        .tint(elementColor)
-                    }
-
-                    VStack(alignment: .leading, spacing: 4) {
-                        HStack {
-                            Text("PRESENCE")
-                                .font(.system(size: 9, weight: .light))
-                                .tracking(2.0)
-                                .foregroundColor(theme.subtle)
-                            Spacer()
-                            Text(String(format: "%.0f%%", wire.userPresence * 100))
-                                .font(.system(size: 10, design: .monospaced))
-                                .foregroundColor(theme.muted)
-                        }
-                        Slider(value: Binding(
-                            get: { Double(wire.userPresence) },
-                            set: { wire.userPresence = Float($0) }
-                        ), in: 0.0...1.0)
-                        .tint(elementColor)
-                    }
-
-                    if wire.carrierLocked {
-                        HStack(spacing: 6) {
-                            Image(systemName: "scope")
-                                .font(.system(size: 9))
-                            Text("carrier · derived")
-                                .font(.system(size: 10, design: .serif))
-                                .italic()
-                        }
-                        .foregroundColor(elementColor)
-                        .transition(.opacity)
-                    }
-                }
-                .padding(.horizontal, 16)
-                .padding(.vertical, 12)
-                .frame(width: 240)
-            }
+            .padding(.horizontal, 14)
+            .padding(.vertical, 7)
         }
+        .buttonStyle(.plain)
         .background(
             Capsule(style: .continuous)
                 .fill(.ultraThinMaterial)
-                .opacity(pillExpanded ? 0 : 1)
         )
-        .background(
-            RoundedRectangle(cornerRadius: 16, style: .continuous)
-                .fill(.ultraThinMaterial)
-                .opacity(pillExpanded ? 1 : 0)
+        .overlay(
+            Capsule(style: .continuous)
+                .stroke(theme.muted.opacity(0.15), lineWidth: 1)
         )
-        .overlay {
-            if pillExpanded {
-                RoundedRectangle(cornerRadius: 16, style: .continuous)
-                    .stroke(theme.muted.opacity(0.15), lineWidth: 1)
-            } else {
-                Capsule(style: .continuous)
-                    .stroke(theme.muted.opacity(0.15), lineWidth: 1)
-            }
-        }
+        .animation(.easeInOut(duration: 1.3).repeatForever(autoreverses: true),
+                   value: pillBreathePhase)
+        .onAppear { pillBreathePhase = true }
     }
 
     // MARK: - Loading + Integration
