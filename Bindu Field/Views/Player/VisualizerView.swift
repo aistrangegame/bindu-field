@@ -82,10 +82,13 @@ struct VisualizerView: View {
                     let intensity = min(1.0,
                         Double(energy) * 0.4 + Double(mod) * 0.6)
 
-                    // Cathedral + ensemble layers run only for the Air
-                    // vocabulary (Anahata). Every other element gets its
-                    // own visual world from VocabularyRenderer. Singular
-                    // vizMode bypasses both — just the Bindu Lissajous.
+                    // Singular mode is the intimate mode — only the Bindu
+                    // Lissajous dances. The Cathedral (Air), every other
+                    // vocabulary (Earth · Water · Fire · Ether · …), and
+                    // every ensemble archetype draw is skipped. Background
+                    // remains the vocabulary's element-tinted bg (set by
+                    // PlayerView at the layer below this view) so the
+                    // element still breathes through, just calmly.
                     if !isSingular {
                         if vocab == .air {
                             drawAirCathedral(ctx: ctx, size: size, t: t,
@@ -98,9 +101,9 @@ struct VisualizerView: View {
                         }
                     }
 
-                    // BINDU — singular Lissajous, always drawn (it IS the
-                    // singular-mode rendering, and it's the foreground in
-                    // ensemble mode and over every vocabulary).
+                    // BINDU — always drawn. Comet trail + RMS bloom + beat
+                    // rings + carrier-lock 1.5× pulse. In singular mode,
+                    // this is the entire visualizer.
                     drawBindu(ctx: ctx, size: size, t: t,
                               energy: energy, beat: beat, mod: mod,
                               bindu: bindu)
@@ -138,6 +141,15 @@ struct VisualizerView: View {
             withAnimation(.easeOut(duration: 0.18)) {
                 carrierPulse = locked ? 1.5 : 1.0
             }
+        }
+        // Singular ↔ ensemble transitions can leave stale buffer data
+        // for archetypes that the new mode doesn't draw (Ashrey trail,
+        // grain particles). Clear them so a return to ensemble doesn't
+        // briefly paint yesterday's centroid trail. Beat rings stay —
+        // they're a Bindu effect, drawn in both modes.
+        .onChange(of: settings.vizMode) { _, _ in
+            ashreyTrail.removeAll(keepingCapacity: false)
+            grain.removeAll(keepingCapacity: false)
         }
     }
 
