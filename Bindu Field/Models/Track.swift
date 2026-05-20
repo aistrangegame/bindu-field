@@ -48,9 +48,68 @@ struct Track: Codable, Hashable {
     /// One-line statement of what this track IS, passed to the Oracle so
     /// it has knowledge beyond verb/element/state. `nil` when the
     /// Airtable column has not been populated (or in older on-disk
-    /// caches that pre-date the field — synthesized `Codable` uses
-    /// `decodeIfPresent` for `String?` so old caches still decode).
-    /// The Oracle treats `nil` and empty as the same and skips the
-    /// catalog suffix in either case.
+    /// caches that pre-date the field — the custom decoder below uses
+    /// `decodeIfPresent`). The Oracle treats `nil` and empty as the same
+    /// and skips the catalog suffix in either case.
     let recognitionStatement: String?
+
+    /// Long-form prose for the Player's READING sheet · WORDS tab.
+    /// Empty string when not yet written for a track.
+    let lyricalWordsReading: String
+
+    /// Long-form prose for the Player's READING sheet · FREQUENCY tab.
+    /// Empty string when not yet written for a track.
+    let frequencyReading: String
+
+    /// Long-form prose for the Player's READING sheet · VIDEO tab.
+    /// Empty string when not yet written for a track.
+    let videoPulseReading: String
+
+    /// Lalita's perspective on the song — surfaced in the Player's READING
+    /// sheet · LALITA tab. `nil` when not yet written.
+    let lalitasPerspective: String?
+
+    /// Explicit `CodingKeys` so the custom decoder below can resolve them
+    /// from outside the primary declaration. Synthesized keys are private
+    /// and not accessible from extensions.
+    enum CodingKeys: String, CodingKey {
+        case id, verb, song, artist, element, state, chakra, type
+        case audioURL, youtubeID, seed, carrierHz, beatHz
+        case recognitionStatement
+        case lyricalWordsReading, frequencyReading, videoPulseReading
+        case lalitasPerspective
+    }
+}
+
+extension Track {
+    /// Backwards-compatible decoder. The three Reading Space fields are
+    /// non-optional `String` for consumer ergonomics but default to `""`
+    /// when missing from an older `binduCatalog.v1` cache that pre-dates
+    /// the Lalita pass. Without this, decoding an old cache would fail
+    /// and `CatalogStore.loadFromCache` would silently drop the catalog
+    /// until the next Airtable refresh.
+    ///
+    /// Declared in an extension so the synthesized memberwise initializer
+    /// is preserved for `AirtableService` to call directly.
+    init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        id = try c.decode(Int.self, forKey: .id)
+        verb = try c.decode(String.self, forKey: .verb)
+        song = try c.decode(String.self, forKey: .song)
+        artist = try c.decode(String.self, forKey: .artist)
+        element = try c.decode(String.self, forKey: .element)
+        state = try c.decode(BrainwaveState.self, forKey: .state)
+        chakra = try c.decodeIfPresent(ChakraName.self, forKey: .chakra)
+        type = try c.decode(TrackType.self, forKey: .type)
+        audioURL = try c.decode(String.self, forKey: .audioURL)
+        youtubeID = try c.decodeIfPresent(String.self, forKey: .youtubeID)
+        seed = try c.decode(String.self, forKey: .seed)
+        carrierHz = try c.decode(Double.self, forKey: .carrierHz)
+        beatHz = try c.decode(Double.self, forKey: .beatHz)
+        recognitionStatement = try c.decodeIfPresent(String.self, forKey: .recognitionStatement)
+        lyricalWordsReading = try c.decodeIfPresent(String.self, forKey: .lyricalWordsReading) ?? ""
+        frequencyReading = try c.decodeIfPresent(String.self, forKey: .frequencyReading) ?? ""
+        videoPulseReading = try c.decodeIfPresent(String.self, forKey: .videoPulseReading) ?? ""
+        lalitasPerspective = try c.decodeIfPresent(String.self, forKey: .lalitasPerspective)
+    }
 }

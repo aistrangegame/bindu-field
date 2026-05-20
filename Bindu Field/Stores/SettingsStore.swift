@@ -8,6 +8,7 @@ final class SettingsStore {
 
     private let gainKey = "binduSettings.gain"
     private let durationKey = "binduSettings.defaultDuration"
+    private let vizModeKey = "binduSettings.vizMode"
 
     var gain: Float {
         didSet {
@@ -30,11 +31,24 @@ final class SettingsStore {
         }
     }
 
+    /// Player visualization mode. `"ensemble"` (default) renders the full
+    /// Cathedral + archetype layers + Bindu. `"singular"` renders only the
+    /// Bindu Lissajous — the canonical reference visualization.
+    /// Consumed by `VisualizerView` on every frame.
+    var vizMode: String {
+        didSet {
+            UserDefaults.standard.set(vizMode, forKey: vizModeKey)
+        }
+    }
+
     private init() {
         let storedGain = UserDefaults.standard.object(forKey: gainKey) as? Float
         self.gain = storedGain ?? 0.04
 
         let storedDuration = UserDefaults.standard.object(forKey: durationKey) as? Double
         self.defaultSessionDuration = storedDuration ?? 600
+
+        let storedVizMode = UserDefaults.standard.string(forKey: vizModeKey)
+        self.vizMode = storedVizMode ?? "ensemble"
     }
 }

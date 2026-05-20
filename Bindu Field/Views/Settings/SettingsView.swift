@@ -75,6 +75,35 @@ struct SettingsView: View {
                             }
                         }
 
+                        // Visualization
+                        SettingsSection(title: "visualization") {
+                            VStack(alignment: .leading, spacing: 12) {
+                                Text("Player visualization")
+                                    .font(.system(size: 13, design: .serif))
+                                    .italic()
+                                    .foregroundColor(theme.text)
+
+                                HStack(spacing: 8) {
+                                    VizModeChip(
+                                        label: "Ensemble",
+                                        isSelected: settings.vizMode == "ensemble",
+                                        action: { settings.vizMode = "ensemble" }
+                                    )
+                                    VizModeChip(
+                                        label: "Singular",
+                                        isSelected: settings.vizMode == "singular",
+                                        action: { settings.vizMode = "singular" }
+                                    )
+                                }
+
+                                Text(settings.vizMode == "singular"
+                                     ? "Just the Bindu — a single dot along its Lissajous path."
+                                     : "Full Cathedral — columns, vault, arches, archetypes, and Bindu.")
+                                    .font(.system(size: 11))
+                                    .foregroundColor(theme.subtle)
+                            }
+                        }
+
                         // Session
                         SettingsSection(title: "session") {
                             VStack(alignment: .leading, spacing: 12) {
@@ -367,6 +396,30 @@ private struct DurationChip: View {
                 .foregroundColor(isSelected ? theme.bg : theme.muted)
                 .padding(.horizontal, 12)
                 .padding(.vertical, 5)
+                .background(
+                    Capsule()
+                        .fill(isSelected ? theme.text : Color.clear)
+                        .overlay(Capsule().stroke(theme.muted.opacity(0.3), lineWidth: isSelected ? 0 : 1))
+                )
+        }
+        .buttonStyle(.plain)
+    }
+}
+
+private struct VizModeChip: View {
+    let label: String
+    let isSelected: Bool
+    let action: () -> Void
+    @Environment(\.binduTheme) private var theme
+
+    var body: some View {
+        Button(action: action) {
+            Text(label)
+                .font(.system(size: 12, design: .serif))
+                .italic()
+                .foregroundColor(isSelected ? theme.bg : theme.muted)
+                .frame(maxWidth: .infinity)
+                .padding(.vertical, 8)
                 .background(
                     Capsule()
                         .fill(isSelected ? theme.text : Color.clear)

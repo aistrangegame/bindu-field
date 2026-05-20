@@ -55,6 +55,60 @@ final class DSPWireService {
         didSet { binauralEnabled ? resumeBinaural() : suspendBinaural() }
     }
 
+    // MARK: - Phase 3 (Lalita pass) — track-aware beat + carrier state
+    //
+    // These additions surface the running track's binaural state to the
+    // Player CONTROL sheet so the user can adjust BEAT Hz in-session and
+    // see the live CARRIER + DERIVED status. Strictly additive — none of
+    // the existing DSP wire behavior changes.
+
+    /// Track-default beat Hz, set by `resetForNewTrack`. The fallback when
+    /// `_userBeatHz == nil`. Initialized to a sane theta value so a Player
+    /// opened with no track (defensive) doesn't render zero.
+    var currentTrackBeatHz: Float = 5.5
+
+    /// Engine-side carrier, mirrored here for the CONTROL sheet's readout.
+    /// Updated by `resetForNewTrack` (initial Airtable hint) and by the
+    /// `.binduCarrierDerived` observer below (post-DSP-derivation value).
+    /// G13: DSP wins, so the displayed value follows the engine.
+    private(set) var currentCarrierHz: Float = 136.1
+
+    /// Sticky-for-session derivation flag. Flips true the first time the
+    /// derivation pulse fires for the current track and stays true until
+    /// `resetForNewTrack` clears it. Drives the persistent "DERIVED" chip
+    /// in the Player CONTROL sheet (vs `carrierLocked` which is the 500ms
+    /// visual pulse used by VisualizerView).
+    private(set) var hasDerivedCarrier: Bool = false
+
+    /// User's in-session BEAT override. `nil` means "no override — use
+    /// `currentTrackBeatHz`". The setter writes the new value to the
+    /// BinauralEngine immediately so dragging the Player BEAT slider
+    /// changes the audible beat in real time.
+    var userBeatHz: Float {
+        get { _userBeatHz ?? currentTrackBeatHz }
+        set {
+            let clamped = min(max(newValue, 0.5), 44)
+            _userBeatHz = clamped
+            BinauralEngine.shared.updateBeat(clamped)
+        }
+    }
+    private var _userBeatHz: Float? = nil
+
+    /// `true` when the user has overridden the track default. Lets the
+    /// Player CONTROL sheet hint that BEAT is no longer the track value.
+    var hasBeatOverride: Bool { _userBeatHz != nil }
+
+    /// Called by `TrackPlaybackService.play` on a new track. Clears the
+    /// user override (track defaults take effect), seeds the carrier
+    /// readout with the Airtable hint (until DSP derives a real value),
+    /// and clears the sticky DERIVED flag.
+    func resetForNewTrack(beatHz: Float, carrierHz: Float) {
+        _userBeatHz = nil
+        currentTrackBeatHz = beatHz
+        currentCarrierHz = carrierHz
+        hasDerivedCarrier = false
+    }
+
     private var pollingTimer: Timer?
     private var lastGain: Float = 0
     private let gainChangeThreshold: Float = 0.02
@@ -167,6 +221,10 @@ final class DSPWireService {
             MainActor.assumeIsolated {
                 BinauralEngine.shared.setCarrier(hz)
                 self?.carrierLocked = true
+                // Phase 3: mirror the derived value for the CONTROL sheet's
+                // readout and set the sticky DERIVED flag.
+                self?.currentCarrierHz = hz
+                self?.hasDerivedCarrier = true
                 // B10: cancel any previous in-flight reset before staging
                 // a new one, so two rapid derivation events don't race.
                 self?.carrierResetTask?.cancel()

@@ -1,0 +1,837 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Bindu Player — Lalita Design Pass</title>
+<link href="https://fonts.googleapis.com/css2?family=Lora:ital,wght@0,300;0,400;1,300;1,400&display=swap" rel="stylesheet">
+<script src="https://unpkg.com/react@18.3.1/umd/react.development.js" integrity="sha384-hD6/rw4ppMLGNu3tX5cjIb+uRZ7UkRJ6BPkLpg4hAu/6onKUg4lLsHAs9EBPT82L" crossorigin="anonymous"></script>
+<script src="https://unpkg.com/react-dom@18.3.1/umd/react-dom.development.js" integrity="sha384-u6aeetuaXnQ38mYT8rp6sbXaQe3NL9t+IBXmnYxwkUI2Hw4bsp2Wvmx4yRQF1uAm" crossorigin="anonymous"></script>
+<script src="https://unpkg.com/@babel/standalone@7.29.0/babel.min.js" integrity="sha384-m08KidiNqLdpJqLq95G/LEi8Qvjl/xUYll3QILypMoQ65QorJ9Lvtp2RXYGBFj1y" crossorigin="anonymous"></script>
+<script type="text/babel" src="design-canvas.jsx"></script>
+<script type="text/babel" src="tweaks-panel.jsx"></script>
+<script type="text/babel" src="bindu-ensemble.jsx"></script>
+<script type="text/babel" src="bindu-lissajous.jsx"></script>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { background: #010105; font-family: -apple-system, sans-serif; }
+  ::-webkit-scrollbar { display: none; }
+  input[type=range] { -webkit-appearance: none; appearance: none; background: transparent; cursor: pointer; }
+  input[type=range]::-webkit-slider-thumb { -webkit-appearance: none; width: 14px; height: 14px; border-radius: 50%; cursor: pointer; }
+
+  @keyframes breathePill {
+    0%, 100% { opacity: 0.7; transform: scale(1); }
+    50% { opacity: 1; transform: scale(1.25); }
+  }
+  @keyframes spinnerFade {
+    0%, 100% { opacity: 0.3; }
+    50% { opacity: 1; }
+  }
+</style>
+<template id="__bundler_thumbnail" data-bg-color="#020208">
+  <svg viewBox="0 0 393 720" xmlns="http://www.w3.org/2000/svg">
+    <rect width="393" height="720" fill="#020208"/>
+    <radialGradient id="g" cx="50%" cy="50%" r="45%">
+      <stop offset="0%" stop-color="hsl(280,55%,25%)" stop-opacity="0.5"/>
+      <stop offset="100%" stop-color="#020208" stop-opacity="0"/>
+    </radialGradient>
+    <rect width="393" height="720" fill="url(#g)"/>
+    <circle cx="196" cy="300" r="6" fill="hsl(280,62%,72%)" opacity="0.9"/>
+    <circle cx="196" cy="298" r="2" fill="white" opacity="0.8"/>
+    <text x="196" y="430" text-anchor="middle" font-family="serif" font-style="italic" font-weight="300" font-size="60" fill="hsl(280,55%,68%)" opacity="0.9">still</text>
+  </svg>
+</template>
+</head>
+<body>
+<script type="text/babel">
+const { useState, useEffect, useRef, useCallback } = React;
+
+// ── DESIGN TOKENS (from CLAUDE.md ThemeData.void) ────────────────────
+const BG      = '#020208';
+const TEXT    = '#F5E2D6';
+const MUTED   = 'rgba(245,226,214,0.55)';
+const SUBTLE  = 'rgba(245,226,214,0.28)';
+const FAINT   = 'rgba(245,226,214,0.12)';
+const BORDER  = 'rgba(255,255,255,0.08)';
+const SURFACE = 'rgba(255,255,255,0.042)';
+
+// ── ELEMENT PALETTE ───────────────────────────────────────────────────
+// Hues from CLAUDE.md ElementColors.swift; CSS HSL matched to HSB source
+const ELEMENTS = {
+  Earth:       { hue: 15,  label: 'Earth',       accent: (a=1) => `hsla(15, 60%, 62%, ${a})`  },
+  Water:       { hue: 210, label: 'Water',       accent: (a=1) => `hsla(210, 62%, 66%, ${a})` },
+  Fire:        { hue: 25,  label: 'Fire',        accent: (a=1) => `hsla(25, 68%, 62%, ${a})`  },
+  Air:         { hue: 195, label: 'Air',         accent: (a=1) => `hsla(195, 52%, 68%, ${a})` },
+  Light:       { hue: 50,  label: 'Light',       accent: (a=1) => `hsla(50, 60%, 68%, ${a})`  },
+  Crown:       { hue: 280, label: 'Crown',       accent: (a=1) => `hsla(280, 60%, 72%, ${a})` },
+  Soul:        { hue: 265, label: 'Soul',        accent: (a=1) => `hsla(265, 52%, 70%, ${a})` },
+  Dissolution: { hue: 190, label: 'Dissolution', accent: (a=1) => `hsla(190, 42%, 60%, ${a})` },
+};
+
+// ── DEMO TRACK — Experience / Ludovico Einaudi / Light ────────────────
+const TRACK = {
+  verb:      'still',
+  song:      'Experience',
+  artist:    'Ludovico Einaudi',
+  element:   'Light',
+  state:     'alpha',
+  carrier:   110.0,
+  beat:      8.5,
+  seed:      "This song has no words. It doesn't need them.",
+  recognition: "This song has no words. It doesn't need them.",
+};
+
+// ── READING CONTENT ───────────────────────────────────────────────────
+const READING_WORDS = [
+  "The witness has always been here.",
+  "Not arriving — simply noticed.",
+  "This silence is not the absence of sound. It is the presence that sound cannot disturb.",
+  "You thought you were looking for stillness.",
+  "Stillness was looking for you.",
+];
+
+// ── BRAINWAVE STATE ───────────────────────────────────────────────────
+const getBrainwaveState = hz => {
+  if (hz < 4)  return 'DELTA';
+  if (hz < 8)  return 'THETA';
+  if (hz < 13) return 'ALPHA';
+  return 'BETA';
+};
+
+// ─────────────────────────────────────────────────────────────────────
+// VIZ WRAPPER — switches between Singular Lissajous and Ensemble
+// ─────────────────────────────────────────────────────────────────────
+function BinduViz({ vizMode, hue, speed, dimmed, element, centered = false }) {
+  // For ensemble in a non-720px container: center the 720px canvas
+  const wrapStyle = centered
+    ? { position: 'relative', overflow: 'hidden', width: '100%', height: '100%' }
+    : { width: '100%', height: '100%' };
+
+  if (vizMode === 'ensemble') {
+    const innerStyle = centered
+      ? { position: 'absolute', top: '50%', left: '50%', transform: 'translate(-50%,-50%)', width: 393, height: 720 }
+      : { width: '100%', height: '100%' };
+    return (
+      <div style={wrapStyle}>
+        <div style={innerStyle}>
+          <BinduEnsemble
+            track={{ ...TRACK, element, carrier: TRACK.carrier, beat: TRACK.beat }}
+            playing={false}
+            toneOn={false}
+            dimmed={dimmed}
+          />
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div style={wrapStyle}>
+      <BinduLissajous hue={hue} speed={speed} beat={TRACK.beat} dimmed={dimmed} />
+    </div>
+  );
+}
+
+// ─────────────────────────────────────────────────────────────────────
+// BINAURAL PILL — collapsed pill at top of every screen
+// ─────────────────────────────────────────────────────────────────────
+function BinauralPill({ hue, on = true }) {
+  const ac = ELEMENTS[Object.keys(ELEMENTS).find(k => ELEMENTS[k].hue === hue) || 'Crown'] || ELEMENTS.Crown;
+  const col = ac.accent();
+  return (
+    <div style={{
+      display: 'inline-flex', alignItems: 'center', gap: 7,
+      padding: '7px 14px',
+      borderRadius: 20,
+      background: 'rgba(255,255,255,0.055)',
+      border: '1px solid rgba(255,255,255,0.09)',
+      backdropFilter: 'blur(14px)',
+    }}>
+      <div style={{
+        width: 6, height: 6, borderRadius: '50%',
+        background: on ? col : SUBTLE,
+        boxShadow: on ? `0 0 8px 2px ${ac.accent(0.45)}` : 'none',
+        animation: on ? 'breathePill 2.6s ease-in-out infinite' : 'none',
+      }} />
+      <span style={{
+        fontFamily: '-apple-system,sans-serif', fontSize: 9,
+        letterSpacing: '0.20em', textTransform: 'uppercase', color: SUBTLE,
+      }}>BINAURAL</span>
+      <span style={{ color: FAINT, fontSize: 9, lineHeight: 1 }}>›</span>
+    </div>
+  );
+}
+
+// ─────────────────────────────────────────────────────────────────────
+// SCRUBBER — thin 2pt line, element color, "flowing" label
+// ─────────────────────────────────────────────────────────────────────
+function Scrubber({ hue, progress = 0.3 }) {
+  const elKey = Object.keys(ELEMENTS).find(k => ELEMENTS[k].hue === hue) || 'Crown';
+  const col = ELEMENTS[elKey].accent();
+  const colFaint = ELEMENTS[elKey].accent(0.35);
+  return (
+    <div style={{ padding: '0 28px' }}>
+      <div style={{ position: 'relative', height: 2, background: 'rgba(255,255,255,0.07)', borderRadius: 2 }}>
+        <div style={{
+          position: 'absolute', left: 0, top: 0, bottom: 0,
+          width: `${progress * 100}%`,
+          background: col, borderRadius: 2,
+          boxShadow: `0 0 6px ${colFaint}`,
+        }} />
+        <div style={{
+          position: 'absolute', top: '50%', left: `${progress * 100}%`,
+          transform: 'translate(-50%,-50%)',
+          width: 8, height: 8, borderRadius: '50%',
+          background: col, boxShadow: `0 0 10px ${col}`,
+        }} />
+      </div>
+      <div style={{
+        display: 'flex', justifyContent: 'space-between', alignItems: 'baseline',
+        marginTop: 9,
+      }}>
+        <span style={{
+          fontFamily: 'Lora,Georgia,serif', fontStyle: 'italic', fontSize: 10,
+          color: SUBTLE, letterSpacing: '0.04em',
+        }}>flowing</span>
+        <span style={{
+          fontFamily: '-apple-system,sans-serif', fontSize: 9,
+          letterSpacing: '0.12em', textTransform: 'uppercase', color: FAINT,
+        }}>{Math.round(progress * 100)}%</span>
+      </div>
+    </div>
+  );
+}
+
+// ─────────────────────────────────────────────────────────────────────
+// SCREEN 1 — FIELD MODE
+// "You have entered the field. Nothing is in the way."
+// ─────────────────────────────────────────────────────────────────────
+function FieldScreen({ element, vizMode, speed }) {
+  const el = ELEMENTS[element] || ELEMENTS.Crown;
+  const col = el.accent();
+  const colGlow = el.accent(0.28);
+
+  return (
+    <div style={{
+      width: 393, height: 720,
+      background: BG,
+      position: 'relative',
+      overflow: 'hidden',
+      borderRadius: 47,
+      fontFamily: 'Lora,Georgia,serif',
+    }}>
+      {/* ── Bindu visualization — top 60% ─────────────────────── */}
+      <div style={{ position: 'absolute', top: 0, left: 0, right: 0, height: 432 }}>
+        <BinduViz vizMode={vizMode} hue={el.hue} speed={speed} dimmed={false} element={element} centered={vizMode === 'ensemble'} />
+      </div>
+
+      {/* ── Top gradient for status bar legibility ─────────────── */}
+      <div style={{
+        position: 'absolute', top: 0, left: 0, right: 0, height: 88,
+        background: `linear-gradient(to bottom, ${BG}cc 0%, transparent 100%)`,
+        pointerEvents: 'none',
+      }} />
+
+      {/* ── Bottom gradient — viz fades into content ─────────────  */}
+      <div style={{
+        position: 'absolute', top: 348, left: 0, right: 0, height: 86,
+        background: `linear-gradient(to bottom, transparent, ${BG})`,
+        pointerEvents: 'none',
+      }} />
+
+      {/* ── Binaural pill ─────────────────────────────────────────  */}
+      <div style={{
+        position: 'absolute', top: 52, left: 0, right: 0,
+        display: 'flex', justifyContent: 'center',
+        zIndex: 20,
+      }}>
+        <BinauralPill hue={el.hue} on={true} />
+      </div>
+
+      {/* ── Content block ─────────────────────────────────────────  */}
+      <div style={{
+        position: 'absolute', top: 425, left: 0, right: 0, bottom: 0,
+        display: 'flex', flexDirection: 'column',
+        paddingBottom: 28,
+      }}>
+        {/* Verb — the primary gesture */}
+        <div style={{
+          textAlign: 'center',
+          fontStyle: 'italic', fontWeight: 300,
+          fontSize: 62,
+          color: col,
+          textShadow: `0 0 48px ${colGlow}, 0 0 100px ${el.accent(0.10)}`,
+          letterSpacing: '-0.01em',
+          lineHeight: 1,
+          paddingTop: 4,
+          paddingBottom: 8,
+        }}>
+          {TRACK.verb}
+        </div>
+
+        {/* Song + artist */}
+        <div style={{
+          textAlign: 'center',
+          fontStyle: 'italic', fontWeight: 300,
+          fontSize: 12,
+          color: SUBTLE,
+          letterSpacing: '0.025em',
+          marginBottom: 12,
+        }}>
+          {TRACK.song} — {TRACK.artist}
+        </div>
+
+        {/* Recognition statement */}
+        <div style={{
+          textAlign: 'center',
+          fontStyle: 'italic', fontWeight: 300,
+          fontSize: 13,
+          color: FAINT,
+          padding: '0 38px',
+          lineHeight: 1.6,
+          textWrap: 'balance',
+        }}>
+          "{TRACK.recognition}"
+        </div>
+
+        <div style={{ flex: 1 }} />
+
+        {/* Scrubber */}
+        <Scrubber hue={el.hue} progress={0.30} />
+      </div>
+    </div>
+  );
+}
+
+// ─────────────────────────────────────────────────────────────────────
+// SCREEN 2 — CONTROL MODE
+// "The instrument panel surfaces. The field continues above."
+// ─────────────────────────────────────────────────────────────────────
+function ControlScreen({ element, vizMode, speed }) {
+  const el = ELEMENTS[element] || ELEMENTS.Crown;
+  const col = el.accent();
+  const colDim = el.accent(0.45);
+  const colGlow = el.accent(0.22);
+
+  const [playing, setPlaying]   = useState(false);
+  const [binOn, setBinOn]       = useState(true);
+  const [presence, setPresence] = useState(72);
+  const [beatHz, setBeatHz]     = useState(8.5);
+
+  const bwState = getBrainwaveState(beatHz);
+  const BEAT_MIN = 0.5, BEAT_MAX = 30;
+  const beatPct = (beatHz - BEAT_MIN) / (BEAT_MAX - BEAT_MIN) * 100;
+
+  // Zone positions on slider (%)
+  const zones = [
+    { hz: 4,  label: 'Δ', pct: (4 - BEAT_MIN)  / (BEAT_MAX - BEAT_MIN) * 100 },
+    { hz: 8,  label: 'Θ', pct: (8 - BEAT_MIN)  / (BEAT_MAX - BEAT_MIN) * 100 },
+    { hz: 13, label: 'α', pct: (13 - BEAT_MIN) / (BEAT_MAX - BEAT_MIN) * 100 },
+  ];
+
+  const SliderRow = ({ label, value, min, max, step, onChange, displayText, badge }) => {
+    const pct = (value - min) / (max - min) * 100;
+    return (
+      <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 12 }}>
+        <span style={{
+          fontFamily: '-apple-system,sans-serif', fontSize: 9,
+          letterSpacing: '0.20em', textTransform: 'uppercase',
+          color: SUBTLE, width: 68, flexShrink: 0,
+        }}>{label}</span>
+        <div style={{ flex: 1, position: 'relative', height: 24, display: 'flex', alignItems: 'center' }}>
+          {/* Track */}
+          <div style={{ position: 'absolute', left: 0, right: 0, height: 1, background: 'rgba(255,255,255,0.13)', borderRadius: 1 }} />
+          {/* Fill */}
+          <div style={{ position: 'absolute', left: 0, width: `${pct}%`, height: 1, background: col, borderRadius: 1, boxShadow: `0 0 4px ${colDim}` }} />
+          {/* Thumb */}
+          <div style={{
+            position: 'absolute', left: `${pct}%`,
+            transform: 'translate(-50%,-50%)', top: '50%',
+            width: 13, height: 13, borderRadius: '50%',
+            background: col, boxShadow: `0 0 10px ${colDim}, 0 0 22px ${el.accent(0.12)}`,
+            pointerEvents: 'none',
+          }} />
+          <input type="range" min={min} max={max} step={step} value={value}
+            onChange={e => onChange(parseFloat(e.target.value))}
+            style={{ position: 'absolute', inset: 0, opacity: 0, width: '100%', height: '100%', cursor: 'pointer' }}
+          />
+        </div>
+        {displayText && (
+          <span style={{
+            fontFamily: '-apple-system,sans-serif', fontSize: 10,
+            color: MUTED, width: 46, textAlign: 'right', flexShrink: 0,
+          }}>{displayText}</span>
+        )}
+        {badge && (
+          <span style={{
+            fontFamily: '-apple-system,sans-serif', fontSize: 8,
+            letterSpacing: '0.14em', textTransform: 'uppercase',
+            color: col, background: `hsl(${el.hue}, 38%, 13%)`,
+            padding: '2px 6px', borderRadius: 4,
+            border: `1px solid ${colDim}`, flexShrink: 0,
+          }}>{badge}</span>
+        )}
+      </div>
+    );
+  };
+
+  return (
+    <div style={{
+      width: 393, height: 720,
+      background: BG,
+      position: 'relative',
+      overflow: 'hidden',
+      borderRadius: 47,
+    }}>
+      {/* ── Viz — top 45%, dimmed ──────────────────────────────── */}
+      <div style={{ position: 'absolute', top: 0, left: 0, right: 0, height: 324, overflow: 'hidden' }}>
+        <BinduViz vizMode={vizMode} hue={el.hue} speed={speed} dimmed={true} element={element} centered={true} />
+        {/* Fade to control surface */}
+        <div style={{
+          position: 'absolute', bottom: 0, left: 0, right: 0, height: 100,
+          background: `linear-gradient(transparent, rgba(6,6,18,0.96))`,
+        }} />
+      </div>
+
+      {/* ── Binaural pill ─────────────────────────────────────────  */}
+      <div style={{
+        position: 'absolute', top: 52, left: 0, right: 0,
+        display: 'flex', justifyContent: 'center', zIndex: 20,
+      }}>
+        <BinauralPill hue={el.hue} on={binOn} />
+      </div>
+
+      {/* ── Control surface ───────────────────────────────────────  */}
+      <div style={{
+        position: 'absolute', bottom: 0, left: 0, right: 0,
+        height: 414,
+        background: 'rgba(5,5,16,0.97)',
+        backdropFilter: 'blur(28px)',
+        WebkitBackdropFilter: 'blur(28px)',
+        borderRadius: '32px 32px 47px 47px',
+        border: `1px solid rgba(255,255,255,0.07)`,
+        borderBottom: 'none',
+        display: 'flex', flexDirection: 'column',
+        padding: '0 26px 30px',
+      }}>
+        {/* Drag handle */}
+        <div style={{
+          width: 34, height: 3, borderRadius: 2,
+          background: 'rgba(255,255,255,0.10)',
+          margin: '14px auto 16px',
+          flexShrink: 0,
+        }} />
+
+        {/* Play / Pause */}
+        <div style={{ display: 'flex', justifyContent: 'center', marginBottom: 20, flexShrink: 0 }}>
+          <div
+            onClick={() => setPlaying(p => !p)}
+            style={{
+              width: 56, height: 56, borderRadius: '50%',
+              display: 'flex', alignItems: 'center', justifyContent: 'center',
+              background: `hsl(${el.hue}, 32%, 12%)`,
+              border: `1px solid ${colDim}`,
+              boxShadow: `0 0 32px ${colGlow}, 0 0 60px ${el.accent(0.08)}`,
+              cursor: 'pointer',
+              transition: 'box-shadow 0.3s',
+            }}>
+            <span style={{ color: col, fontSize: playing ? 17 : 22, marginLeft: playing ? 0 : 3 }}>
+              {playing ? '⏸' : '▶'}
+            </span>
+          </div>
+        </div>
+
+        {/* ── Binaural controls ──────────────────────────────────── */}
+        <div style={{
+          fontFamily: '-apple-system,sans-serif', fontSize: 9,
+          letterSpacing: '0.22em', textTransform: 'uppercase',
+          color: FAINT, marginBottom: 12, flexShrink: 0,
+        }}>BINAURAL</div>
+
+        {/* Toggle row */}
+        <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 14, flexShrink: 0 }}>
+          <div
+            onClick={() => setBinOn(v => !v)}
+            style={{
+              width: 44, height: 24, borderRadius: 12,
+              background: binOn ? col : 'rgba(255,255,255,0.10)',
+              position: 'relative', cursor: 'pointer', flexShrink: 0,
+              transition: 'background 0.28s',
+              boxShadow: binOn ? `0 0 12px ${colGlow}` : 'none',
+            }}>
+            <div style={{
+              position: 'absolute', top: 2, left: binOn ? 22 : 2, width: 20, height: 20,
+              borderRadius: '50%', background: 'rgba(5,5,16,0.95)',
+              transition: 'left 0.28s cubic-bezier(0.4,0,0.2,1)',
+            }} />
+          </div>
+          <span style={{
+            fontFamily: '-apple-system,sans-serif', fontSize: 10,
+            letterSpacing: '0.14em', textTransform: 'uppercase',
+            color: binOn ? MUTED : SUBTLE,
+            transition: 'color 0.3s',
+          }}>{binOn ? 'ON' : 'OFF'}</span>
+          {binOn && (
+            <div style={{
+              width: 6, height: 6, borderRadius: '50%',
+              background: col,
+              boxShadow: `0 0 8px 2px ${colDim}`,
+              animation: 'breathePill 2s ease-in-out infinite',
+            }} />
+          )}
+        </div>
+
+        {/* PRESENCE slider */}
+        <SliderRow
+          label="PRESENCE"
+          value={presence} min={0} max={100} step={1}
+          onChange={setPresence}
+          displayText={`${presence}%`}
+        />
+
+        {/* BEAT slider with zone marks */}
+        <div style={{ marginBottom: 12 }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+            <span style={{
+              fontFamily: '-apple-system,sans-serif', fontSize: 9,
+              letterSpacing: '0.20em', textTransform: 'uppercase',
+              color: SUBTLE, width: 68, flexShrink: 0,
+            }}>BEAT</span>
+            <div style={{ flex: 1, position: 'relative', height: 28, display: 'flex', alignItems: 'center' }}>
+              {/* Track */}
+              <div style={{ position: 'absolute', left: 0, right: 0, height: 1, background: 'rgba(255,255,255,0.13)', borderRadius: 1 }} />
+              {/* Fill */}
+              <div style={{ position: 'absolute', left: 0, width: `${beatPct}%`, height: 1, background: col, borderRadius: 1 }} />
+              {/* Zone tick marks */}
+              {zones.map(z => (
+                <div key={z.hz} style={{
+                  position: 'absolute', left: `${z.pct}%`, top: '50%', transform: 'translate(-50%,-50%)',
+                  display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 3,
+                }}>
+                  <div style={{ width: 1, height: 5, background: 'rgba(255,255,255,0.14)' }} />
+                </div>
+              ))}
+              {/* Thumb */}
+              <div style={{
+                position: 'absolute', left: `${beatPct}%`,
+                transform: 'translate(-50%,-50%)', top: '50%',
+                width: 13, height: 13, borderRadius: '50%',
+                background: col, boxShadow: `0 0 10px ${colDim}`,
+                pointerEvents: 'none',
+              }} />
+              <input type="range" min={BEAT_MIN} max={BEAT_MAX} step={0.5} value={beatHz}
+                onChange={e => setBeatHz(parseFloat(e.target.value))}
+                style={{ position: 'absolute', inset: 0, opacity: 0, width: '100%', height: '100%', cursor: 'pointer' }}
+              />
+            </div>
+            <span style={{ fontFamily: '-apple-system,sans-serif', fontSize: 10, color: MUTED, width: 38, textAlign: 'right', flexShrink: 0 }}>
+              {beatHz} Hz
+            </span>
+            <span style={{
+              fontFamily: '-apple-system,sans-serif', fontSize: 8,
+              letterSpacing: '0.14em', textTransform: 'uppercase',
+              color: col, background: `hsl(${el.hue}, 38%, 13%)`,
+              padding: '2px 6px', borderRadius: 4,
+              border: `1px solid ${colDim}`, flexShrink: 0,
+              minWidth: 40, textAlign: 'center',
+            }}>{bwState}</span>
+          </div>
+          {/* Zone label strip */}
+          <div style={{ position: 'relative', height: 12, marginLeft: 76, marginRight: 90 }}>
+            {zones.map(z => (
+              <div key={z.hz} style={{
+                position: 'absolute', left: `${z.pct}%`,
+                transform: 'translateX(-50%)',
+                fontFamily: '-apple-system,sans-serif',
+                fontSize: 8, color: FAINT, letterSpacing: '0.05em',
+              }}>{z.label}</div>
+            ))}
+          </div>
+        </div>
+
+        {/* CARRIER row */}
+        <div style={{
+          display: 'flex', alignItems: 'center', gap: 8,
+          marginBottom: 18, flexShrink: 0,
+        }}>
+          <span style={{
+            fontFamily: '-apple-system,sans-serif', fontSize: 9,
+            letterSpacing: '0.20em', textTransform: 'uppercase',
+            color: SUBTLE, width: 68, flexShrink: 0,
+          }}>CARRIER</span>
+          <span style={{
+            fontFamily: '-apple-system,sans-serif', fontSize: 13,
+            color: MUTED, flex: 1,
+          }}>{TRACK.carrier.toFixed(1)} Hz</span>
+          <span style={{
+            fontFamily: '-apple-system,sans-serif', fontSize: 8,
+            letterSpacing: '0.14em', textTransform: 'uppercase',
+            color: col, background: `hsl(${el.hue}, 38%, 13%)`,
+            padding: '2px 8px', borderRadius: 4,
+            border: `1px solid ${colDim}`,
+          }}>DERIVED</span>
+        </div>
+
+        <div style={{ flex: 1 }} />
+
+        {/* Bottom capsule buttons */}
+        <div style={{ display: 'flex', gap: 10, flexShrink: 0 }}>
+          <button style={{
+            flex: 1, padding: '12px 0',
+            borderRadius: 24, background: 'transparent',
+            border: `1px solid rgba(255,255,255,0.22)`,
+            fontFamily: '-apple-system,sans-serif', fontSize: 10,
+            letterSpacing: '0.14em', textTransform: 'uppercase',
+            color: MUTED, cursor: 'pointer',
+          }}>READING</button>
+          <button style={{
+            flex: 1, padding: '12px 0',
+            borderRadius: 24, background: 'transparent',
+            border: `1px solid rgba(255,255,255,0.10)`,
+            fontFamily: '-apple-system,sans-serif', fontSize: 10,
+            letterSpacing: '0.12em', textTransform: 'uppercase',
+            color: SUBTLE, cursor: 'pointer',
+          }}>END SESSION</button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ─────────────────────────────────────────────────────────────────────
+// SCREEN 3 — READING MODE
+// "You've chosen to go deeper. The field whispers in the background."
+// ─────────────────────────────────────────────────────────────────────
+function ReadingScreen({ element, vizMode, speed }) {
+  const el = ELEMENTS[element] || ELEMENTS.Crown;
+  const col = el.accent();
+  const colGlow = el.accent(0.22);
+
+  const TABS = ['WORDS', 'FREQUENCY', 'VIDEO', 'LALITA'];
+  const [activeTab, setActiveTab] = useState('WORDS');
+
+  return (
+    <div style={{
+      width: 393, height: 720,
+      background: BG,
+      position: 'relative',
+      overflow: 'hidden',
+      borderRadius: 47,
+    }}>
+      {/* ── Tiny ambient Bindu — top 20% ──────────────────────── */}
+      <div style={{ position: 'absolute', top: 0, left: 0, right: 0, height: 144, overflow: 'hidden' }}>
+        <BinduViz vizMode={vizMode} hue={el.hue} speed={speed} dimmed={true} element={element} centered={true} />
+        <div style={{
+          position: 'absolute', bottom: 0, left: 0, right: 0, height: 64,
+          background: `linear-gradient(transparent, rgba(5,5,15,0.98))`,
+        }} />
+      </div>
+
+      {/* ── Reading sheet — bottom 80% ─────────────────────────── */}
+      <div style={{
+        position: 'absolute', bottom: 0, left: 0, right: 0, height: 592,
+        background: 'rgba(5,5,15,0.98)',
+        backdropFilter: 'blur(28px)',
+        WebkitBackdropFilter: 'blur(28px)',
+        borderRadius: '32px 32px 47px 47px',
+        border: `1px solid rgba(255,255,255,0.07)`,
+        borderBottom: 'none',
+        display: 'flex', flexDirection: 'column',
+        overflow: 'hidden',
+      }}>
+        {/* Drag handle */}
+        <div style={{
+          width: 34, height: 3, borderRadius: 2,
+          background: 'rgba(255,255,255,0.10)',
+          margin: '14px auto 0',
+          flexShrink: 0,
+        }} />
+
+        {/* Recognition statement — element-colored, centered */}
+        <div style={{
+          padding: '16px 28px 18px',
+          fontFamily: 'Lora,Georgia,serif',
+          fontStyle: 'italic', fontWeight: 300,
+          fontSize: 17, color: col,
+          lineHeight: 1.55, textAlign: 'center',
+          textShadow: `0 0 28px ${colGlow}`,
+          borderBottom: `1px solid rgba(255,255,255,0.06)`,
+          flexShrink: 0,
+        }}>
+          "{TRACK.recognition}"
+        </div>
+
+        {/* Tabs */}
+        <div style={{
+          display: 'flex',
+          borderBottom: `1px solid rgba(255,255,255,0.06)`,
+          padding: '0 20px',
+          flexShrink: 0,
+        }}>
+          {TABS.map(tab => (
+            <button
+              key={tab}
+              onClick={() => setActiveTab(tab)}
+              style={{
+                flex: 1, padding: '13px 2px',
+                fontFamily: '-apple-system,sans-serif', fontSize: 9,
+                letterSpacing: '0.18em', textTransform: 'uppercase',
+                color: activeTab === tab ? TEXT : SUBTLE,
+                background: 'none', border: 'none', cursor: 'pointer',
+                borderBottom: `1.5px solid ${activeTab === tab ? col : 'transparent'}`,
+                marginBottom: -1,
+                transition: 'color 0.2s, border-color 0.2s',
+              }}>
+              {tab}
+            </button>
+          ))}
+        </div>
+
+        {/* Tab content */}
+        <div style={{
+          flex: 1, overflowY: 'auto', scrollbarWidth: 'none',
+          padding: '24px 28px 36px',
+        }}>
+
+          {activeTab === 'WORDS' && (
+            <div>
+              {READING_WORDS.map((line, i) => (
+                <p key={i} style={{
+                  fontFamily: 'Lora,Georgia,serif',
+                  fontStyle: 'italic', fontWeight: 300,
+                  fontSize: 15,
+                  color: i === READING_WORDS.length - 1 ? col : MUTED,
+                  lineHeight: 1.82,
+                  marginBottom: i === READING_WORDS.length - 1 ? 0 : 16,
+                  paddingTop: i === READING_WORDS.length - 1 ? 18 : 0,
+                  borderTop: i === READING_WORDS.length - 1 ? `1px solid rgba(255,255,255,0.05)` : 'none',
+                }}>
+                  {line}
+                </p>
+              ))}
+            </div>
+          )}
+
+          {activeTab === 'FREQUENCY' && (
+            <div>
+              {[
+                ['State',    TRACK.state.toUpperCase()],
+                ['Beat',     `${TRACK.beat} Hz · ${getBrainwaveState(TRACK.beat)}`],
+                ['Carrier',  `${TRACK.carrier.toFixed(1)} Hz`],
+                ['Element',  TRACK.element],
+                ['Breath',   '3s · hold 7s · exhale 10s'],
+              ].map(([label, val]) => (
+                <div key={label} style={{
+                  display: 'flex', justifyContent: 'space-between', alignItems: 'baseline',
+                  padding: '14px 0',
+                  borderBottom: `1px solid rgba(255,255,255,0.05)`,
+                }}>
+                  <span style={{
+                    fontFamily: '-apple-system,sans-serif', fontSize: 9.5,
+                    letterSpacing: '0.18em', textTransform: 'uppercase', color: SUBTLE,
+                  }}>{label}</span>
+                  <span style={{
+                    fontFamily: '-apple-system,sans-serif', fontSize: 13,
+                    color: MUTED, textAlign: 'right',
+                  }}>{val}</span>
+                </div>
+              ))}
+            </div>
+          )}
+
+          {activeTab === 'VIDEO' && (
+            <div style={{
+              height: 200, background: SURFACE,
+              borderRadius: 14, border: `1px solid ${BORDER}`,
+              display: 'flex', alignItems: 'center', justifyContent: 'center',
+            }}>
+              <span style={{
+                fontFamily: 'Lora,Georgia,serif', fontStyle: 'italic',
+                fontSize: 13, color: SUBTLE,
+              }}>video arrives in a future session</span>
+            </div>
+          )}
+
+          {activeTab === 'LALITA' && (
+            <div>
+              <p style={{
+                fontFamily: 'Lora,Georgia,serif', fontStyle: 'italic', fontWeight: 300,
+                fontSize: 15, color: MUTED, lineHeight: 1.82, marginBottom: 24,
+              }}>
+                The Lalita reading for this song is still forming. What you've brought to it is part of the reading.
+              </p>
+              <p style={{
+                fontFamily: 'Lora,Georgia,serif', fontStyle: 'italic', fontWeight: 300,
+                fontSize: 14, color: FAINT, lineHeight: 1.82,
+              }}>
+                Return when the field calls you back.
+              </p>
+            </div>
+          )}
+
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ─────────────────────────────────────────────────────────────────────
+// MAIN — Design canvas with tweaks
+// ─────────────────────────────────────────────────────────────────────
+const TWEAK_DEFAULTS = /*EDITMODE-BEGIN*/{
+  "element": "Crown",
+  "vizMode": "ensemble",
+  "speed": 1
+}/*EDITMODE-END*/;
+
+function BinduPlayerDesign() {
+  const [t, setTweak] = useTweaks(TWEAK_DEFAULTS);
+  const props = { element: t.element, vizMode: t.vizMode, speed: t.speed };
+
+  return (
+    <DesignCanvas title="Bindu Player — Lalita Design Pass">
+      <DCSection id="player" title="The Player — Three Modes of Being">
+        <DCArtboard id="field" label="FIELD MODE · the field is entered · nothing is in the way" width={393} height={720}>
+          <FieldScreen {...props} />
+        </DCArtboard>
+        <DCArtboard id="control" label="CONTROL MODE · the instrument surfaces · the field continues above" width={393} height={720}>
+          <ControlScreen {...props} />
+        </DCArtboard>
+        <DCArtboard id="reading" label="READING MODE · depth is chosen · the field whispers" width={393} height={720}>
+          <ReadingScreen {...props} />
+        </DCArtboard>
+      </DCSection>
+
+      <TweaksPanel>
+        <TweakSection label="Element" />
+        <TweakSelect
+          label="Element"
+          value={t.element}
+          options={Object.keys(ELEMENTS)}
+          onChange={v => setTweak('element', v)}
+        />
+
+        <TweakSection label="Bindu" />
+        <TweakRadio
+          label="Visualization"
+          value={t.vizMode}
+          options={['singular', 'ensemble']}
+          onChange={v => setTweak('vizMode', v)}
+        />
+        <TweakSlider
+          label="Speed"
+          value={t.speed}
+          min={0.25} max={2.5} step={0.05}
+          unit="×"
+          onChange={v => setTweak('speed', v)}
+        />
+      </TweaksPanel>
+    </DesignCanvas>
+  );
+}
+
+ReactDOM.createRoot(document.getElementById('root')).render(<BinduPlayerDesign />);
+</script>
+<div id="root"></div>
+</body>
+</html>

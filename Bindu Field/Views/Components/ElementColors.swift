@@ -20,4 +20,41 @@ extension Color {
         default:            return Color(hue: 0,       saturation: 0.0,  brightness: 0.75)
         }
     }
+
+    /// Hue value in degrees (0–360) for a Track element. Used when the
+    /// caller wants to mix custom saturation/brightness — for example, the
+    /// Oracle response glow or the Loop reveal — and a single `Color`
+    /// would over-constrain the rendering. Mirrors `bindu(element:)`'s
+    /// hue table exactly. Meditate and unknown elements return 0 (the
+    /// caller is expected to set saturation to 0 for greyscale).
+    static func binduHue(element: String) -> Double {
+        switch element {
+        case "Earth":       return 15
+        case "Water":       return 210
+        case "Fire":        return 25
+        case "Air":         return 195
+        case "Light":       return 50
+        case "Crown":       return 280
+        case "Soul":        return 265
+        case "Dissolution": return 190
+        case "Family":      return 330
+        case "Meditate":    return 0
+        default:            return 0
+        }
+    }
+
+    /// Hex-string initialiser used throughout the Lalita design pass.
+    /// Accepts "#RRGGBB" or "RRGGBB". Invalid input falls back to black.
+    init(hex: String) {
+        var s = hex.trimmingCharacters(in: .whitespacesAndNewlines)
+        if s.hasPrefix("#") { s.removeFirst() }
+        guard s.count == 6, let v = UInt32(s, radix: 16) else {
+            self = .black
+            return
+        }
+        let r = Double((v >> 16) & 0xFF) / 255
+        let g = Double((v >> 8)  & 0xFF) / 255
+        let b = Double( v        & 0xFF) / 255
+        self = Color(red: r, green: g, blue: b)
+    }
 }

@@ -119,7 +119,11 @@ final class AirtableService {
                 seed: seed,
                 carrierHz: carrierHz,
                 beatHz: beatHz,
-                recognitionStatement: f.recognitionStatement
+                recognitionStatement: f.recognitionStatement,
+                lyricalWordsReading: f.lyricalWordsReading ?? "",
+                frequencyReading: f.frequencyReading ?? "",
+                videoPulseReading: f.videoPulseReading ?? "",
+                lalitasPerspective: f.lalitasPerspective
             )
         }
 
@@ -176,6 +180,10 @@ private nonisolated struct AirtableFields: Decodable {
     let beatHz: Double?
     let seedPhrase: String?
     let recognitionStatement: String?
+    let lyricalWordsReading: String?
+    let frequencyReading: String?
+    let videoPulseReading: String?
+    let lalitasPerspective: String?
 
     enum CodingKeys: String, CodingKey {
         case trackID = "Track ID"
@@ -192,5 +200,9 @@ private nonisolated struct AirtableFields: Decodable {
         case beatHz = "Beat Hz"
         case seedPhrase = "Seed Phrase"
         case recognitionStatement = "Recognition Statement"
+        case lyricalWordsReading = "Lyrical Words Reading"
+        case frequencyReading = "Frequency Reading"
+        case videoPulseReading = "Video Pulse Reading"
+        case lalitasPerspective = "Lalita's Perspective"
     }
 }
