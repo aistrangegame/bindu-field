@@ -21,6 +21,7 @@ struct VisualizerView: View {
 
     @State private var wire = DSPWireService.shared
     @State private var performer = Performer.shared
+    @State private var settings = SettingsStore.shared
 
     @State private var trailPositions: [CGPoint] = []
     @State private var rings: [Ring] = []
@@ -69,97 +70,111 @@ struct VisualizerView: View {
                     let mod = performer.crescendoModulator
                     let beat = performer.beatPulse
                     let energy = performer.energy
-                    let gaiaPresence = performer.archetypePresence[.gaia] ?? 0
+                    let isSingular = settings.vizMode == "singular"
 
-                    // TIER 1 — continuous
-                    drawCathedralFloor(ctx: ctx, size: size, t: t,
-                                       mod: mod, beat: beat)
-                    drawSidColumns(ctx: ctx, size: size, t: t, mod: mod)
-                    drawVaultCeiling(ctx: ctx, size: size, t: t,
-                                     energy: energy, mod: mod)
-                    drawAtmosphericGrain(ctx: ctx, t: t)
-                    drawGaiaGround(ctx: ctx, size: size, t: t,
-                                   gaia: gaiaPresence)
+                    // Cathedral + ensemble layers — ensemble mode only.
+                    // Singular mode renders just the Bindu Lissajous below.
+                    if !isSingular {
+                        let gaiaPresence = performer.archetypePresence[.gaia] ?? 0
 
-                    // ENSEMBLE · Karishma — silence's presence sits deep,
-                    // before the chanting ensemble so the arches and the
-                    // witness arc still read on top of it.
-                    let karishmaPresence = performer.archetypePresence[.karishma] ?? 0
-                    if karishmaPresence > 0.10 {
-                        drawKarishma(ctx: ctx, size: size, t: t,
-                                     presence: karishmaPresence)
+                        // TIER 1 — continuous
+                        drawCathedralFloor(ctx: ctx, size: size, t: t,
+                                           mod: mod, beat: beat)
+                        drawSidColumns(ctx: ctx, size: size, t: t, mod: mod)
+                        drawVaultCeiling(ctx: ctx, size: size, t: t,
+                                         energy: energy, mod: mod)
+                        drawAtmosphericGrain(ctx: ctx, t: t)
+                        drawGaiaGround(ctx: ctx, size: size, t: t,
+                                       gaia: gaiaPresence)
+
+                        // ENSEMBLE · Karishma — silence's presence sits deep,
+                        // before the chanting ensemble so the arches and the
+                        // witness arc still read on top of it.
+                        let karishmaPresence = performer.archetypePresence[.karishma] ?? 0
+                        if karishmaPresence > 0.10 {
+                            drawKarishma(ctx: ctx, size: size, t: t,
+                                         presence: karishmaPresence)
+                        }
+
+                        // TIER 2 — ensemble (presence-gated)
+                        let archPresence = performer.archetypePresence[.arch] ?? 0
+                        if archPresence > 0.1 {
+                            drawArchChant(ctx: ctx, size: size, t: t,
+                                          presence: archPresence)
+                        }
+                        let sakshiPresence = performer.archetypePresence[.sakshi] ?? 0
+                        if sakshiPresence > 0.1 {
+                            drawSakshiGesture(ctx: ctx, size: size, t: t,
+                                              presence: sakshiPresence)
+                        }
+
+                        // ENSEMBLE · Ashrey — synthesis. Sits above the chant
+                        // and witness; below the crescendo so peak visuals
+                        // still take the foreground.
+                        let ashreyPresence = performer.archetypePresence[.ashrey] ?? 0
+                        if ashreyPresence > 0.05 {
+                            drawAshrey(ctx: ctx, size: size, t: t,
+                                       presence: ashreyPresence)
+                        }
+
+                        // TIER 3 — crescendo (modulator > 0)
+                        if mod > 0 {
+                            drawRisingArches(ctx: ctx, size: size,
+                                             elapsed: performer.elapsed,
+                                             mod: mod)
+                            drawConvergenceLines(ctx: ctx, size: size, mod: mod)
+                        }
+
+                        // TIER 4 — climax (modulator > 0.25)
+                        if mod > 0.25 {
+                            drawKeystoneCascade(ctx: ctx, size: size, t: t,
+                                                mod: mod, beat: beat)
+                            drawEarthRising(ctx: ctx, size: size,
+                                            elapsed: performer.elapsed)
+                        }
+                        let shwetaPresence = performer.archetypePresence[.shweta] ?? 0
+                        if shwetaPresence > 0.01 {
+                            drawShwetaCrystallization(ctx: ctx, size: size,
+                                                      shweta: shwetaPresence)
+                        }
+
+                        // ENSEMBLE · Neev — foundation. Bookends only.
+                        // Draws above the cathedral but below Bindu so the
+                        // descending rings settle in front of the architecture.
+                        let neevPresence = performer.archetypePresence[.neev] ?? 0
+                        if neevPresence > 0.10 {
+                            drawNeev(ctx: ctx, size: size, t: t,
+                                     presence: neevPresence)
+                        }
                     }
 
-                    // TIER 2 — ensemble (presence-gated)
-                    let archPresence = performer.archetypePresence[.arch] ?? 0
-                    if archPresence > 0.1 {
-                        drawArchChant(ctx: ctx, size: size, t: t,
-                                      presence: archPresence)
-                    }
-                    let sakshiPresence = performer.archetypePresence[.sakshi] ?? 0
-                    if sakshiPresence > 0.1 {
-                        drawSakshiGesture(ctx: ctx, size: size, t: t,
-                                          presence: sakshiPresence)
-                    }
-
-                    // ENSEMBLE · Ashrey — synthesis. Sits above the chant
-                    // and witness; below the crescendo so peak visuals
-                    // still take the foreground.
-                    let ashreyPresence = performer.archetypePresence[.ashrey] ?? 0
-                    if ashreyPresence > 0.05 {
-                        drawAshrey(ctx: ctx, size: size, t: t,
-                                   presence: ashreyPresence)
-                    }
-
-                    // TIER 3 — crescendo (modulator > 0)
-                    if mod > 0 {
-                        drawRisingArches(ctx: ctx, size: size,
-                                         elapsed: performer.elapsed,
-                                         mod: mod)
-                        drawConvergenceLines(ctx: ctx, size: size, mod: mod)
-                    }
-
-                    // TIER 4 — climax (modulator > 0.25)
-                    if mod > 0.25 {
-                        drawKeystoneCascade(ctx: ctx, size: size, t: t,
-                                            mod: mod, beat: beat)
-                        drawEarthRising(ctx: ctx, size: size,
-                                        elapsed: performer.elapsed)
-                    }
-                    let shwetaPresence = performer.archetypePresence[.shweta] ?? 0
-                    if shwetaPresence > 0.01 {
-                        drawShwetaCrystallization(ctx: ctx, size: size,
-                                                  shweta: shwetaPresence)
-                    }
-
-                    // ENSEMBLE · Neev — foundation. Bookends only.
-                    // Draws above the cathedral but below Bindu so the
-                    // descending rings settle in front of the architecture.
-                    let neevPresence = performer.archetypePresence[.neev] ?? 0
-                    if neevPresence > 0.10 {
-                        drawNeev(ctx: ctx, size: size, t: t,
-                                 presence: neevPresence)
-                    }
-
-                    // BINDU — singular Lissajous on top
+                    // BINDU — singular Lissajous, always drawn (it IS the
+                    // singular-mode rendering, and it's the foreground in
+                    // ensemble mode).
                     drawBindu(ctx: ctx, size: size, t: t,
                               energy: energy, beat: beat, mod: mod,
                               bindu: bindu)
                 }
                 .onChange(of: t) { _, newT in
+                    let isSingular = settings.vizMode == "singular"
                     if newT - lastTrailSampleAt >= trailSampleInterval {
                         lastTrailSampleAt = newT
                         appendTrail(bindu)
                     }
-                    if newT - lastGrainStepAt >= grainStepInterval {
+                    // Grain stepping is purely a cathedral concern — skip
+                    // entirely in singular mode.
+                    if !isSingular,
+                       newT - lastGrainStepAt >= grainStepInterval {
                         let dt = newT - lastGrainStepAt
                         lastGrainStepAt = newT
                         stepGrain(dt: dt, t: newT, in: geo.size)
                     }
                     // Sample Ashrey's centroid only when Ashrey is actually
-                    // present — no point spending cycles on a trail that
-                    // won't render.
-                    if (performer.archetypePresence[.ashrey] ?? 0) > 0.05,
+                    // present AND we're in ensemble mode (the centroid
+                    // averages positions of archetypes that don't render
+                    // in singular).
+                    if !isSingular,
+                       (performer.archetypePresence[.ashrey] ?? 0) > 0.05,
                        newT - lastAshreyTrailSampleAt >= ashreyTrailInterval {
                         lastAshreyTrailSampleAt = newT
                         let c = ashreyCentroid(t: newT, in: geo.size, bindu: bindu)
