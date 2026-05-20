@@ -10,62 +10,60 @@ struct RootView: View {
     var body: some View {
         ZStack {
             TabView(selection: $nav.selectedTab) {
-                FieldView()
+                // MAP — the front door of the app. Tag 0.
+                MapView()
                     .tabItem {
-                        Label { Text("Field") } icon: {
-                            BinduTabIcon(tab: .field, active: nav.selectedTab == 0)
+                        Label { Text("Map") } icon: {
+                            BinduTabIcon(tab: .map, active: nav.selectedTab == 0)
                         }
                     }
                     .tag(0)
-                OracleView()
+                FieldView()
                     .tabItem {
-                        Label { Text("Oracle") } icon: {
-                            BinduTabIcon(tab: .oracle, active: nav.selectedTab == 1)
+                        Label { Text("Field") } icon: {
+                            BinduTabIcon(tab: .field, active: nav.selectedTab == 1)
                         }
                     }
                     .tag(1)
-                SpaceView()
+                OracleView()
                     .tabItem {
-                        Label { Text("Space") } icon: {
-                            BinduTabIcon(tab: .space, active: nav.selectedTab == 2)
+                        Label { Text("Oracle") } icon: {
+                            BinduTabIcon(tab: .oracle, active: nav.selectedTab == 2)
                         }
                     }
                     .tag(2)
-                LabView()
+                SpaceView()
                     .tabItem {
-                        Label { Text("Lab") } icon: {
-                            BinduTabIcon(tab: .lab, active: nav.selectedTab == 3)
+                        Label { Text("Space") } icon: {
+                            BinduTabIcon(tab: .space, active: nav.selectedTab == 3)
                         }
                     }
                     .tag(3)
-                ArchiveView()
+                LabView()
                     .tabItem {
-                        Label { Text("Archive") } icon: {
-                            BinduTabIcon(tab: .archive, active: nav.selectedTab == 4)
+                        Label { Text("Lab") } icon: {
+                            BinduTabIcon(tab: .lab, active: nav.selectedTab == 4)
                         }
                     }
                     .tag(4)
-                RitualView()
+                ArchiveView()
                     .tabItem {
-                        Label { Text("Ritual") } icon: {
-                            BinduTabIcon(tab: .ritual, active: nav.selectedTab == 5)
+                        Label { Text("Archive") } icon: {
+                            BinduTabIcon(tab: .archive, active: nav.selectedTab == 5)
                         }
                     }
                     .tag(5)
-                LetterView()
+                RitualView()
                     .tabItem {
-                        Label { Text("Letter") } icon: {
-                            BinduTabIcon(tab: .letter, active: nav.selectedTab == 6)
+                        Label { Text("Ritual") } icon: {
+                            BinduTabIcon(tab: .ritual, active: nav.selectedTab == 6)
                         }
                     }
                     .tag(6)
-                // MAP tab — placeholder for Session B. Tag 7 keeps existing
-                // tags untouched so the Field → Oracle deep-link and other
-                // tag-7-aware code paths stay correct.
-                EmptyView()
+                LetterView()
                     .tabItem {
-                        Label { Text("Map") } icon: {
-                            BinduTabIcon(tab: .map, active: nav.selectedTab == 7)
+                        Label { Text("Letter") } icon: {
+                            BinduTabIcon(tab: .letter, active: nav.selectedTab == 7)
                         }
                     }
                     .tag(7)

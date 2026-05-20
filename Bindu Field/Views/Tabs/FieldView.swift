@@ -225,12 +225,14 @@ struct FieldView: View {
                             .contentShape(Circle().size(width: 80, height: 80))  // larger tap target than visual
                         }
                         .onLongPressGesture(minimumDuration: 0.6) {
-                            // Tap-and-hold → open Oracle
+                            // Tap-and-hold → open Oracle. Oracle's tag
+                            // shifted from 1 to 2 when the Map became
+                            // the front door (Session B).
                             let haptic = UIImpactFeedbackGenerator(style: .medium)
                             haptic.impactOccurred()
                             dismissOracleHint()
                             withAnimation(.easeInOut(duration: 0.3)) {
-                                NavigationStore.shared.selectedTab = 1
+                                NavigationStore.shared.selectedTab = 2
                             }
                         }
                     }

@@ -161,6 +161,14 @@ final class PlayerStore {
             note: note
         )
         SessionStore.shared.save(session)
+
+        // Phase 3 of Session B: a chakra is "danced" only when the track
+        // ran to its natural end. Map node lookup uses the chakra name
+        // lowercased to match the registry id.
+        if completed, let chakra = track.chakra {
+            let chakraID = chakra.rawValue.lowercased()
+            ChakraJourneyStore.shared.markDanced(chakraID)
+        }
     }
 
     /// Close the player and stop audio. Pass `completed: true` only from
