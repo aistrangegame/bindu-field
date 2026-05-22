@@ -55,11 +55,14 @@ struct LabView: View {
     private let carrierMin: Float = 40
     private let carrierMax: Float = 440
     private let carrierStep: Float = 0.1
-    private let carrierFineStep: Float = 1.0      // ± stepper moves by 1 Hz
+    // ± stepper precision matches the readout precision so a user can
+    // reach values like 136.1 (OM) and 2.69 Hz one tap at a time without
+    // having to type. The slider drag remains the coarse control.
+    private let carrierFineStep: Float = 0.1      // ± stepper moves by 0.1 Hz (matches 1-decimal readout)
     private let beatMin: Float = 0.5
     private let beatMax: Float = 44
     private let beatStep: Float = 0.1
-    private let beatFineStep: Float = 0.1         // ± stepper moves by 0.1 Hz
+    private let beatFineStep: Float = 0.01        // ± stepper moves by 0.01 Hz (matches 2-decimal readout)
 
     // MARK: - Derived
 
