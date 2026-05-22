@@ -219,7 +219,13 @@ final class AirtableService {
                 lyricalWordsReading: f.lyricalWordsReading ?? "",
                 frequencyReading: f.frequencyReading ?? "",
                 lalitasPerspective: f.lalitasPerspective,
-                phaseLabels: f.phaseLabels
+                phaseLabels: f.phaseLabels,
+                inhaleSec: f.inhaleSec,
+                holdSec: f.holdSec,
+                exhaleSec: f.exhaleSec,
+                intentionKey: f.intention,
+                safetyKey: f.safety,
+                specialCueKey: f.specialCue
             )
         }
 
@@ -292,6 +298,16 @@ private nonisolated struct AirtableBreathFields: Decodable {
     let lalitasPerspective: String?
     let phaseLabels: String?
 
+    // Protocol metadata — added 2026-05-22, populated for the 11 breath
+    // sessions. Optional everywhere: if a field is blank the app falls
+    // back to the hardcoded `BreathProtocolMetadata.all` seed table.
+    let inhaleSec: Int?
+    let holdSec: Int?
+    let exhaleSec: Int?
+    let intention: String?
+    let safety: String?
+    let specialCue: String?
+
     enum CodingKeys: String, CodingKey {
         case trackID = "Track ID"
         case songTitle = "Song Title"
@@ -306,6 +322,12 @@ private nonisolated struct AirtableBreathFields: Decodable {
         case frequencyReading = "Frequency Reading"
         case lalitasPerspective = "Lalita's Perspective"
         case phaseLabels = "Phase Labels"
+        case inhaleSec = "Inhale Sec"
+        case holdSec = "Hold Sec"
+        case exhaleSec = "Exhale Sec"
+        case intention = "Intention"
+        case safety = "Safety"
+        case specialCue = "Special Cue"
     }
 }
 

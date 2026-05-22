@@ -3,9 +3,12 @@ import Foundation
 /// One of the 11 breath sessions (Airtable Track ID 101–111, Track Type
 /// = "breath"). The Airtable spine holds song/verb/state/carrier/beat/seed
 /// and the Reading-space prose. The breath-specific protocol metadata
-/// (intention, inhale/hold/exhale, safety, special cue, honesty tiers) is
-/// not in Airtable today — it lives in `BreathProtocolMetadata` keyed by
-/// `id`. See `joined(with:)` for the joined surface used by views.
+/// (intention, inhale/hold/exhale, safety, special cue) is also stored
+/// in Airtable as of the 2026-05-22 migration — `BreathProtocolMetadata.all`
+/// remains as a code-level seed/fallback that fills in any missing field.
+///
+/// See `joined()` for the merged surface used by views: Airtable values
+/// win; the hardcoded fallback only fills gaps.
 struct BreathSession: Codable, Hashable, Identifiable {
     let id: Int
     let name: String                  // Airtable "Song Title" — e.g. "Come Home"
@@ -19,6 +22,93 @@ struct BreathSession: Codable, Hashable, Identifiable {
     let frequencyReading: String      // Airtable "Frequency Reading"
     let lalitasPerspective: String?   // Airtable "Lalita's Perspective"
     let phaseLabels: String?          // Airtable "Phase Labels" — used by the Reading Space PHASES tab
+
+    // Protocol metadata pulled from Airtable (migration 2026-05-22).
+    // Optional everywhere; the merge in `joined()` falls back to the
+    // hardcoded `BreathProtocolMetadata.all` seed table when a field is
+    // missing. Cached `binduBreathSessions.v1` from before the migration
+    // decodes with all of these nil — same end result as a fresh
+    // Airtable fetch where the column is empty.
+    let inhaleSec: Int?
+    let holdSec: Int?
+    let exhaleSec: Int?
+    let intentionKey: String?         // Airtable "Intention"   — singleSelect raw name
+    let safetyKey: String?            // Airtable "Safety"      — singleSelect raw name
+    let specialCueKey: String?        // Airtable "Special Cue" — singleSelect raw name
+
+    enum CodingKeys: String, CodingKey {
+        case id, name, verb, stateKey, carrierHz, beatHz, seed
+        case recognitionStatement, lyricalWordsReading, frequencyReading
+        case lalitasPerspective, phaseLabels
+        case inhaleSec, holdSec, exhaleSec
+        case intentionKey, safetyKey, specialCueKey
+    }
+
+    init(
+        id: Int,
+        name: String,
+        verb: String,
+        stateKey: String,
+        carrierHz: Float,
+        beatHz: Float,
+        seed: String,
+        recognitionStatement: String?,
+        lyricalWordsReading: String,
+        frequencyReading: String,
+        lalitasPerspective: String?,
+        phaseLabels: String?,
+        inhaleSec: Int? = nil,
+        holdSec: Int? = nil,
+        exhaleSec: Int? = nil,
+        intentionKey: String? = nil,
+        safetyKey: String? = nil,
+        specialCueKey: String? = nil
+    ) {
+        self.id = id
+        self.name = name
+        self.verb = verb
+        self.stateKey = stateKey
+        self.carrierHz = carrierHz
+        self.beatHz = beatHz
+        self.seed = seed
+        self.recognitionStatement = recognitionStatement
+        self.lyricalWordsReading = lyricalWordsReading
+        self.frequencyReading = frequencyReading
+        self.lalitasPerspective = lalitasPerspective
+        self.phaseLabels = phaseLabels
+        self.inhaleSec = inhaleSec
+        self.holdSec = holdSec
+        self.exhaleSec = exhaleSec
+        self.intentionKey = intentionKey
+        self.safetyKey = safetyKey
+        self.specialCueKey = specialCueKey
+    }
+
+    /// Backwards-compatible decoder. The six migration fields use
+    /// `decodeIfPresent` so a cached `binduBreathSessions.v1` written
+    /// before the migration still decodes (all six come through nil and
+    /// the merge falls back to the hardcoded table).
+    init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        id = try c.decode(Int.self, forKey: .id)
+        name = try c.decode(String.self, forKey: .name)
+        verb = try c.decode(String.self, forKey: .verb)
+        stateKey = try c.decode(String.self, forKey: .stateKey)
+        carrierHz = try c.decode(Float.self, forKey: .carrierHz)
+        beatHz = try c.decode(Float.self, forKey: .beatHz)
+        seed = try c.decode(String.self, forKey: .seed)
+        recognitionStatement = try c.decodeIfPresent(String.self, forKey: .recognitionStatement)
+        lyricalWordsReading = try c.decodeIfPresent(String.self, forKey: .lyricalWordsReading) ?? ""
+        frequencyReading = try c.decodeIfPresent(String.self, forKey: .frequencyReading) ?? ""
+        lalitasPerspective = try c.decodeIfPresent(String.self, forKey: .lalitasPerspective)
+        phaseLabels = try c.decodeIfPresent(String.self, forKey: .phaseLabels)
+        inhaleSec = try c.decodeIfPresent(Int.self, forKey: .inhaleSec)
+        holdSec = try c.decodeIfPresent(Int.self, forKey: .holdSec)
+        exhaleSec = try c.decodeIfPresent(Int.self, forKey: .exhaleSec)
+        intentionKey = try c.decodeIfPresent(String.self, forKey: .intentionKey)
+        safetyKey = try c.decodeIfPresent(String.self, forKey: .safetyKey)
+        specialCueKey = try c.decodeIfPresent(String.self, forKey: .specialCueKey)
+    }
 }
 
 /// Eight high-level intentions that group the 11 breath sessions into a
@@ -92,11 +182,16 @@ enum BreathSafety: String, Codable, Hashable {
 /// Optional special breath cue layered over the immersed circle. The
 /// circle's mechanics don't change — a small italic-serif line surfaces
 /// on the relevant phase.
+///
+/// Raw values match the Airtable "Special Cue" singleSelect option names
+/// exactly, so `BreathSpecialCue(rawValue:)` decodes Airtable strings
+/// directly. Unknown / unrecognized strings return nil (graceful: the
+/// view renders no cue without crashing).
 enum BreathSpecialCue: String, Codable, Hashable {
-    case hum            // 103 The Hum — humming on exhale
-    case ocean          // 110 The Ocean Breath — ujjayi throat on exhale
-    case doublePulse    // 111 The Night Protocol — inhale · pause · inhale
-    case activePhase    // 105 The Stoke — faster active-phase breath
+    case hum          = "hum"            // 103 The Hum — humming on exhale
+    case ocean        = "ocean"          // 110 The Ocean Breath — ujjayi throat on exhale
+    case doublePulse  = "double_pulse"   // 111 The Night Protocol — inhale · pause · inhale
+    case activePhase  = "active_phase"   // 105 The Stoke — faster active-phase breath
 
     var cueLabel: String {
         switch self {
@@ -152,6 +247,11 @@ struct BreathProtocolMetadata: Codable, Hashable {
     /// Lookup keyed by Track ID. Falls back to a permissive default when
     /// an unknown ID is requested (lets a future Airtable-only session
     /// still surface in the app without a crash).
+    ///
+    /// The hardcoded `all` table is the SEED / FALLBACK as of the
+    /// 2026-05-22 migration — it still contains the canonical values
+    /// because the merge in `BreathSession.joined()` reads from it when
+    /// Airtable is missing a field. Do not delete.
     static func `for`(id: Int) -> BreathProtocolMetadata {
         all[id] ?? BreathProtocolMetadata(
             id: id, intention: .balance, hue: 210,
@@ -160,6 +260,87 @@ struct BreathProtocolMetadata: Codable, Hashable {
             oneLine: "An equal breath. The simplest container.",
             carrierTiers: [.tradition], beatTiers: [.science]
         )
+    }
+
+    /// Code-level backstop: these IDs are always routed through the
+    /// screened gate, regardless of what Airtable says. Defense in
+    /// depth — a bad Airtable edit (an accidental "open" on session 105,
+    /// for instance) cannot un-gate a session the code knows is intense.
+    ///
+    /// Today only 105 (The Stoke) lives here. Any future screened
+    /// session should add its ID here as soon as it ships, before its
+    /// Airtable row exists.
+    static let knownScreenedIDs: Set<Int> = [105]
+
+    /// Merge Airtable-provided values onto a code-level fallback.
+    ///
+    /// Field-by-field rules:
+    /// - inhale/hold/exhale: Airtable wins when present; else fallback.
+    ///   Note `0` is a valid value (e.g. Hold Sec = 0 for sessions with
+    ///   no held breath) — the `Int?` decode preserves it.
+    /// - intention: Airtable's string decodes via `BreathIntention(rawValue:)`.
+    ///   Unknown / empty → fallback intention.
+    /// - special: if Airtable has a non-empty value, trust it
+    ///   (unknown → no cue, never crash). Only an EMPTY/nil Airtable
+    ///   value falls through to the hardcoded special.
+    /// - safety: FAIL CLOSED. Only an explicit Airtable `"open"` →
+    ///   `.open`. Empty / nil / `"screened"` / unknown → `.screened`.
+    ///   `knownScreenedIDs` is an additional backstop that overrides
+    ///   any `"open"` for code-flagged intense sessions.
+    /// - hue, oneLine, carrierTiers, beatTiers: not migrated; come from
+    ///   the fallback table. Hue carries occasional intentional
+    ///   divergence from `intention.hue` (e.g. 109/111 use a different
+    ///   hue than their intention) so it cannot just be derived.
+    static func merge(airtable s: BreathSession) -> BreathProtocolMetadata {
+        let fallback = BreathProtocolMetadata.for(id: s.id)
+
+        let intention: BreathIntention = {
+            if let key = s.intentionKey?.trimmingCharacters(in: .whitespaces),
+               !key.isEmpty,
+               let parsed = BreathIntention(rawValue: key) {
+                return parsed
+            }
+            return fallback.intention
+        }()
+
+        let special: BreathSpecialCue? = {
+            // Empty / nil → fallback. Non-empty → trust Airtable (unknown
+            // value decodes to nil; that's the intended "no cue" outcome,
+            // not a fallback trigger — see the prompt).
+            guard let raw = s.specialCueKey?.trimmingCharacters(in: .whitespaces),
+                  !raw.isEmpty
+            else { return fallback.special }
+            return BreathSpecialCue(rawValue: raw)
+        }()
+
+        return BreathProtocolMetadata(
+            id: s.id,
+            intention: intention,
+            hue: fallback.hue,
+            inhale: s.inhaleSec ?? fallback.inhale,
+            hold:   s.holdSec   ?? fallback.hold,
+            exhale: s.exhaleSec ?? fallback.exhale,
+            safety: resolveSafety(airtableKey: s.safetyKey, id: s.id),
+            special: special,
+            oneLine: fallback.oneLine,
+            carrierTiers: fallback.carrierTiers,
+            beatTiers: fallback.beatTiers
+        )
+    }
+
+    /// Fail-closed safety resolver.
+    ///
+    /// Returns `.open` only when:
+    ///   1. The id is NOT in `knownScreenedIDs`, AND
+    ///   2. Airtable's Safety value is exactly `"open"`.
+    ///
+    /// Everything else (nil / empty / `"screened"` / unknown string) →
+    /// `.screened`, so the contraindication gate shows by default.
+    static func resolveSafety(airtableKey: String?, id: Int) -> BreathSafety {
+        if knownScreenedIDs.contains(id) { return .screened }
+        let trimmed = airtableKey?.trimmingCharacters(in: .whitespaces)
+        if trimmed == "open" { return .open }
+        return .screened
     }
 
     static let all: [Int: BreathProtocolMetadata] = [
@@ -282,8 +463,11 @@ struct JoinedBreathSession: Identifiable, Hashable {
 }
 
 extension BreathSession {
-    /// Join Airtable data with in-app protocol metadata.
+    /// Join Airtable data with in-app protocol metadata. Airtable values
+    /// win; the hardcoded `BreathProtocolMetadata.all` table is the
+    /// fallback only. Safety always fails closed (see
+    /// `BreathProtocolMetadata.resolveSafety`).
     func joined() -> JoinedBreathSession {
-        JoinedBreathSession(session: self, metadata: .for(id: id))
+        JoinedBreathSession(session: self, metadata: .merge(airtable: self))
     }
 }
