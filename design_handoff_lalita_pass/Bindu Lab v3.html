@@ -1,0 +1,894 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<title>Bindu Lab v3 — Design Brief 01</title>
+<link href="https://fonts.googleapis.com/css2?family=Lora:ital,wght@0,300;0,400;1,300;1,400&family=DM+Mono:wght@300;400&display=swap" rel="stylesheet">
+<script src="https://unpkg.com/react@18.3.1/umd/react.development.js" integrity="sha384-hD6/rw4ppMLGNu3tX5cjIb+uRZ7UkRJ6BPkLpg4hAu/6onKUg4lLsHAs9EBPT82L" crossorigin="anonymous"></script>
+<script src="https://unpkg.com/react-dom@18.3.1/umd/react-dom.development.js" integrity="sha384-u6aeetuaXnQ38mYT8rp6sbXaQe3NL9t+IBXmnYxwkUI2Hw4bsp2Wvmx4yRQF1uAm" crossorigin="anonymous"></script>
+<script src="https://unpkg.com/@babel/standalone@7.29.0/babel.min.js" integrity="sha384-m08KidiNqLdpJqLq95G/LEi8Qvjl/xUYll3QILypMoQ65QorJ9Lvtp2RXYGBFj1y" crossorigin="anonymous"></script>
+<script type="text/babel" src="design-canvas.jsx"></script>
+<script type="text/babel" src="tweaks-panel.jsx"></script>
+<style>
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{background:#010106;font-family:-apple-system,sans-serif}
+  ::-webkit-scrollbar{display:none}
+  input[type=number]{-moz-appearance:textfield}
+  input[type=number]::-webkit-outer-spin-button,
+  input[type=number]::-webkit-inner-spin-button{-webkit-appearance:none}
+  @keyframes fadeUp{from{opacity:0;transform:translateY(5px)}to{opacity:1;transform:translateY(0)}}
+  @keyframes breathDot{0%,100%{opacity:.65}50%{opacity:1}}
+  @keyframes badgeIn{from{opacity:0;transform:scale(0.88)}to{opacity:1;transform:scale(1)}}
+  @keyframes spinLock{0%{transform:scale(1.08)}100%{transform:scale(1)}}
+  @keyframes cycleFlash{0%,100%{opacity:1}45%,55%{opacity:.25}}
+</style>
+<template id="__bundler_thumbnail" data-bg-color="#020208">
+  <svg viewBox="0 0 393 720" xmlns="http://www.w3.org/2000/svg">
+    <rect width="393" height="720" fill="#020208"/>
+    <circle cx="196" cy="100" r="3" fill="hsl(210,55%,68%)" opacity=".8"/>
+    <text x="212" y="104" font-family="Georgia,serif" font-style="italic" font-size="15" fill="rgba(245,226,214,0.85)" font-weight="300">frequency lab</text>
+    <rect x="28" y="130" width="337" height="88" fill="rgba(255,255,255,0.02)" stroke="rgba(255,255,255,0.06)" stroke-width=".5"/>
+    <path d="M28,174 Q90,150 150,174 Q210,198 270,174 Q320,154 365,174" stroke="hsl(210,60%,70%)" stroke-width="1.6" fill="none" opacity=".7"/>
+    <text x="196" y="316" text-anchor="middle" font-family="'DM Mono',monospace" font-size="8" fill="rgba(245,226,214,0.3)" letter-spacing="4">BEAT</text>
+    <text x="196" y="360" text-anchor="middle" font-family="'DM Mono',monospace" font-size="48" font-weight="300" fill="hsl(210,58%,70%)">7.83</text>
+    <text x="214" y="380" font-family="'DM Mono',monospace" font-size="11" fill="rgba(245,226,214,0.45)">Hz</text>
+    <rect x="28" y="400" width="280" height="1" rx=".5" fill="rgba(255,255,255,0.08)"/>
+    <circle cx="148" cy="400" r="9" fill="hsl(210,60%,67%)" opacity=".9"/>
+    <circle cx="328" cy="400" r="17" fill="none" stroke="rgba(255,255,255,0.12)" stroke-width="1"/>
+    <circle cx="356" cy="400" r="17" fill="none" stroke="rgba(255,255,255,0.12)" stroke-width="1"/>
+    <text x="196" y="510" text-anchor="middle" font-family="Georgia,serif" font-style="italic" font-size="11" fill="rgba(245,226,214,0.32)">theta · dream threshold</text>
+    <rect x="262" y="503" width="22" height="10" rx="3" fill="rgba(210,165,70,0.12)" stroke="rgba(210,165,70,0.3)" stroke-width=".5"/>
+    <text x="273" y="511" text-anchor="middle" font-family="monospace" font-size="6" fill="rgba(210,165,70,0.8)" letter-spacing="1">T</text>
+  </svg>
+</template>
+</head>
+<body>
+<div id="root"></div>
+<script type="text/babel">
+const { useState, useEffect, useRef, useCallback } = React;
+
+// ── TOKENS ──────────────────────────────────────────────────────────────
+const BG      = '#020208';
+const TEXT    = '#F5E2D6';
+const MUTED   = 'rgba(245,226,214,0.55)';
+const SUBTLE  = 'rgba(245,226,214,0.28)';
+const FAINT   = 'rgba(245,226,214,0.12)';
+const BORDER  = 'rgba(255,255,255,0.07)';
+const SERIF   = "'Lora', Georgia, serif";
+const MONO    = "'DM Mono', 'SF Mono', ui-monospace, monospace";
+
+// ── HONESTY TIERS ────────────────────────────────────────────────────────
+const TIER_META = {
+  S: { label:'SCIENCE',   bg:'rgba(72,190,170,0.10)', bd:'rgba(72,190,170,0.32)', tx:'rgba(72,190,170,0.88)',   desc:'Documented, measured, replicable physiology.' },
+  T: { label:'TRADITION', bg:'rgba(208,162,62,0.10)', bd:'rgba(208,162,62,0.32)', tx:'rgba(208,162,62,0.88)',   desc:'Long-standing contemplative association; true as tradition, not necessarily as physiology.' },
+  C: { label:'CLAIM',     bg:'rgba(195,82,68,0.10)',  bd:'rgba(195,82,68,0.30)',  tx:'rgba(195,82,68,0.82)',    desc:'A modern assertion without solid empirical support.' },
+};
+
+function HonestyBadge({ tier, full = false }) {
+  const m = TIER_META[tier];
+  if (!m) return null;
+  return (
+    <span style={{
+      display:'inline-flex', alignItems:'center',
+      padding: full ? '2px 8px' : '2px 5px',
+      borderRadius:4,
+      background:m.bg, border:`0.5px solid ${m.bd}`,
+      fontFamily:MONO, fontSize:7, letterSpacing:'0.16em',
+      color:m.tx, marginLeft:5, verticalAlign:'middle',
+      whiteSpace:'nowrap', animation:'badgeIn 0.25s ease',
+    }}>
+      {full ? m.label : tier}
+    </span>
+  );
+}
+
+// ── BRAINWAVE STATES ─────────────────────────────────────────────────────
+const STATES = {
+  delta: {
+    label:'DELTA', range:'0.5 – 4 Hz', hue:15,
+    essence:'deep root · healing · integration',
+    detail:'The deepest ground state. The nervous system releases. The body repairs. The field reorganizes below ordinary awareness. Heavy, slow, immersive.',
+    tiers:['S','T'],
+    tierNotes:{ S:'Delta-band EEG in slow-wave sleep is one of the most replicated findings in neuroscience.', T:'"Healing" and "integration" are contemplative framings — the physiology is real, the meaning is traditional.' },
+  },
+  theta: {
+    label:'THETA', range:'4 – 8 Hz', hue:260,
+    essence:'dream · creation · threshold',
+    detail:'The border between waking and sleep. Images arrive without effort. Creativity flows from a place that does not know it is creating. Where inner knowing speaks.',
+    tiers:['S','T'],
+    tierNotes:{ S:'Theta in REM sleep and deep meditation states has strong EEG support.', T:'The "threshold between worlds" framing is a contemplative tradition, not a clinical description.' },
+  },
+  alpha: {
+    label:'ALPHA', range:'8 – 13 Hz', hue:210,
+    essence:'open · aware · present',
+    detail:'Relaxed wakefulness. The witness is active but not grasping. You are here, and here is enough. The nervous system in its natural resting frequency.',
+    tiers:['S'],
+    tierNotes:{ S:'Alpha in relaxed, eyes-closed wakefulness is one of the strongest and most consistent findings in EEG research.' },
+  },
+  beta: {
+    label:'BETA', range:'13 – 30 Hz', hue:165,
+    essence:'focus · processing · active',
+    detail:'Active cognition. The analytical mind is engaged. Useful for focused work, intentional creation, clear thinking. The everyday field of attention.',
+    tiers:['S'],
+    tierNotes:{ S:'Beta during active cognitive tasks is well-documented in EEG literature.' },
+  },
+  gamma: {
+    label:'GAMMA', range:'30 + Hz', hue:50,
+    essence:'peak binding · insight · coherence',
+    detail:'Brief, intense. Moments of heightened clarity. Some advanced practitioners can sustain this state. Associated with the binding of perception across brain regions.',
+    tiers:['S','C'],
+    tierNotes:{ S:'Gamma oscillations in perceptual binding have EEG support, though the mechanisms are still debated.', C:'"Peak insight" and heightened coherence claims go beyond what the current literature can confirm.' },
+  },
+};
+function getState(hz) {
+  if (hz < 4)  return STATES.delta;
+  if (hz < 8)  return STATES.theta;
+  if (hz < 13) return STATES.alpha;
+  if (hz < 30) return STATES.beta;
+  return STATES.gamma;
+}
+
+// ── SACRED CARRIERS ──────────────────────────────────────────────────────
+const SACRED = [
+  { hz:136.1, name:'OM',   note:'C#3',  tiers:['T'],     essence:'Earth-year tone · cosmic OM',
+    detail:"Hans Cousto calculated the Earth's orbital period as 136.1 Hz. The OM association is a yogic tradition, not a measured physiological claim." },
+  { hz:174.0, name:'174',  note:'F3',   tiers:['T','C'],  essence:'Solfeggio root · foundation',
+    detail:'Part of the Solfeggio frequency system. Foundation and grounding associations are modern interpretations; the historical Solfeggio is a medieval musical tradition.' },
+  { hz:285.0, name:'285',  note:'D4',   tiers:['T','C'],  essence:'Solfeggio · field coherence',    detail:'Solfeggio association; field coherence claims are contemporary and not empirically established.' },
+  { hz:396.0, name:'UT',   note:'G4',   tiers:['T','C'],  essence:'Solfeggio · liberation',         detail:'The Ut (Do) of the historical Solfeggio scale. Liberation and fear-release are modern re-interpretations.' },
+  { hz:417.0, name:'RE',   note:'G#4',  tiers:['T','C'],  essence:'Solfeggio · facilitating change', detail:'Re of the Solfeggio. Change-facilitation claims are a modern, unverified extension of the tradition.' },
+  { hz:432.0, name:'432',  note:'A4♭',  tiers:['T','C'],  essence:'alternative concert pitch · natural resonance',
+    detail:'Some musicians and instrument-makers prefer A=432 Hz. The "more natural" and "harmonic with nature" claims are widely circulated but contested — there is no strong empirical resolution to the 440 vs 432 debate.' },
+  { hz:440.0, name:'440',  note:'A4',   tiers:['S'],      essence:'ISO standard concert pitch',
+    detail:'The ISO 16 standard (1975). Well-established. No special physiological claims attach to this frequency itself.' },
+];
+function nearSacred(hz, threshold = 1.8) {
+  return SACRED.find(s => Math.abs(s.hz - hz) <= threshold) || null;
+}
+
+// ── PRESETS ───────────────────────────────────────────────────────────────
+const SYS_PRESETS = [
+  { name:'Earth Tone',  carrier:136.1, beat:7.83, tag:'OM · Schumann' },
+  { name:'Deep Delta',  carrier:136.1, beat:1.5,  tag:'root descent' },
+  { name:'Theta Gate',  carrier:174.0, beat:5.5,  tag:'dream portal' },
+  { name:'Creative',    carrier:174.0, beat:7.0,  tag:'174 Hz · open' },
+  { name:'Presence',    carrier:432.0, beat:10.0, tag:'432 · aware' },
+];
+
+// ── WAVEFORM ──────────────────────────────────────────────────────────────
+function WaveformCanvas({ carrier, beat, hue, active, height = 96 }) {
+  const cvs = useRef(null);
+  const live = useRef({ carrier, beat, hue, active });
+  useEffect(() => { live.current = { carrier, beat, hue, active }; });
+
+  useEffect(() => {
+    const canvas = cvs.current;
+    if (!canvas) return;
+    const dpr = Math.min(window.devicePixelRatio || 1, 2);
+    let W = 0, H = 0, ctx;
+    function resize() {
+      const r = canvas.getBoundingClientRect();
+      const nW = Math.round(r.width), nH = Math.round(r.height);
+      if (nW === W && nH === H) return;
+      W = nW; H = nH;
+      canvas.width = W * dpr; canvas.height = H * dpr;
+      ctx = canvas.getContext('2d'); ctx.scale(dpr, dpr);
+    }
+    resize();
+    let t = 0, raf;
+    const draw = () => {
+      raf = requestAnimationFrame(draw);
+      resize();
+      const { carrier: c, beat: b, hue: h, active: a } = live.current;
+      t += a ? 0.016 : 0.003;
+      ctx.clearRect(0, 0, W, H);
+
+      // Atmosphere glow
+      const atm = ctx.createRadialGradient(W/2, H/2, 0, W/2, H/2, W * 0.65);
+      atm.addColorStop(0, `hsla(${h},40%,15%,${a ? 0.22 : 0.10})`);
+      atm.addColorStop(1, 'transparent');
+      ctx.fillStyle = atm; ctx.fillRect(0, 0, W, H);
+
+      const Cy = H / 2, AMP = H * 0.30;
+      const speed = b / Math.max(1, c) * 650;
+      const w1 = 0.020 * Math.max(0.5, c / 220);
+      const w2 = w1 * (1 + speed * 0.0014);
+
+      if (!a) {
+        // Ghost — beautiful static snapshot
+        ctx.save();
+        ctx.globalAlpha = 0.20;
+        ctx.strokeStyle = `hsl(${h},50%,65%)`;
+        ctx.lineWidth = 1.2;
+        ctx.beginPath();
+        for (let x = 0; x <= W; x += 2) {
+          const env = 0.5 + 0.5 * Math.cos((x / W) * Math.PI * 2.5);
+          const y = Cy + AMP * env * Math.sin((x / W) * Math.PI * 10 + 0.4);
+          x === 0 ? ctx.moveTo(x, y) : ctx.lineTo(x, y);
+        }
+        ctx.stroke(); ctx.restore();
+        // Centerline
+        ctx.save(); ctx.globalAlpha = 0.06;
+        ctx.strokeStyle = TEXT; ctx.lineWidth = 0.5; ctx.setLineDash([3,9]);
+        ctx.beginPath(); ctx.moveTo(0, Cy); ctx.lineTo(W, Cy); ctx.stroke();
+        ctx.setLineDash([]); ctx.restore();
+        return;
+      }
+
+      // L channel — muted cream
+      ctx.save();
+      ctx.strokeStyle = 'rgba(245,226,214,0.13)'; ctx.lineWidth = 1.0;
+      ctx.beginPath();
+      for (let x = 0; x <= W; x += 2) {
+        const y = Cy + AMP * Math.sin(x * w1 + t * 0.9);
+        x === 0 ? ctx.moveTo(x, y) : ctx.lineTo(x, y);
+      }
+      ctx.stroke(); ctx.restore();
+
+      // R channel — element-colored
+      ctx.save();
+      ctx.strokeStyle = `hsla(${h},55%,68%,0.36)`;
+      ctx.lineWidth = 1.0;
+      ctx.beginPath();
+      for (let x = 0; x <= W; x += 2) {
+        const y = Cy + AMP * Math.sin(x * w2 + t * 1.1);
+        x === 0 ? ctx.moveTo(x, y) : ctx.lineTo(x, y);
+      }
+      ctx.stroke(); ctx.restore();
+
+      // Beat envelope — interference, prominent, glowing
+      ctx.save();
+      ctx.strokeStyle = `hsl(${h},62%,72%)`;
+      ctx.lineWidth = 1.7;
+      ctx.shadowColor = `hsla(${h},60%,68%,0.5)`;
+      ctx.shadowBlur = 8;
+      ctx.beginPath();
+      for (let x = 0; x <= W; x += 2) {
+        const env = 0.5 + 0.5 * Math.cos((x * w2 - x * w1) * 0.5 + t * 0.2);
+        const y = Cy + AMP * env * Math.sin(x * w1 + t * 0.9);
+        x === 0 ? ctx.moveTo(x, y) : ctx.lineTo(x, y);
+      }
+      ctx.stroke(); ctx.restore();
+
+      // L / R labels
+      ctx.save(); ctx.globalAlpha = 0.18;
+      ctx.font = `8px ${MONO}`; ctx.fillStyle = TEXT;
+      ctx.fillText('L', 10, 14); ctx.fillText('R', 10, H - 6);
+      ctx.restore();
+    };
+    raf = requestAnimationFrame(draw);
+    return () => cancelAnimationFrame(raf);
+  }, []);
+
+  return (
+    <canvas ref={cvs}
+      style={{ width:'100%', height:`${height}px`, display:'block' }} />
+  );
+}
+
+// ── TUNING CLUSTER ────────────────────────────────────────────────────────
+// The core new component: label + hero readout + [−] slider [+] in one block.
+// markers = [{ hz, name }] — dots on the track; nearest one gets floating label.
+function TuningCluster({ label, value, onChange, min, max, step, fineStep, hue, markers = [] }) {
+  const [editing, setEditing] = useState(false);
+  const [raw, setRaw] = useState('');
+  const inputRef = useRef(null);
+  const trackRef = useRef(null);
+  const dragging = useRef(false);
+
+  const accent    = `hsl(${hue},55%,68%)`;
+  const accentDim = `hsla(${hue},50%,62%,0.22)`;
+  const pct = Math.max(0, Math.min(1, (value - min) / (max - min)));
+  const nearest = markers.find(m => Math.abs(m.hz - value) <= 2.8) || null;
+
+  const clampSnap = (v) => parseFloat(Math.max(min, Math.min(max, Math.round(v / step) * step)).toFixed(3));
+
+  const setFromX = (clientX) => {
+    const r = trackRef.current?.getBoundingClientRect();
+    if (!r) return;
+    const t = Math.max(0, Math.min(1, (clientX - r.left) / r.width));
+    onChange(clampSnap(min + t * (max - min)));
+  };
+
+  const commit = () => {
+    const n = parseFloat(raw);
+    if (!isNaN(n)) onChange(parseFloat(Math.max(min, Math.min(max, n)).toFixed(3)));
+    setEditing(false);
+  };
+
+  const decDigits = label === 'CARRIER' ? 1 : 2;
+
+  return (
+    <div style={{ padding:'0 28px' }}>
+      {/* Label row + hero readout */}
+      <div style={{ display:'flex', alignItems:'baseline', justifyContent:'space-between', marginBottom:12 }}>
+        <span style={{ fontFamily:MONO, fontSize:8.5, letterSpacing:'0.28em', textTransform:'uppercase', color:SUBTLE }}>
+          {label}
+        </span>
+        {editing ? (
+          <input
+            ref={inputRef}
+            type="number" value={raw}
+            onChange={e => setRaw(e.target.value)}
+            onBlur={commit}
+            onKeyDown={e => { if (e.key==='Enter') commit(); if (e.key==='Escape') setEditing(false); }}
+            style={{
+              fontFamily:MONO, fontSize:40, fontWeight:300, letterSpacing:'-0.02em',
+              color:accent, background:'transparent', border:'none', outline:'none',
+              borderBottom:`1px solid ${accent}`, width:160, textAlign:'right',
+            }}
+          />
+        ) : (
+          <div
+            style={{ display:'flex', alignItems:'baseline', gap:5, cursor:'text' }}
+            onClick={() => {
+              setRaw(value.toFixed(decDigits));
+              setEditing(true);
+              requestAnimationFrame(() => { inputRef.current?.focus(); inputRef.current?.select(); });
+            }}
+            title="tap to type"
+          >
+            <span style={{
+              fontFamily:MONO, fontSize:40, fontWeight:300,
+              letterSpacing:'-0.02em', lineHeight:1,
+              color:accent,
+              textShadow:`0 0 30px hsla(${hue},60%,68%,0.30)`,
+            }}>
+              {value.toFixed(decDigits)}
+            </span>
+            <span style={{ fontFamily:MONO, fontSize:11, color:MUTED, letterSpacing:'0.08em' }}>Hz</span>
+          </div>
+        )}
+      </div>
+
+      {/* Slider + steppers row */}
+      <div style={{ display:'flex', alignItems:'center', gap:10 }}>
+        {/* − stepper */}
+        <button
+          onClick={() => onChange(parseFloat(Math.max(min, value - fineStep).toFixed(3)))}
+          style={{
+            width:36, height:36, borderRadius:18, flexShrink:0,
+            border:`1px solid ${BORDER}`, background:'transparent',
+            color:MUTED, fontFamily:MONO, fontSize:18, fontWeight:300,
+            cursor:'pointer', display:'flex', alignItems:'center', justifyContent:'center', lineHeight:1,
+            transition:'border-color 0.2s, background 0.2s',
+          }}
+          onMouseEnter={e => { e.currentTarget.style.background = accentDim; e.currentTarget.style.borderColor = `hsla(${hue},45%,60%,0.35)`; }}
+          onMouseLeave={e => { e.currentTarget.style.background = 'transparent'; e.currentTarget.style.borderColor = BORDER; }}
+        >−</button>
+
+        {/* Track */}
+        <div
+          ref={trackRef}
+          style={{ flex:1, position:'relative', height:44, cursor:'pointer', display:'flex', alignItems:'center' }}
+          onPointerDown={e => { e.currentTarget.setPointerCapture(e.pointerId); dragging.current = true; setFromX(e.clientX); }}
+          onPointerMove={e => { if (dragging.current) setFromX(e.clientX); }}
+          onPointerUp={() => { dragging.current = false; }}
+        >
+          {/* Base track */}
+          <div style={{ position:'absolute', left:0, right:0, height:1, background:'rgba(255,255,255,0.09)' }} />
+          {/* Filled track */}
+          <div style={{ position:'absolute', left:0, height:1, width:`${pct*100}%`, background:`hsla(${hue},48%,65%,0.50)` }} />
+
+          {/* Marker dots */}
+          {markers.map(m => {
+            const mp = (m.hz - min) / (max - min);
+            if (mp < 0 || mp > 1) return null;
+            const isNear = nearest?.hz === m.hz;
+            return (
+              <div key={m.hz} style={{
+                position:'absolute', left:`${mp*100}%`, top:'50%',
+                transform:'translate(-50%,-50%)',
+                width: isNear ? 5 : 3, height: isNear ? 5 : 3, borderRadius:'50%',
+                background: isNear ? accent : 'rgba(255,255,255,0.22)',
+                boxShadow: isNear ? `0 0 7px 2px hsla(${hue},55%,68%,0.5)` : 'none',
+                transition:'all 0.3s ease',
+                pointerEvents:'none',
+              }}>
+                {/* Floating name — only nearest, no collision possible */}
+                {isNear && (
+                  <div style={{
+                    position:'absolute', bottom:'calc(100% + 8px)',
+                    left:'50%', transform:'translateX(-50%)',
+                    fontFamily:MONO, fontSize:8, letterSpacing:'0.16em',
+                    color:accent, whiteSpace:'nowrap',
+                    animation:'fadeUp 0.22s ease',
+                  }}>{m.name}</div>
+                )}
+              </div>
+            );
+          })}
+
+          {/* Thumb */}
+          <div style={{
+            position:'absolute', left:`${pct*100}%`, top:'50%',
+            transform:'translate(-50%,-50%)',
+            width:20, height:20, borderRadius:10,
+            background:`radial-gradient(circle at 34% 28%, hsl(${hue},72%,86%), hsl(${hue},58%,64%))`,
+            boxShadow:`0 0 16px hsla(${hue},65%,68%,0.60), 0 2px 5px rgba(0,0,0,0.55)`,
+            pointerEvents:'none',
+          }} />
+        </div>
+
+        {/* + stepper */}
+        <button
+          onClick={() => onChange(parseFloat(Math.min(max, value + fineStep).toFixed(3)))}
+          style={{
+            width:36, height:36, borderRadius:18, flexShrink:0,
+            border:`1px solid ${BORDER}`, background:'transparent',
+            color:MUTED, fontFamily:MONO, fontSize:18, fontWeight:300,
+            cursor:'pointer', display:'flex', alignItems:'center', justifyContent:'center', lineHeight:1,
+            transition:'border-color 0.2s, background 0.2s',
+          }}
+          onMouseEnter={e => { e.currentTarget.style.background = accentDim; e.currentTarget.style.borderColor = `hsla(${hue},45%,60%,0.35)`; }}
+          onMouseLeave={e => { e.currentTarget.style.background = 'transparent'; e.currentTarget.style.borderColor = BORDER; }}
+        >+</button>
+      </div>
+    </div>
+  );
+}
+
+// ── MEANING PANEL ─────────────────────────────────────────────────────────
+// Single adaptive line at rest. Synthesizes beat (state) + carrier (sacred).
+// Tap to expand full knowledge with honesty tiers.
+function MeaningPanel({ beat, carrier, showTiers = true }) {
+  const [open, setOpen] = useState(false);
+  const st = getState(beat);
+  const sacred = nearSacred(carrier);
+  const accent = `hsl(${st.hue},52%,68%)`;
+
+  return (
+    <div style={{ margin:'0 28px' }}>
+      <button
+        onClick={() => setOpen(o => !o)}
+        style={{
+          width:'100%', background:'transparent', border:'none',
+          cursor:'pointer', textAlign:'left', padding:'10px 0',
+          display:'flex', alignItems:'center', gap:10,
+        }}
+      >
+        {/* Breathing state dot */}
+        <div style={{
+          width:6, height:6, borderRadius:3, flexShrink:0,
+          background:accent,
+          boxShadow:`0 0 8px 2px hsla(${st.hue},52%,68%,0.55)`,
+          animation:'breathDot 2.8s ease-in-out infinite',
+        }} />
+
+        {/* Summary line — the instrument's voice */}
+        <div style={{ flex:1, display:'flex', alignItems:'center', flexWrap:'wrap', gap:3 }}>
+          <span style={{ fontFamily:SERIF, fontStyle:'italic', fontSize:12.5, color:MUTED, letterSpacing:'0.01em' }}>
+            {st.label.toLowerCase()} · {st.essence}
+          </span>
+          {showTiers && st.tiers.map(t => <HonestyBadge key={t} tier={t} />)}
+          {sacred && (
+            <>
+              <span style={{ fontFamily:MONO, fontSize:9, color:FAINT, margin:'0 1px' }}>·</span>
+              <span style={{ fontFamily:MONO, fontSize:9, letterSpacing:'0.12em', color:SUBTLE }}>{sacred.name}</span>
+              {showTiers && sacred.tiers.map(t => <HonestyBadge key={`c-${t}`} tier={t} />)}
+            </>
+          )}
+        </div>
+
+        <span style={{
+          fontFamily:MONO, fontSize:8, color:FAINT, flexShrink:0,
+          display:'inline-block',
+          transform: open ? 'rotate(180deg)' : 'none',
+          transition:'transform 0.25s ease',
+        }}>▾</span>
+      </button>
+
+      {/* Expanded knowledge panel */}
+      {open && (
+        <div style={{
+          padding:'12px 0 20px 16px',
+          borderLeft:`1px solid hsla(${st.hue},38%,55%,0.20)`,
+          animation:'fadeUp 0.28s cubic-bezier(0.16,1,0.3,1)',
+        }}>
+          {/* Beat / state section */}
+          <div style={{ marginBottom:16 }}>
+            <div style={{ fontFamily:MONO, fontSize:7.5, letterSpacing:'0.24em', color:SUBTLE, marginBottom:7 }}>
+              BEAT · {st.range}
+            </div>
+            <div style={{ fontFamily:SERIF, fontStyle:'italic', fontSize:13.5, color:MUTED, lineHeight:1.68, marginBottom:10 }}>
+              {st.detail}
+            </div>
+            {showTiers && (
+              <div style={{ display:'flex', flexDirection:'column', gap:6 }}>
+                {st.tiers.map(t => (
+                  <div key={t} style={{ display:'flex', alignItems:'flex-start', gap:7 }}>
+                    <HonestyBadge tier={t} full />
+                    <span style={{ fontFamily:SERIF, fontStyle:'italic', fontSize:10.5, color:FAINT, lineHeight:1.5 }}>
+                      {st.tierNotes[t]}
+                    </span>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+
+          {/* Carrier / sacred section */}
+          {sacred && (
+            <div style={{ paddingTop:14, borderTop:`1px solid rgba(255,255,255,0.05)` }}>
+              <div style={{ fontFamily:MONO, fontSize:7.5, letterSpacing:'0.24em', color:SUBTLE, marginBottom:7 }}>
+                CARRIER · {sacred.name} · {sacred.note}
+              </div>
+              <div style={{ fontFamily:SERIF, fontStyle:'italic', fontSize:13.5, color:MUTED, lineHeight:1.68, marginBottom:6 }}>
+                {sacred.essence}
+              </div>
+              {sacred.detail && (
+                <div style={{ fontFamily:SERIF, fontStyle:'italic', fontSize:11.5, color:FAINT, lineHeight:1.60, marginBottom:10 }}>
+                  {sacred.detail}
+                </div>
+              )}
+              {showTiers && (
+                <div style={{ display:'flex', flexDirection:'column', gap:6 }}>
+                  {sacred.tiers.map(t => (
+                    <div key={`sd-${t}`} style={{ display:'flex', alignItems:'flex-start', gap:7 }}>
+                      <HonestyBadge tier={t} full />
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* Tier legend */}
+          {showTiers && (
+            <div style={{ marginTop:14, paddingTop:12, borderTop:`1px solid rgba(255,255,255,0.04)`, display:'flex', flexDirection:'column', gap:5 }}>
+              {Object.entries(TIER_META).map(([k, m]) => (
+                <div key={k} style={{ display:'flex', alignItems:'center', gap:8 }}>
+                  <HonestyBadge tier={k} />
+                  <span style={{ fontFamily:SERIF, fontStyle:'italic', fontSize:10, color:FAINT }}>{m.desc}</span>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ── PRESET ROW ────────────────────────────────────────────────────────────
+// Fix: spacer divs prevent first/last chip from clipping.
+function PresetRow({ carrier, beat, onChange, hue }) {
+  const [userPresets, setUserPresets] = useState(() => {
+    try { return JSON.parse(localStorage.getItem('bindulab_v3') || '[]'); }
+    catch { return []; }
+  });
+  const [saving, setSaving] = useState(false);
+  const [saveName, setSaveName] = useState('');
+  const accent = `hsl(${hue},52%,68%)`;
+
+  const isCurrent = p => Math.abs(p.carrier - carrier) < 0.7 && Math.abs(p.beat - beat) < 0.18;
+
+  const savePreset = () => {
+    if (!saveName.trim()) return;
+    const st = getState(beat);
+    const updated = [{ name:saveName, carrier, beat, tag:`${beat.toFixed(1)} Hz · ${st.label.toLowerCase()}`, user:true }, ...userPresets].slice(0, 6);
+    setUserPresets(updated);
+    localStorage.setItem('bindulab_v3', JSON.stringify(updated));
+    setSaving(false); setSaveName('');
+  };
+
+  const deletePreset = i => {
+    const updated = userPresets.filter((_,idx) => idx !== i);
+    setUserPresets(updated);
+    localStorage.setItem('bindulab_v3', JSON.stringify(updated));
+  };
+
+  const chip = active => ({
+    flexShrink:0, padding:'8px 14px', borderRadius:20, cursor:'pointer', textAlign:'left',
+    background: active ? `hsla(${hue},38%,14%,0.85)` : 'rgba(255,255,255,0.025)',
+    border:`1px solid ${active ? `hsla(${hue},48%,56%,0.42)` : BORDER}`,
+    transition:'background 0.2s, border-color 0.2s',
+  });
+
+  return (
+    <div>
+      <div style={{ padding:'0 28px', marginBottom:10 }}>
+        <span style={{ fontFamily:MONO, fontSize:8.5, letterSpacing:'0.28em', color:SUBTLE }}>PRESETS</span>
+      </div>
+      <div style={{ display:'flex', gap:8, overflowX:'auto', WebkitOverflowScrolling:'touch', scrollbarWidth:'none' }}>
+        {/* Leading spacer — fixes first-chip clipping bug */}
+        <div style={{ width:28, flexShrink:0 }} />
+
+        {SYS_PRESETS.map(p => (
+          <div key={p.name} style={chip(isCurrent(p))} onClick={() => onChange(p.carrier, p.beat)}>
+            <div style={{ fontFamily:SERIF, fontStyle:'italic', fontSize:12.5, color:isCurrent(p) ? TEXT : MUTED, marginBottom:2, whiteSpace:'nowrap' }}>{p.name}</div>
+            <div style={{ fontFamily:MONO, fontSize:8, letterSpacing:'0.14em', color:SUBTLE, whiteSpace:'nowrap' }}>{p.tag}</div>
+          </div>
+        ))}
+
+        {userPresets.map((p, i) => (
+          <div key={`u${i}`} style={chip(isCurrent(p))}>
+            <div style={{ display:'flex', alignItems:'center', gap:7 }}>
+              <span style={{ fontFamily:SERIF, fontStyle:'italic', fontSize:12.5, color:MUTED, whiteSpace:'nowrap', cursor:'pointer' }} onClick={() => onChange(p.carrier, p.beat)}>{p.name}</span>
+              <span style={{ fontFamily:MONO, fontSize:11, color:FAINT, cursor:'pointer', lineHeight:1 }} onClick={() => deletePreset(i)}>×</span>
+            </div>
+            <div style={{ fontFamily:MONO, fontSize:8, letterSpacing:'0.14em', color:SUBTLE, whiteSpace:'nowrap', marginTop:2 }}>{p.tag}</div>
+          </div>
+        ))}
+
+        {saving ? (
+          <div style={{ flexShrink:0, padding:'8px 14px', borderRadius:20, background:'rgba(255,255,255,0.025)', border:`1px solid ${BORDER}`, display:'flex', alignItems:'center', gap:8 }}>
+            <input autoFocus value={saveName} onChange={e => setSaveName(e.target.value)}
+              onKeyDown={e => { if (e.key==='Enter') savePreset(); if (e.key==='Escape') { setSaving(false); setSaveName(''); } }}
+              placeholder="name…"
+              style={{ fontFamily:SERIF, fontStyle:'italic', fontSize:12.5, color:TEXT, background:'none', border:'none', outline:'none', width:85 }} />
+            <button onClick={savePreset} style={{ fontFamily:MONO, fontSize:8, letterSpacing:'0.14em', color:accent, background:'none', border:'none', cursor:'pointer', padding:0 }}>save</button>
+          </div>
+        ) : (
+          <div style={{ ...chip(false), display:'flex', alignItems:'center' }} onClick={() => setSaving(true)}>
+            <span style={{ fontFamily:MONO, fontSize:9, letterSpacing:'0.18em', color:SUBTLE, whiteSpace:'nowrap' }}>+ save</span>
+          </div>
+        )}
+
+        {/* Trailing spacer */}
+        <div style={{ width:28, flexShrink:0 }} />
+      </div>
+    </div>
+  );
+}
+
+// ── MAIN LAB SCREEN ───────────────────────────────────────────────────────
+function LabScreen({ initCarrier = 136.1, initBeat = 7.83, showTiers = true, waveH = 96, startExpanded = false }) {
+  const [carrier, setCarrier] = useState(initCarrier);
+  const [beat,    setBeat]    = useState(initBeat);
+  const [active,  setActive]  = useState(false);
+  const [cycling, setCycling] = useState(false);
+
+  const st      = getState(beat);
+  const accent  = `hsl(${st.hue},55%,68%)`;
+
+  // Beat slider: zone boundary markers
+  const beatMarkers = [
+    { hz:4,  name:'δ/θ' },
+    { hz:8,  name:'θ/α' },
+    { hz:13, name:'α/β' },
+    { hz:30, name:'β/γ' },
+  ];
+
+  // Carrier slider: sacred freq markers — the slider IS the sacred map
+  const carrierMarkers = SACRED
+    .filter(s => s.hz >= 40 && s.hz <= 440)
+    .map(s => ({ hz:s.hz, name:s.name }));
+
+  const randomize = useCallback(() => {
+    if (cycling) return;
+    setCycling(true);
+    const roll = Math.random();
+    const tb = roll < 0.12 ? 0.5  + Math.random() * 3.5 :
+               roll < 0.45 ? 4    + Math.random() * 4   :
+               roll < 0.82 ? 8    + Math.random() * 5   :
+               roll < 0.95 ? 13   + Math.random() * 17  :
+                             30   + Math.random() * 10;
+    const pool = SACRED.filter(s => s.hz >= 40 && s.hz <= 440);
+    const base = pool[Math.floor(Math.random() * pool.length)].hz;
+    const tc = base + (Math.random() - 0.5) * 0.9;
+    let i = 0;
+    const id = setInterval(() => {
+      i++;
+      if (i < 10) {
+        setBeat(parseFloat((0.5 + Math.random() * 39).toFixed(1)));
+        setCarrier(parseFloat((40 + Math.random() * 400).toFixed(1)));
+      } else {
+        clearInterval(id);
+        setBeat(parseFloat(tb.toFixed(1)));
+        setCarrier(parseFloat(tc.toFixed(1)));
+        setCycling(false);
+      }
+    }, 78);
+  }, [cycling]);
+
+  return (
+    <div style={{
+      width:'100%', height:'100%',
+      display:'flex', flexDirection:'column',
+      background:BG, position:'relative', overflow:'hidden',
+    }}>
+      {/* Dynamic state atmosphere */}
+      <div style={{
+        position:'absolute', inset:0, pointerEvents:'none',
+        background:`radial-gradient(ellipse at 50% 28%, hsla(${st.hue},40%,10%,0.20) 0%, transparent 58%)`,
+        transition:'background 1.0s ease',
+      }} />
+
+      {/* Scrollable body */}
+      <div style={{ flex:1, overflowY:'auto', overflowX:'hidden', WebkitOverflowScrolling:'touch', position:'relative' }}>
+
+        {/* ── Header */}
+        <div style={{ padding:'52px 28px 0' }}>
+          <div style={{ display:'flex', alignItems:'center', gap:10, marginBottom:3 }}>
+            <div style={{
+              width:5, height:5, borderRadius:'50%', flexShrink:0,
+              background: active ? accent : SUBTLE,
+              boxShadow: active ? `0 0 9px 2px hsla(${st.hue},55%,68%,0.6)` : 'none',
+              transition:'all 0.5s', animation: active ? 'breathDot 2.5s ease-in-out infinite' : 'none',
+            }} />
+            <span style={{ fontFamily:SERIF, fontStyle:'italic', fontWeight:300, fontSize:18, color:TEXT, letterSpacing:'0.01em' }}>
+              frequency lab
+            </span>
+          </div>
+          <span style={{ fontFamily:MONO, fontSize:9, letterSpacing:'0.18em', color:SUBTLE, paddingLeft:15 }}>
+            craft your own permission slip
+          </span>
+        </div>
+
+        {/* ── Waveform */}
+        <div style={{ margin:'18px 0', borderTop:`1px solid ${BORDER}`, borderBottom:`1px solid ${BORDER}` }}>
+          <WaveformCanvas carrier={carrier} beat={beat} hue={st.hue} active={active} height={waveH} />
+        </div>
+
+        {/* ── Beat cluster */}
+        <div style={{ marginBottom:24 }}>
+          <TuningCluster
+            label="BEAT"
+            value={beat}
+            onChange={v => setBeat(parseFloat(v.toFixed(1)))}
+            min={0.5} max={40} step={0.1} fineStep={0.1}
+            hue={st.hue}
+            markers={beatMarkers}
+          />
+        </div>
+
+        {/* ── Carrier cluster */}
+        <div style={{ marginBottom:22 }}>
+          <TuningCluster
+            label="CARRIER"
+            value={carrier}
+            onChange={v => setCarrier(parseFloat(v.toFixed(1)))}
+            min={40} max={440} step={0.1} fineStep={1}
+            hue={st.hue}
+            markers={carrierMarkers}
+          />
+        </div>
+
+        {/* Separator */}
+        <div style={{ height:1, background:BORDER, margin:'0 28px 20px' }} />
+
+        {/* ── Single meaning line + expand */}
+        <div style={{ marginBottom:24 }}>
+          <MeaningPanel beat={beat} carrier={carrier} showTiers={showTiers} />
+        </div>
+
+        {/* ── Presets */}
+        <div style={{ marginBottom:28 }}>
+          <PresetRow
+            carrier={carrier} beat={beat}
+            onChange={(c,b) => { setCarrier(c); setBeat(b); }}
+            hue={st.hue}
+          />
+        </div>
+
+        {/* ── Actions */}
+        <div style={{ padding:'0 28px', display:'flex', gap:12, marginBottom:32 }}>
+          <button
+            onClick={randomize}
+            disabled={cycling}
+            style={{
+              flex:1, padding:'14px 0', borderRadius:28, cursor: cycling ? 'default' : 'pointer',
+              background:'transparent', border:`1px solid ${BORDER}`,
+              fontFamily:SERIF, fontStyle:'italic', fontSize:13,
+              color: cycling ? FAINT : MUTED,
+              animation: cycling ? 'cycleFlash 0.16s ease-in-out infinite' : 'none',
+              transition:'color 0.3s',
+            }}>
+            {cycling ? 'choosing…' : 'let the field choose'}
+          </button>
+          <button
+            onClick={() => setActive(a => !a)}
+            style={{
+              flex:1.2, padding:'14px 0', borderRadius:28, cursor:'pointer',
+              background: active ? accent : TEXT,
+              border:'none',
+              fontFamily:MONO, fontSize:9.5, letterSpacing:'0.22em',
+              color: BG,
+              boxShadow: active
+                ? `0 0 30px hsla(${st.hue},60%,68%,0.45), 0 0 60px hsla(${st.hue},55%,65%,0.15)`
+                : 'none',
+              transition:'all 0.4s cubic-bezier(0.4,0,0.2,1)',
+              animation: active ? `spinLock 0.3s ease` : 'none',
+            }}>
+            {active ? '◼ ACTIVE' : 'ACTIVATE'}
+          </button>
+        </div>
+
+        {/* Bottom breathing room */}
+        <div style={{ height:16 }} />
+      </div>
+
+      {/* ── Tab bar simulation */}
+      <div style={{
+        height:50, background:'rgba(2,2,8,0.97)',
+        borderTop:`1px solid rgba(255,255,255,0.06)`,
+        display:'flex', alignItems:'center', justifyContent:'space-around',
+        padding:'0 6px', flexShrink:0,
+      }}>
+        {[['MAP','◉',false],['FIELD','⊙',false],['ORACLE','◌',false],['SPACE','◎',false],['LAB','⊡',true]].map(([label,icon,on]) => (
+          <div key={label} style={{ display:'flex', flexDirection:'column', alignItems:'center', gap:3, opacity:on?1:0.32 }}>
+            <span style={{ fontFamily:MONO, fontSize:12, color:on ? TEXT : MUTED, lineHeight:1 }}>{icon}</span>
+            <span style={{ fontFamily:MONO, fontSize:7, letterSpacing:'0.14em', color:on ? 'rgba(245,226,214,0.7)' : SUBTLE }}>{label}</span>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+// ── ROOT — DESIGN CANVAS ──────────────────────────────────────────────────
+const TWEAK_DEFAULTS = /*EDITMODE-BEGIN*/{
+  "showTiers": true,
+  "waveH": 96
+}/*EDITMODE-END*/;
+
+function Root() {
+  const [t, setTweak] = useTweaks(TWEAK_DEFAULTS);
+
+  return (
+    <DesignCanvas title="Bindu Lab v3 — Design Brief 01">
+
+      <DCSection id="v3" title="The Lab — V3" subtitle="Unified clusters · honesty tiers · knowledge on demand">
+
+        <DCArtboard id="default" label="Default · Earth Tone · collapsed" width={393} height={780}>
+          <LabScreen
+            initCarrier={136.1} initBeat={7.83}
+            showTiers={t.showTiers} waveH={t.waveH}
+          />
+        </DCArtboard>
+
+        <DCArtboard id="expanded" label="Meaning expanded · theta detail + OM note" width={393} height={780}>
+          <LabScreen
+            initCarrier={136.1} initBeat={6.0}
+            showTiers={t.showTiers} waveH={t.waveH}
+            startExpanded={true}
+          />
+        </DCArtboard>
+
+        <DCArtboard id="delta" label="Delta state · deep root · warm terracotta" width={393} height={780}>
+          <LabScreen
+            initCarrier={136.1} initBeat={1.5}
+            showTiers={t.showTiers} waveH={t.waveH}
+          />
+        </DCArtboard>
+
+        <DCArtboard id="432" label="432 Hz carrier · alpha · presence" width={393} height={780}>
+          <LabScreen
+            initCarrier={432.0} initBeat={10.0}
+            showTiers={t.showTiers} waveH={t.waveH}
+          />
+        </DCArtboard>
+
+        <DCArtboard id="gamma" label="Gamma · peak · gold" width={393} height={780}>
+          <LabScreen
+            initCarrier={285.0} initBeat={36.0}
+            showTiers={t.showTiers} waveH={t.waveH}
+          />
+        </DCArtboard>
+
+      </DCSection>
+
+      <TweaksPanel>
+        <TweakSection label="Knowledge layer">
+          <TweakToggle label="Show honesty tiers [S][T][C]" id="showTiers" value={t.showTiers} onChange={v => setTweak('showTiers', v)} />
+        </TweakSection>
+        <TweakSection label="Waveform">
+          <TweakSlider label="Height" id="waveH" value={t.waveH} min={60} max={140} step={4} onChange={v => setTweak('waveH', v)} />
+        </TweakSection>
+        <TweakSection label="Notes">
+          <div style={{ fontFamily:'Georgia,serif', fontStyle:'italic', fontSize:11, color:'rgba(41,38,27,0.6)', lineHeight:1.6 }}>
+            Drag sliders, tap −/+ steppers, tap the Hz readout to type directly. Tap the meaning line to expand knowledge. Activate to animate the waveform. Try "let the field choose."
+          </div>
+        </TweakSection>
+      </TweaksPanel>
+
+    </DesignCanvas>
+  );
+}
+
+ReactDOM.createRoot(document.getElementById('root')).render(<Root />);
+</script>
+</body>
+</html>

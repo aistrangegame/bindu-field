@@ -1,0 +1,944 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<title>Bindu Akash — Design Brief 01</title>
+<link href="https://fonts.googleapis.com/css2?family=Lora:ital,wght@0,300;0,400;1,300;1,400&family=DM+Mono:wght@300;400&display=swap" rel="stylesheet">
+<script src="https://unpkg.com/react@18.3.1/umd/react.development.js" integrity="sha384-hD6/rw4ppMLGNu3tX5cjIb+uRZ7UkRJ6BPkLpg4hAu/6onKUg4lLsHAs9EBPT82L" crossorigin="anonymous"></script>
+<script src="https://unpkg.com/react-dom@18.3.1/umd/react-dom.development.js" integrity="sha384-u6aeetuaXnQ38mYT8rp6sbXaQe3NL9t+IBXmnYxwkUI2Hw4bsp2Wvmx4yRQF1uAm" crossorigin="anonymous"></script>
+<script src="https://unpkg.com/@babel/standalone@7.29.0/babel.min.js" integrity="sha384-m08KidiNqLdpJqLq95G/LEi8Qvjl/xUYll3QILypMoQ65QorJ9Lvtp2RXYGBFj1y" crossorigin="anonymous"></script>
+<script type="text/babel" src="design-canvas.jsx"></script>
+<script type="text/babel" src="tweaks-panel.jsx"></script>
+<style>
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{background:#010106;font-family:-apple-system,sans-serif}
+  ::-webkit-scrollbar{display:none}
+  @keyframes fadeUp{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:translateY(0)}}
+  @keyframes breathScale{0%,100%{transform:scale(0.94)}50%{transform:scale(1.0)}}
+  @keyframes breathDot{0%,100%{opacity:.6}50%{opacity:1}}
+  @keyframes fadeIn{from{opacity:0}to{opacity:1}}
+  @keyframes slideIn{from{opacity:0;transform:translateX(22px)}to{opacity:1;transform:translateX(0)}}
+</style>
+<template id="__bundler_thumbnail" data-bg-color="#020208">
+  <svg viewBox="0 0 393 720" xmlns="http://www.w3.org/2000/svg">
+    <rect width="393" height="720" fill="#020208"/>
+    <text x="196" y="70" text-anchor="middle" font-family="Georgia,serif" font-style="italic" font-size="22" fill="rgba(245,226,214,0.85)">Akash</text>
+    <text x="196" y="92" text-anchor="middle" font-family="monospace" font-size="8" letter-spacing="3" fill="rgba(245,226,214,0.3)">BREATHE WITH THE FIELD</text>
+    <rect x="20" y="120" width="165" height="88" rx="8" fill="rgba(255,130,60,0.06)" stroke="rgba(255,130,60,0.2)" stroke-width=".8"/>
+    <circle cx="36" cy="138" r="3" fill="hsl(15,60%,55%)"/>
+    <text x="56" y="142" font-family="Georgia,serif" font-style="italic" font-size="16" fill="rgba(245,226,214,0.85)">ground</text>
+    <text x="36" y="195" font-family="monospace" font-size="7" letter-spacing="1.5" fill="rgba(245,226,214,0.3)">COME HOME TO THE BODY</text>
+    <rect x="207" y="120" width="165" height="88" rx="8" fill="rgba(50,130,200,0.06)" stroke="rgba(50,130,200,0.2)" stroke-width=".8"/>
+    <circle cx="223" cy="138" r="3" fill="hsl(210,55%,60%)"/>
+    <text x="243" y="142" font-family="Georgia,serif" font-style="italic" font-size="16" fill="rgba(245,226,214,0.85)">clarify</text>
+    <circle cx="196" cy="450" r="80" fill="none" stroke="rgba(50,130,200,0.25)" stroke-width="1"/>
+    <circle cx="196" cy="450" r="55" fill="none" stroke="rgba(50,130,200,0.5)" stroke-width="1.2"/>
+    <circle cx="196" cy="450" r="6" fill="hsl(210,55%,65%)"/>
+    <text x="196" y="480" text-anchor="middle" font-family="Georgia,serif" font-style="italic" font-size="14" fill="rgba(245,226,214,0.6)">inhale</text>
+  </svg>
+</template>
+</head>
+<body>
+<div id="root"></div>
+<script type="text/babel">
+const { useState, useEffect, useRef, useCallback } = React;
+
+// ── TOKENS ────────────────────────────────────────────────────────────────
+const BG      = '#020208';
+const TEXT    = '#F5E2D6';
+const MUTED   = 'rgba(245,226,214,0.55)';
+const SUBTLE  = 'rgba(245,226,214,0.28)';
+const FAINT   = 'rgba(245,226,214,0.12)';
+const BORDER  = 'rgba(255,255,255,0.07)';
+const SERIF   = "'Lora', Georgia, serif";
+const MONO    = "'DM Mono', 'SF Mono', ui-monospace, monospace";
+
+const TIER_META = {
+  S:{ label:'SCIENCE',   bg:'rgba(72,190,170,0.10)', bd:'rgba(72,190,170,0.32)', tx:'rgba(72,190,170,0.88)' },
+  T:{ label:'TRADITION', bg:'rgba(208,162,62,0.10)',  bd:'rgba(208,162,62,0.32)',  tx:'rgba(208,162,62,0.88)' },
+  C:{ label:'CLAIM',     bg:'rgba(195,82,68,0.10)',   bd:'rgba(195,82,68,0.30)',   tx:'rgba(195,82,68,0.82)'  },
+};
+function HonestyBadge({ tier, full=false }) {
+  const m = TIER_META[tier]; if (!m) return null;
+  return (
+    <span style={{
+      display:'inline-flex', alignItems:'center',
+      padding: full ? '2px 7px' : '2px 5px', borderRadius:4,
+      background:m.bg, border:`0.5px solid ${m.bd}`,
+      fontFamily:MONO, fontSize:7, letterSpacing:'0.16em', color:m.tx,
+      marginLeft:4, verticalAlign:'middle', whiteSpace:'nowrap',
+    }}>{full ? m.label : tier}</span>
+  );
+}
+
+// ── INTENTION DATA ────────────────────────────────────────────────────────
+const INTENTIONS = [
+  { id:'ground',   word:'ground',   hue:15,  phrase:'come home to the body',          sessions:[101] },
+  { id:'activate', word:'activate', hue:35,  phrase:'move and clear the field',        sessions:[105] },
+  { id:'open',     word:'open',     hue:195, phrase:'receive what is already here',    sessions:[103,110] },
+  { id:'clarify',  word:'clarify',  hue:210, phrase:'see without the filter',          sessions:[104] },
+  { id:'dissolve', word:'dissolve', hue:260, phrase:'let what is held release',        sessions:[107] },
+  { id:'expand',   word:'expand',   hue:50,  phrase:'breathe past the edge of known',  sessions:[108] },
+  { id:'rest',     word:'rest',     hue:15,  phrase:'give the system a long exhale',   sessions:[106,111] },
+  { id:'balance',  word:'balance',  hue:140, phrase:'the even breath · the still point', sessions:[102] },
+];
+
+// ── SESSION DATA (Airtable IDs 101–111) ───────────────────────────────────
+const SESSIONS = {
+  101:{ id:101, name:'Come Home',          intention:'ground',   hue:15,  carrier:80,     beat:2.5,  state:'delta',       safety:'open',    inhale:4, hold:4, exhale:8,  seed:'you have always been here',         recognition:'The body is not where you go. It is what you are.', one_line:'The most basic return. Breath to ground, ground to body, body to the field.', special:null,          carrier_tiers:['T'], beat_tiers:['S'] },
+  102:{ id:102, name:'The Even Breath',    intention:'balance',  hue:140, carrier:136.1,  beat:10,   state:'alpha',       safety:'open',    inhale:5, hold:0, exhale:5,  seed:'you are already balanced',          recognition:'Balance is not something you achieve. It is what you are when you stop fighting.', one_line:'Equal inhale, equal exhale. The breath as a demonstration of center.', special:null, carrier_tiers:['T'], beat_tiers:['S'] },
+  103:{ id:103, name:'The Hum',            intention:'open',     hue:195, carrier:136.1,  beat:6.5,  state:'theta',       safety:'open',    inhale:4, hold:2, exhale:6,  seed:'the sound is already in you',       recognition:'You don\'t make the hum. You let it through.', one_line:'Inhale through the nose. On the exhale, a quiet hum — lips closed, throat open, sound continuous.', special:'hum',         carrier_tiers:['T'], beat_tiers:['S'] },
+  104:{ id:104, name:'The Counted Exhale', intention:'clarify',  hue:210, carrier:256,    beat:10.5, state:'alpha',       safety:'open',    inhale:4, hold:0, exhale:8,  seed:'exhale until you hear it',          recognition:'Clarity doesn\'t arrive. The noise leaves.', one_line:'Extended exhale activates the parasympathetic. The counting is the anchor.', special:null,          carrier_tiers:['T'], beat_tiers:['S'] },
+  105:{ id:105, name:'The Stoke',          intention:'activate', hue:35,  carrier:194.18, beat:18,   state:'beta',        safety:'screened',inhale:6, hold:0, exhale:2,  seed:'let it move',                       recognition:'The body knows how to wake. You are giving it permission.', one_line:'Fast inhale, brief exhale. Builds charge — physical and energetic. A screened practice.', special:'active_phase', carrier_tiers:['T'], beat_tiers:['S'] },
+  106:{ id:106, name:'The Long Release',   intention:'rest',     hue:15,  carrier:60,     beat:1.5,  state:'delta',       safety:'open',    inhale:4, hold:2, exhale:12, seed:'there is nowhere to go',            recognition:'The exhale is the permission.', one_line:'A very long exhale trains the nervous system toward rest. Nothing to do.', special:null,             carrier_tiers:['T'], beat_tiers:['S'] },
+  107:{ id:107, name:'The Empty Pause',    intention:'dissolve', hue:260, carrier:136.1,  beat:5.5,  state:'theta',       safety:'open',    inhale:4, hold:6, exhale:8,  seed:'the gap between breaths is the door', recognition:'Between the exhale and the next inhale — that gap is what you are.', one_line:'The pause after exhale is the dissolution point. Rest in the empty between.', special:null, carrier_tiers:['T'], beat_tiers:['S','T'] },
+  108:{ id:108, name:'The Thinning Breath',intention:'expand',   hue:50,  carrier:221.23, beat:7.5,  state:'theta-alpha', safety:'open',    inhale:5, hold:5, exhale:5,  seed:'breathe past the edge',             recognition:'The body knows how to expand. You are showing it you are willing.', one_line:'A slow, deliberate breath that softens the boundary between self and field.', special:null, carrier_tiers:['T','C'], beat_tiers:['S'] },
+  110:{ id:110, name:'The Ocean Breath',   intention:'open',     hue:195, carrier:194.18, beat:8.5,  state:'alpha',       safety:'open',    inhale:4, hold:0, exhale:6,  seed:'the sound is the opening',          recognition:'The ocean breath is the throat knowing itself.', one_line:'Ujjayi — constrict the back of the throat on the exhale. The sound is the practice.', special:'ocean',       carrier_tiers:['T'], beat_tiers:['S'] },
+  111:{ id:111, name:'The Night Protocol', intention:'rest',     hue:260, carrier:60,     beat:1.5,  state:'delta',       safety:'open',    inhale:4, hold:0, exhale:8,  seed:'let the body go',                   recognition:'You are not going to sleep. Sleep is coming for you.', one_line:'Designed for the threshold between waking and sleep. Do not resist the dissolve.', special:'double_pulse', carrier_tiers:['T'], beat_tiers:['S'] },
+};
+
+// ── READING CONTENT (101 fully written; others are quality-benchmarked stubs) ──
+const READINGS = {
+  101: {
+    words:`The first breath feels like arriving.
+
+Not arrival the way you arrive somewhere new — arrival the way you arrive somewhere you have always been and only now are willing to feel. The body has been here. The ground has been here. You have been in your head.
+
+With the first full exhale, something drops. A tension you didn't know you were holding. The second exhale, another layer. By the third cycle you are no longer thinking about breathing — the breath is breathing you.
+
+Around the fourth or fifth minute, the affirmations stop being words and start being weather — something in the atmosphere. This is the threshold. The recognition that the ground you came looking for was the body you arrived in.
+
+The carrier at 80 Hz sits low, in the chest rather than the head. It is not heard — it is felt as a hand placed on the sternum. The delta beat brings the brain's left-right conversation to the pace of deep rest while the body stays awake.
+
+You don't need to do anything with that. You just need to keep breathing.`,
+    frequency:`80 Hz sits in the low treble — above bass, below voice. At this register, tones settle in the sternum and chest rather than the head. Nothing sharp here. The sound is soft, dense, low.
+
+2.5 Hz is deep delta — the brainwave band of slow-wave sleep and cellular restoration. Delta is not a state you enter by trying. It arrives when trying stops. The question is whether you allow it while awake.
+
+[SCIENCE] Delta waves (0.5–4 Hz) in slow-wave sleep are among the most replicated findings in EEG research. Binaural beat entrainment in the delta range has shown preliminary support in some studies, with significant individual variation.
+
+[TRADITION] 80 Hz is used in some Nada Brahma practices as a grounding carrier, associated with the register of the Earth's acoustic presence. The 80 Hz assignment specifically is a contemporary interpretation of this principle.
+
+This pairing — low carrier, deep delta beat — is the frequency equivalent of a weighted blanket.`,
+    lalita:`What this session IS: a reorientation from the mental to the physical. Not a technique for achieving a state — a permission to inhabit the one that has always been present.
+
+The pattern it works with: the mind's habit of living above the neck. The nervous system's learned preference for vigilance. The body's ongoing arrival that the mind keeps missing.
+
+The play: 2.5 Hz is slow enough that entrainment, if it happens, is geological rather than immediate. The breath does not rush this. The extended exhale activates the parasympathetic by lengthening vagal tone. You are not relaxing. You are remembering.
+
+The blessing it leaves: a relationship with the ground that does not require a session to access. The body remembers the memory of settling. It will return there more easily next time.`,
+    phases:[
+      { name:'Arriving', time:'0–3 min', desc:'The nervous system negotiates arrival. Thoughts continue. The breath begins to slow them without argument.' },
+      { name:'Settling', time:'3–7 min', desc:'The mind releases its grip. The body\'s weight becomes perceptible. Something drops that you did not know you were holding.' },
+      { name:'Receiving', time:'7–12 min', desc:'The field reorganizes. The carrier\'s vibration is felt rather than heard. This is the ground — not arrived at, recognized.' },
+      { name:'Returning', time:'12–15 min', desc:'The return is not a loss. What was found does not leave when the session ends. It only quiets, waiting to be returned to.' },
+    ],
+  },
+  102: {
+    words:`Five seconds in. Five seconds out. An equal breath.
+
+It sounds simple enough to seem like it isn't doing anything. That is the point. The equal breath does not try to fix or improve or deepen. It demonstrates. It says: this is the center. It has been here the whole time.
+
+With the first few cycles, the mind is restless — it wants an edge to work against, an effort to prove its presence. The equal breath offers none. This is its particular discipline. There is no technique to perfect here. There is only the rhythm, and your willingness to stay with it.
+
+By the fourth or fifth minute, something synchronizes. Not a feeling of having achieved balance — a recognition that balance was already the underlying condition. The breath is not creating this. It is revealing it.`,
+    frequency:`136.1 Hz is the frequency calculated by Hans Cousto from the Earth's orbital period around the Sun — one revolution per year, shifted up through octaves until it reaches the audible range. This is the OM frequency in this system.
+
+10 Hz is mid-alpha — the brainwave band most associated with relaxed, present wakefulness. The eyes-closed alpha peak is one of the most consistent and replicated findings in EEG research.
+
+[SCIENCE] 10 Hz binaural beats and alpha entrainment have shown some support in research contexts, particularly for states of relaxed alertness. Results are individual.
+
+[TRADITION] The 136.1 Hz carrier comes from Cousto's planetary tone calculations (Das Kosmische Oktave, 1984). The Earth-year tone as carrier is a contemplative application of that calculation.
+
+The pairing serves the equal breath well: a carrier associated with ground and center, a beat in the frequency of present, open awareness.`,
+    lalita:`What this session IS: a demonstration of center. The equal breath does not create balance — it reveals that balance was the substrate all along.
+
+The pattern it works with: the mind's preference for imbalance, for problems to solve, for edges to work against. The equal breath offers no edge. This is its teaching.
+
+The play: 5-5 with no hold means the breath is continuous — no pause at the top, no rest at the bottom. A circle rather than a wave. The Lemniscate. The infinity sign as breath.
+
+The blessing it leaves: the recognition that homeostasis is the default. You are not trying to achieve balance. You are returning to what balance actually is: the breath, moving, equal, continuous.`,
+    phases:[
+      { name:'The Restlessness', time:'0–3 min', desc:'The mind looks for the technique. There isn\'t one. This is the beginning of the practice.' },
+      { name:'Settling Into Even', time:'3–6 min', desc:'The rhythm begins to carry itself. The equal breath stops requiring attention and begins to provide it.' },
+      { name:'Coherence', time:'6–12 min', desc:'Heart rate variability aligns with the breath rate. This is physiological coherence — the body in conversation with itself.' },
+      { name:'The Still Point', time:'12–15 min', desc:'Not a peak. An arrival at what was always present. Balance recognized, not achieved.' },
+    ],
+  },
+};
+function getReading(id) { return READINGS[id] || { words:'This session\'s words reading is still being written.', frequency:'The frequency reading for this session is still forming.', lalita:'Lalita\'s perspective for this session has not yet arrived.', phases:[] }; }
+
+// ── VIEW: INTENTION GRID (the new front door) ─────────────────────────────
+function IntentionGrid({ onSelect }) {
+  return (
+    <div style={{ width:'100%', height:'100%', background:BG, display:'flex', flexDirection:'column', overflow:'hidden' }}>
+      {/* Header */}
+      <div style={{ padding:'52px 24px 0' }}>
+        <div style={{ display:'flex', alignItems:'center', gap:9, marginBottom:3 }}>
+          <div style={{ width:5, height:5, borderRadius:'50%', background:'rgba(245,226,214,0.4)', animation:'breathDot 3s ease-in-out infinite' }} />
+          <span style={{ fontFamily:SERIF, fontStyle:'italic', fontWeight:300, fontSize:18, color:TEXT, letterSpacing:'0.01em' }}>Akash</span>
+        </div>
+        <span style={{ fontFamily:MONO, fontSize:8.5, letterSpacing:'0.22em', color:SUBTLE, paddingLeft:14 }}>breathe with the field</span>
+      </div>
+
+      {/* Intention grid */}
+      <div style={{ flex:1, padding:'24px 20px 20px', overflow:'auto' }}>
+        <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:10 }}>
+          {INTENTIONS.map(intent => {
+            const hue = intent.hue;
+            const multi = intent.sessions.length > 1;
+            return (
+              <div
+                key={intent.id}
+                onClick={() => onSelect(intent)}
+                style={{
+                  padding:'18px 16px 16px',
+                  background:`hsla(${hue},32%,7%,0.75)`,
+                  border:`1px solid hsla(${hue},30%,24%,0.45)`,
+                  borderRadius:12, cursor:'pointer',
+                  transition:'background 0.25s, border-color 0.25s',
+                  position:'relative',
+                  minHeight:96,
+                  display:'flex', flexDirection:'column', justifyContent:'space-between',
+                }}
+                onMouseEnter={e => { e.currentTarget.style.background = `hsla(${hue},35%,10%,0.90)`; e.currentTarget.style.borderColor = `hsla(${hue},40%,35%,0.65)`; }}
+                onMouseLeave={e => { e.currentTarget.style.background = `hsla(${hue},32%,7%,0.75)`; e.currentTarget.style.borderColor = `hsla(${hue},30%,24%,0.45)`; }}
+              >
+                <div>
+                  <div style={{ display:'flex', alignItems:'center', gap:8, marginBottom:8 }}>
+                    <div style={{
+                      width:6, height:6, borderRadius:'50%',
+                      background:`hsl(${hue},58%,60%)`,
+                      boxShadow:`0 0 6px 2px hsla(${hue},55%,55%,0.40)`,
+                    }} />
+                    {multi && (
+                      <span style={{ fontFamily:MONO, fontSize:6.5, letterSpacing:'0.18em', color:`hsla(${hue},45%,60%,0.65)`, textTransform:'uppercase' }}>
+                        {intent.sessions.length} sessions
+                      </span>
+                    )}
+                  </div>
+                  <div style={{ fontFamily:SERIF, fontStyle:'italic', fontWeight:300, fontSize:19, color:TEXT, lineHeight:1.1, marginBottom:8 }}>
+                    {intent.word}
+                  </div>
+                </div>
+                <div style={{ fontFamily:MONO, fontSize:7.5, letterSpacing:'0.14em', color:`hsla(${hue},35%,62%,0.65)`, textTransform:'uppercase', lineHeight:1.4 }}>
+                  {intent.phrase}
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      </div>
+
+      <TabBar active="SPACE" />
+    </div>
+  );
+}
+
+// ── VIEW: SUB-SELECTION (for multi-session intentions) ────────────────────
+function SubSelection({ intent, onSelect, onBack }) {
+  const hue = intent.hue;
+  const sessions = intent.sessions.map(id => SESSIONS[id]).filter(Boolean);
+  return (
+    <div style={{ width:'100%', height:'100%', background:BG, display:'flex', flexDirection:'column', animation:'slideIn 0.28s ease' }}>
+      <div style={{ padding:'52px 24px 0' }}>
+        <button onClick={onBack} style={{ background:'none', border:'none', cursor:'pointer', display:'flex', alignItems:'center', gap:8, marginBottom:20, padding:0 }}>
+          <span style={{ fontFamily:MONO, fontSize:9, color:SUBTLE, letterSpacing:'0.18em' }}>← {intent.word.toUpperCase()}</span>
+        </button>
+        <div style={{ fontFamily:SERIF, fontStyle:'italic', fontSize:22, color:TEXT, marginBottom:6 }}>choose your session</div>
+        <div style={{ fontFamily:MONO, fontSize:8.5, letterSpacing:'0.18em', color:SUBTLE }}>two paths into the same opening</div>
+      </div>
+      <div style={{ flex:1, padding:'28px 24px', display:'flex', flexDirection:'column', gap:12 }}>
+        {sessions.map(s => (
+          <div key={s.id} onClick={() => onSelect(s)} style={{
+            padding:'20px 20px 18px',
+            background:`hsla(${hue},32%,7%,0.75)`,
+            border:`1px solid hsla(${hue},30%,24%,0.45)`,
+            borderRadius:12, cursor:'pointer',
+            transition:'border-color 0.2s',
+          }}
+            onMouseEnter={e => { e.currentTarget.style.borderColor = `hsla(${hue},40%,38%,0.65)`; }}
+            onMouseLeave={e => { e.currentTarget.style.borderColor = `hsla(${hue},30%,24%,0.45)`; }}
+          >
+            <div style={{ fontFamily:SERIF, fontStyle:'italic', fontSize:20, color:TEXT, marginBottom:6 }}>{s.name}</div>
+            <div style={{ fontFamily:SERIF, fontStyle:'italic', fontSize:13, color:MUTED, lineHeight:1.55, marginBottom:12 }}>{s.one_line}</div>
+            <div style={{ display:'flex', gap:8, alignItems:'center' }}>
+              <span style={{ fontFamily:MONO, fontSize:8, letterSpacing:'0.16em', color:`hsl(${hue},45%,62%)`, textTransform:'uppercase' }}>{s.state}</span>
+              <span style={{ fontFamily:MONO, fontSize:8, color:FAINT }}>·</span>
+              <span style={{ fontFamily:MONO, fontSize:8, letterSpacing:'0.12em', color:SUBTLE }}>{s.carrier} Hz carrier</span>
+              {s.safety === 'screened' && (
+                <span style={{ fontFamily:MONO, fontSize:7, letterSpacing:'0.16em', padding:'2px 7px', borderRadius:4, background:'rgba(210,130,50,0.12)', border:'0.5px solid rgba(210,130,50,0.35)', color:'rgba(210,130,50,0.85)', marginLeft:2 }}>SCREENED</span>
+              )}
+            </div>
+          </div>
+        ))}
+      </div>
+      <TabBar active="SPACE" />
+    </div>
+  );
+}
+
+// ── VIEW: SESSION DETAIL ──────────────────────────────────────────────────
+function SessionDetail({ session, onBegin, onBack, onReadMore, showTiers }) {
+  const [duration, setDuration] = useState(10);
+  const s = session;
+  const hue = s.hue;
+  const accent = `hsl(${hue},55%,65%)`;
+  const phases = [
+    { label:'inhale', sec:s.inhale, show: s.inhale > 0 },
+    { label:'hold',   sec:s.hold,   show: s.hold > 0 },
+    { label:'exhale', sec:s.exhale, show: s.exhale > 0 },
+  ].filter(p => p.show);
+
+  return (
+    <div style={{ width:'100%', height:'100%', background:BG, display:'flex', flexDirection:'column', overflow:'hidden', animation:'slideIn 0.28s ease' }}>
+      {/* Subtle hue atmosphere */}
+      <div style={{ position:'absolute', inset:0, pointerEvents:'none', background:`radial-gradient(ellipse at 50% 25%, hsla(${hue},38%,10%,0.18) 0%, transparent 55%)` }} />
+
+      <div style={{ flex:1, overflowY:'auto', position:'relative' }}>
+        {/* Back + safety badge */}
+        <div style={{ padding:'52px 24px 0', display:'flex', alignItems:'center', justifyContent:'space-between' }}>
+          <button onClick={onBack} style={{ background:'none', border:'none', cursor:'pointer', padding:0 }}>
+            <span style={{ fontFamily:MONO, fontSize:9, color:SUBTLE, letterSpacing:'0.18em' }}>←</span>
+          </button>
+          {s.safety === 'screened' && (
+            <span style={{ fontFamily:MONO, fontSize:7.5, letterSpacing:'0.16em', padding:'3px 9px', borderRadius:4, background:'rgba(210,130,50,0.12)', border:'0.5px solid rgba(210,130,50,0.35)', color:'rgba(210,130,50,0.85)' }}>SCREENED PRACTICE</span>
+          )}
+        </div>
+
+        {/* Name + description */}
+        <div style={{ padding:'20px 24px 0' }}>
+          <div style={{ fontFamily:SERIF, fontStyle:'italic', fontWeight:300, fontSize:28, color:TEXT, lineHeight:1.1, marginBottom:10 }}>{s.name}</div>
+          <div style={{ fontFamily:SERIF, fontStyle:'italic', fontSize:14.5, color:MUTED, lineHeight:1.65, marginBottom:20 }}>{s.one_line}</div>
+
+          {/* Recognition statement — the opening knowledge whisper */}
+          <div style={{ padding:'12px 16px', borderLeft:`1px solid hsla(${hue},40%,40%,0.3)`, marginBottom:24 }}>
+            <div style={{ fontFamily:SERIF, fontStyle:'italic', fontSize:13, color:`hsla(${hue},45%,72%,0.75)`, lineHeight:1.6 }}>
+              "{s.recognition}"
+            </div>
+          </div>
+        </div>
+
+        {/* Breath cycle blocks */}
+        <div style={{ padding:'0 24px', marginBottom:22 }}>
+          <div style={{ fontFamily:MONO, fontSize:8, letterSpacing:'0.22em', color:SUBTLE, marginBottom:12, textTransform:'uppercase' }}>Breath Cycle</div>
+          <div style={{ display:'flex', gap:8 }}>
+            {phases.map(p => (
+              <div key={p.label} style={{
+                flex:1, padding:'14px 10px',
+                background:`hsla(${hue},28%,8%,0.7)`,
+                border:`1px solid hsla(${hue},28%,22%,0.4)`,
+                borderRadius:10, textAlign:'center',
+              }}>
+                <div style={{ fontFamily:MONO, fontSize:24, fontWeight:300, color:accent, marginBottom:4, letterSpacing:'-0.02em' }}>{p.sec}</div>
+                <div style={{ fontFamily:MONO, fontSize:8, letterSpacing:'0.18em', color:SUBTLE, textTransform:'uppercase' }}>{p.label}</div>
+              </div>
+            ))}
+          </div>
+          {s.special === 'hum' && (
+            <div style={{ marginTop:10, fontFamily:SERIF, fontStyle:'italic', fontSize:11.5, color:`hsla(${hue},40%,65%,0.65)` }}>
+              on the exhale — a quiet hum, lips closed, continuous
+            </div>
+          )}
+          {s.special === 'ocean' && (
+            <div style={{ marginTop:10, fontFamily:SERIF, fontStyle:'italic', fontSize:11.5, color:`hsla(${hue},40%,65%,0.65)` }}>
+              on the exhale — constrict the back of the throat gently
+            </div>
+          )}
+          {s.special === 'double_pulse' && (
+            <div style={{ marginTop:10, fontFamily:SERIF, fontStyle:'italic', fontSize:11.5, color:`hsla(${hue},40%,65%,0.65)` }}>
+              inhale · brief pause · inhale again — a double-pulse
+            </div>
+          )}
+        </div>
+
+        {/* Frequency line with honesty tiers */}
+        <div style={{ padding:'0 24px', marginBottom:24 }}>
+          <div style={{ fontFamily:MONO, fontSize:8, letterSpacing:'0.22em', color:SUBTLE, marginBottom:10, textTransform:'uppercase' }}>Frequency</div>
+          <div style={{ display:'flex', flexDirection:'column', gap:6 }}>
+            <div style={{ display:'flex', alignItems:'center', gap:6 }}>
+              <span style={{ fontFamily:MONO, fontSize:9, letterSpacing:'0.12em', color:MUTED }}>carrier</span>
+              <span style={{ fontFamily:MONO, fontSize:9, color:TEXT }}>{s.carrier} Hz</span>
+              {showTiers && s.carrier_tiers.map(t => <HonestyBadge key={t} tier={t} />)}
+            </div>
+            <div style={{ display:'flex', alignItems:'center', gap:6 }}>
+              <span style={{ fontFamily:MONO, fontSize:9, letterSpacing:'0.12em', color:MUTED }}>beat</span>
+              <span style={{ fontFamily:MONO, fontSize:9, color:TEXT }}>{s.beat} Hz</span>
+              <span style={{ fontFamily:MONO, fontSize:9, color:SUBTLE }}>· {s.state}</span>
+              {showTiers && s.beat_tiers.map(t => <HonestyBadge key={`b${t}`} tier={t} />)}
+            </div>
+          </div>
+        </div>
+
+        {/* Duration */}
+        <div style={{ padding:'0 24px', marginBottom:28 }}>
+          <div style={{ fontFamily:MONO, fontSize:8, letterSpacing:'0.22em', color:SUBTLE, marginBottom:10, textTransform:'uppercase' }}>Duration</div>
+          <div style={{ display:'flex', gap:8 }}>
+            {[3,5,10,15].map(m => (
+              <button key={m} onClick={() => setDuration(m)} style={{
+                flex:1, padding:'9px 0', borderRadius:22, cursor:'pointer',
+                background: duration===m ? `hsla(${hue},38%,14%,0.85)` : 'rgba(255,255,255,0.025)',
+                border:`1px solid ${duration===m ? `hsla(${hue},48%,42%,0.50)` : BORDER}`,
+                fontFamily:MONO, fontSize:10, letterSpacing:'0.12em',
+                color: duration===m ? accent : MUTED,
+                transition:'all 0.2s',
+              }}>{m} min</button>
+            ))}
+          </div>
+        </div>
+
+        {/* Seed phrase */}
+        <div style={{ padding:'0 24px', marginBottom:28 }}>
+          <div style={{ fontFamily:SERIF, fontStyle:'italic', fontSize:13, color:FAINT, textAlign:'center', lineHeight:1.5 }}>
+            "{s.seed}"
+          </div>
+        </div>
+      </div>
+
+      {/* Action area */}
+      <div style={{ padding:'12px 24px 20px', borderTop:`1px solid ${BORDER}`, flexShrink:0, background:'rgba(2,2,8,0.96)' }}>
+        <button onClick={() => onBegin(s, duration)} style={{
+          width:'100%', padding:'15px 0', borderRadius:28, cursor:'pointer',
+          background: TEXT, border:'none',
+          fontFamily:SERIF, fontStyle:'italic', fontSize:16, fontWeight:300,
+          color: BG,
+          boxShadow:`0 0 28px hsla(${hue},50%,65%,0.18)`,
+          marginBottom:10,
+        }}>Begin</button>
+        <button onClick={onReadMore} style={{
+          width:'100%', padding:'9px 0', background:'transparent', border:'none',
+          cursor:'pointer',
+          fontFamily:SERIF, fontStyle:'italic', fontSize:12,
+          color: FAINT,
+          letterSpacing:'0.02em',
+        }}>read this session ↓</button>
+      </div>
+    </div>
+  );
+}
+
+// ── VIEW: SCREENED GATE (The Stoke — warm, non-clinical) ─────────────────
+function ScreenedGate({ session, onProceed, onChooseOther }) {
+  const [acknowledged, setAcknowledged] = useState([]);
+  const hue = session.hue;
+  const conditions = [
+    'Heart condition or irregular heartbeat',
+    'Currently pregnant',
+    'History of epilepsy or seizure',
+    'High blood pressure (unmanaged)',
+  ];
+  const toggle = (i) => setAcknowledged(a => a.includes(i) ? a.filter(x => x!==i) : [...a, i]);
+  const anySelected = acknowledged.length > 0;
+  const accent = `hsl(${hue},55%,65%)`;
+
+  return (
+    <div style={{ width:'100%', height:'100%', background:BG, display:'flex', flexDirection:'column', animation:'fadeIn 0.4s ease' }}>
+      {/* Warm atmosphere */}
+      <div style={{ position:'absolute', inset:0, pointerEvents:'none', background:`radial-gradient(ellipse at 50% 30%, hsla(${hue},40%,12%,0.35) 0%, transparent 55%)` }} />
+
+      <div style={{ flex:1, display:'flex', flexDirection:'column', justifyContent:'center', padding:'52px 28px 24px', position:'relative' }}>
+        {/* Name */}
+        <div style={{ marginBottom:8 }}>
+          <div style={{ fontFamily:MONO, fontSize:8.5, letterSpacing:'0.22em', color:`hsla(${hue},45%,60%,0.65)`, textTransform:'uppercase', marginBottom:12 }}>The Stoke · Activation</div>
+          <div style={{ fontFamily:SERIF, fontStyle:'italic', fontWeight:300, fontSize:24, color:TEXT, lineHeight:1.2, marginBottom:12 }}>
+            A strong practice.
+          </div>
+          <div style={{ fontFamily:SERIF, fontStyle:'italic', fontSize:14, color:MUTED, lineHeight:1.65, marginBottom:28 }}>
+            Before you begin, a moment. This session moves energy rapidly — it asks something of the body. Do any of these speak to where you are today?
+          </div>
+        </div>
+
+        {/* Conditions — phrased as a knowing question, not a form */}
+        <div style={{ display:'flex', flexDirection:'column', gap:10, marginBottom:28 }}>
+          {conditions.map((c, i) => (
+            <div
+              key={i}
+              onClick={() => toggle(i)}
+              style={{
+                display:'flex', alignItems:'center', gap:14,
+                padding:'13px 16px', borderRadius:10, cursor:'pointer',
+                background: acknowledged.includes(i) ? `hsla(${hue},30%,12%,0.7)` : 'rgba(255,255,255,0.025)',
+                border:`1px solid ${acknowledged.includes(i) ? `hsla(${hue},35%,32%,0.55)` : BORDER}`,
+                transition:'all 0.2s',
+              }}
+            >
+              <div style={{
+                width:18, height:18, borderRadius:9, flexShrink:0,
+                border:`1px solid ${acknowledged.includes(i) ? accent : 'rgba(255,255,255,0.2)'}`,
+                background: acknowledged.includes(i) ? `hsla(${hue},38%,18%,0.8)` : 'transparent',
+                display:'flex', alignItems:'center', justifyContent:'center',
+              }}>
+                {acknowledged.includes(i) && (
+                  <div style={{ width:8, height:8, borderRadius:4, background:accent }} />
+                )}
+              </div>
+              <span style={{ fontFamily:SERIF, fontStyle:'italic', fontSize:13, color: acknowledged.includes(i) ? MUTED : SUBTLE, lineHeight:1.4 }}>{c}</span>
+            </div>
+          ))}
+        </div>
+
+        {/* Guidance if conditions selected */}
+        {anySelected && (
+          <div style={{ padding:'14px 16px', borderRadius:10, background:`hsla(${hue},22%,8%,0.6)`, border:`1px solid hsla(${hue},28%,22%,0.4)`, marginBottom:20, animation:'fadeUp 0.25s ease' }}>
+            <div style={{ fontFamily:SERIF, fontStyle:'italic', fontSize:13, color:MUTED, lineHeight:1.6 }}>
+              You can still enter — with awareness. If you'd prefer a gentler practice, <span style={{ color:accent }}>The Long Release</span> holds similar opening at a much softer pace.
+            </div>
+          </div>
+        )}
+      </div>
+
+      {/* CTAs */}
+      <div style={{ padding:'0 28px 28px', display:'flex', flexDirection:'column', gap:10, flexShrink:0 }}>
+        <button onClick={onProceed} style={{
+          width:'100%', padding:'14px', borderRadius:28, cursor:'pointer',
+          background: TEXT, border:'none',
+          fontFamily:SERIF, fontStyle:'italic', fontSize:15, fontWeight:300, color:BG,
+        }}>{anySelected ? 'proceed with awareness' : 'Begin'}</button>
+        <button onClick={onChooseOther} style={{
+          width:'100%', padding:'11px', borderRadius:28, cursor:'pointer',
+          background:'transparent', border:`1px solid ${BORDER}`,
+          fontFamily:SERIF, fontStyle:'italic', fontSize:13, color:MUTED,
+        }}>choose another session</button>
+      </div>
+    </div>
+  );
+}
+
+// ── VIEW: IMMERSED (the breathing circle) ─────────────────────────────────
+function ImmersedScreen({ session, duration, onEnd, onOpenReading }) {
+  const s = session;
+  const hue = s.hue;
+  const cvs = useRef(null);
+  const [elapsed, setElapsed] = useState(0);
+  const [phase, setPhase] = useState('inhale');
+  const [phaseCount, setPhaseCount] = useState(0);
+  const [showRecognition, setShowRecognition] = useState(false);
+  const totalSec = duration * 60;
+  const cycleSec = s.inhale + s.hold + s.exhale;
+
+  useEffect(() => {
+    const id = setInterval(() => {
+      setElapsed(e => {
+        const next = e + 1;
+        if (next >= totalSec) { clearInterval(id); onEnd(true); }
+        // Show recognition mid-session once
+        if (next === Math.floor(totalSec * 0.45)) setShowRecognition(true);
+        // Phase tracking
+        const pos = next % cycleSec;
+        if (pos < s.inhale) { setPhase('inhale'); setPhaseCount(s.inhale - pos); }
+        else if (pos < s.inhale + s.hold) { setPhase('hold'); setPhaseCount(s.inhale + s.hold - pos); }
+        else { setPhase('exhale'); setPhaseCount(cycleSec - pos); }
+        return next;
+      });
+    }, 1000);
+    return () => clearInterval(id);
+  }, []);
+
+  // Hide recognition after 4s
+  useEffect(() => {
+    if (!showRecognition) return;
+    const t = setTimeout(() => setShowRecognition(false), 4000);
+    return () => clearTimeout(t);
+  }, [showRecognition]);
+
+  // Canvas breathing circle
+  useEffect(() => {
+    const el = cvs.current; if (!el) return;
+    const dpr = Math.min(window.devicePixelRatio||1, 2);
+    let W = 0, H = 0, ctx, raf;
+    function resize() {
+      const r = el.getBoundingClientRect();
+      const nW = Math.round(r.width), nH = Math.round(r.height);
+      if (nW===W && nH===H) return;
+      W=nW; H=nH;
+      el.width = W*dpr; el.height = H*dpr;
+      ctx = el.getContext('2d'); ctx.scale(dpr, dpr);
+    }
+    resize();
+    let t = 0;
+    function render() {
+      raf = requestAnimationFrame(render);
+      resize();
+      t += 0.016;
+      ctx.clearRect(0, 0, W, H);
+      const Cx = W/2, Cy = H/2;
+      const breathCycle = cycleSec;
+      const breathPos = (t % breathCycle) / breathCycle;
+      let scale;
+      const inhF = s.inhale/breathCycle, holdF = s.hold/breathCycle, exhF = s.exhale/breathCycle;
+      if (breathPos < inhF) { scale = 0.70 + (breathPos/inhF) * 0.50; }
+      else if (breathPos < inhF+holdF) { scale = 1.20; }
+      else { scale = 1.20 - ((breathPos-inhF-holdF)/exhF) * 0.50; }
+
+      // Ambient glow
+      const g = ctx.createRadialGradient(Cx, Cy, 0, Cx, Cy, Math.min(W,H)*0.55);
+      g.addColorStop(0, `hsla(${hue},55%,45%,${0.06+scale*0.04})`);
+      g.addColorStop(1, 'transparent');
+      ctx.fillStyle = g; ctx.fillRect(0, 0, W, H);
+
+      // Outer reference ring
+      const refR = Math.min(W,H)*0.36;
+      ctx.beginPath(); ctx.arc(Cx, Cy, refR, 0, Math.PI*2);
+      ctx.strokeStyle = `hsla(${hue},45%,55%,0.12)`; ctx.lineWidth = 1; ctx.stroke();
+
+      // Beat rings
+      const beatInterval = 1/Math.max(0.5, s.beat*0.5);
+      if (Math.floor(t/beatInterval) > Math.floor((t-0.016)/beatInterval)) {
+        // ring would spawn here in full implementation
+      }
+
+      // Breathing circle
+      const R = refR * scale;
+      const grad = ctx.createRadialGradient(Cx, Cy, 0, Cx, Cy, R);
+      grad.addColorStop(0, `hsla(${hue},60%,55%,${0.35+scale*0.10})`);
+      grad.addColorStop(0.6, `hsla(${hue},55%,45%,${0.12+scale*0.05})`);
+      grad.addColorStop(1, 'transparent');
+      ctx.beginPath(); ctx.arc(Cx, Cy, R, 0, Math.PI*2);
+      ctx.fillStyle = grad; ctx.fill();
+      ctx.beginPath(); ctx.arc(Cx, Cy, R, 0, Math.PI*2);
+      ctx.strokeStyle = `hsla(${hue},65%,60%,${0.65+scale*0.2})`; ctx.lineWidth = 1.4; ctx.stroke();
+
+      // Center dot
+      ctx.beginPath(); ctx.arc(Cx, Cy, 5, 0, Math.PI*2);
+      ctx.fillStyle = `hsl(${hue},70%,68%)`; ctx.shadowColor = `hsl(${hue},65%,60%)`; ctx.shadowBlur = 18; ctx.fill();
+      ctx.shadowBlur = 0;
+    }
+    raf = requestAnimationFrame(render);
+    return () => cancelAnimationFrame(raf);
+  }, []);
+
+  const remaining = totalSec - elapsed;
+  const fmt = s => `${String(Math.floor(s/60)).padStart(2,'0')}:${String(s%60).padStart(2,'0')}`;
+  const phaseColor = phase==='inhale' ? `hsl(${hue},58%,65%)` : phase==='hold' ? `hsl(${(hue+35)%360},52%,62%)` : 'rgba(200,218,230,0.5)';
+  const specialLabel = s.special==='hum' && phase==='exhale' ? 'mmm' : s.special==='ocean' && phase==='exhale' ? 'haaa' : null;
+
+  return (
+    <div style={{ width:'100%', height:'100%', background:BG, position:'relative', overflow:'hidden' }}>
+      <canvas ref={cvs} style={{ position:'absolute', inset:0, width:'100%', height:'100%' }} />
+
+      {/* Timer top-right */}
+      <div style={{ position:'absolute', top:52, right:22 }}>
+        <span style={{ fontFamily:MONO, fontSize:13, color:MUTED, letterSpacing:'0.06em' }}>{fmt(remaining)}</span>
+      </div>
+
+      {/* Close top-left */}
+      <button onClick={() => onEnd(false)} style={{ position:'absolute', top:52, left:22, background:'none', border:'none', cursor:'pointer', padding:4 }}>
+        <span style={{ fontFamily:MONO, fontSize:12, color:SUBTLE }}>×</span>
+      </button>
+
+      {/* Center content */}
+      <div style={{ position:'absolute', inset:0, display:'flex', flexDirection:'column', alignItems:'center', justifyContent:'center', pointerEvents:'none' }}>
+        <div style={{ fontFamily:SERIF, fontStyle:'italic', fontSize:22, color:phaseColor, letterSpacing:'0.02em', marginBottom:6, transition:'color 1.5s ease' }}>
+          {specialLabel || phase}
+        </div>
+        <div style={{ fontFamily:MONO, fontSize:14, color:MUTED, letterSpacing:'0.06em' }}>{phaseCount}</div>
+      </div>
+
+      {/* Recognition mid-session — surfaces once, low opacity */}
+      {showRecognition && (
+        <div style={{ position:'absolute', bottom:'30%', left:0, right:0, padding:'0 44px', textAlign:'center', animation:'fadeIn 1.5s ease', pointerEvents:'none' }}>
+          <div style={{ fontFamily:SERIF, fontStyle:'italic', fontSize:14, color:`rgba(245,226,214,0.28)`, lineHeight:1.65 }}>
+            {s.recognition}
+          </div>
+        </div>
+      )}
+
+      {/* Session name + seed phrase bottom */}
+      <div style={{ position:'absolute', bottom:40, left:0, right:0, textAlign:'center', pointerEvents:'none' }}>
+        <div style={{ fontFamily:SERIF, fontStyle:'italic', fontSize:13, color:`hsl(${hue},40%,58%)`, marginBottom:4, opacity:0.7 }}>{s.name}</div>
+        <div style={{ fontFamily:SERIF, fontStyle:'italic', fontSize:11, color:FAINT }}>{s.seed}</div>
+      </div>
+
+      {/* Reading access — bottom right */}
+      <button onClick={onOpenReading} style={{ position:'absolute', bottom:38, right:20, background:'none', border:'none', cursor:'pointer', pointerEvents:'all' }}>
+        <span style={{ fontFamily:MONO, fontSize:8, letterSpacing:'0.18em', color:FAINT, textTransform:'uppercase' }}>read</span>
+      </button>
+    </div>
+  );
+}
+
+// ── VIEW: READING SPACE (4-tab — mirrors Player's reading room) ───────────
+function ReadingSpace({ session, onBack, showTiers }) {
+  const [tab, setTab] = useState('WORDS');
+  const s = session;
+  const hue = s.hue;
+  const accent = `hsl(${hue},52%,68%)`;
+  const reading = getReading(s.id);
+  const TABS = ['WORDS','FREQUENCY','LALITA','PHASES'];
+
+  return (
+    <div style={{ width:'100%', height:'100%', background:BG, display:'flex', flexDirection:'column', animation:'slideIn 0.28s ease' }}>
+      {/* Atmosphere */}
+      <div style={{ position:'absolute', inset:0, pointerEvents:'none', background:`radial-gradient(ellipse at 50% 20%, hsla(${hue},32%,8%,0.18) 0%, transparent 50%)` }} />
+
+      {/* Header */}
+      <div style={{ padding:'52px 24px 0', position:'relative' }}>
+        <button onClick={onBack} style={{ background:'none', border:'none', cursor:'pointer', marginBottom:14, padding:0 }}>
+          <span style={{ fontFamily:MONO, fontSize:9, color:SUBTLE, letterSpacing:'0.18em' }}>← {s.name.toUpperCase()}</span>
+        </button>
+        {s.recognition && (
+          <div style={{ fontFamily:SERIF, fontStyle:'italic', fontSize:14, color:`hsla(${hue},45%,72%,0.8)`, lineHeight:1.6, marginBottom:18 }}>
+            "{s.recognition}"
+          </div>
+        )}
+      </div>
+
+      {/* Tab bar */}
+      <div style={{ display:'flex', padding:'0 24px', borderBottom:`1px solid ${BORDER}`, flexShrink:0, position:'relative' }}>
+        {TABS.map(t => (
+          <button key={t} onClick={() => setTab(t)} style={{
+            flex:1, padding:'12px 0', background:'transparent', border:'none', cursor:'pointer',
+            fontFamily:MONO, fontSize:9, letterSpacing:'0.18em', textTransform:'uppercase',
+            color: tab===t ? TEXT : SUBTLE,
+            position:'relative',
+          }}>
+            {t}
+            {tab===t && (
+              <div style={{ position:'absolute', bottom:0, left:'50%', transform:'translateX(-50%)', width:'60%', height:1, background:accent }} />
+            )}
+          </button>
+        ))}
+      </div>
+
+      {/* Tab content */}
+      <div style={{ flex:1, overflowY:'auto', padding:'24px 24px 32px' }}>
+        {tab === 'WORDS' && (
+          <div style={{ animation:'fadeUp 0.3s ease' }}>
+            {reading.words.split('\n\n').map((para, i) => (
+              <p key={i} style={{
+                fontFamily:SERIF, fontStyle:'italic', fontSize:14.5,
+                color: i===reading.words.split('\n\n').length-1 ? `hsla(${hue},40%,72%,0.85)` : MUTED,
+                lineHeight:1.75, marginBottom:18,
+              }}>{para}</p>
+            ))}
+          </div>
+        )}
+        {tab === 'FREQUENCY' && (
+          <div style={{ animation:'fadeUp 0.3s ease' }}>
+            {reading.frequency.split('\n\n').map((para, i) => {
+              const isTier = para.startsWith('[SCIENCE]') || para.startsWith('[TRADITION]') || para.startsWith('[CLAIM]');
+              return (
+                <div key={i} style={{ marginBottom:18 }}>
+                  {isTier ? (
+                    <div style={{ padding:'10px 14px', borderLeft:`1px solid ${BORDER}`, background:'rgba(255,255,255,0.02)', borderRadius:'0 6px 6px 0' }}>
+                      {showTiers && <span style={{ fontFamily:MONO, fontSize:7.5, letterSpacing:'0.18em', color:SUBTLE, display:'block', marginBottom:5 }}>{para.split(']')[0].slice(1)}</span>}
+                      <p style={{ fontFamily:SERIF, fontStyle:'italic', fontSize:13, color:FAINT, lineHeight:1.65 }}>{para.split('] ')[1]}</p>
+                    </div>
+                  ) : (
+                    <p style={{ fontFamily:SERIF, fontStyle:'italic', fontSize:14.5, color:MUTED, lineHeight:1.75 }}>{para}</p>
+                  )}
+                </div>
+              );
+            })}
+            {showTiers && (
+              <div style={{ marginTop:20, paddingTop:16, borderTop:`1px solid ${BORDER}`, display:'flex', flexDirection:'column', gap:8 }}>
+                {Object.entries(TIER_META).map(([k,m]) => (
+                  <div key={k} style={{ display:'flex', alignItems:'center', gap:8 }}>
+                    <HonestyBadge tier={k} />
+                    <span style={{ fontFamily:SERIF, fontStyle:'italic', fontSize:10, color:FAINT }}>{m.label.toLowerCase()} — {k==='S'?'documented physiology':k==='T'?'contemplative tradition':'modern, unverified claim'}</span>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        )}
+        {tab === 'LALITA' && (
+          <div style={{ animation:'fadeUp 0.3s ease' }}>
+            {reading.lalita.split('\n\n').map((para, i) => (
+              <p key={i} style={{
+                fontFamily:SERIF, fontStyle:'italic', fontSize:14.5,
+                color: i===reading.lalita.split('\n\n').length-1 ? `hsla(${hue},40%,72%,0.85)` : MUTED,
+                lineHeight:1.75, marginBottom:18,
+              }}>{para}</p>
+            ))}
+          </div>
+        )}
+        {tab === 'PHASES' && (
+          <div style={{ animation:'fadeUp 0.3s ease' }}>
+            {reading.phases.length === 0 ? (
+              <p style={{ fontFamily:SERIF, fontStyle:'italic', fontSize:14, color:FAINT, lineHeight:1.7 }}>The phase map for this session is still being written.</p>
+            ) : reading.phases.map((ph, i) => (
+              <div key={i} style={{ marginBottom:22, paddingLeft:16, borderLeft:`1px solid hsla(${hue},35%,35%,0.25)` }}>
+                <div style={{ fontFamily:MONO, fontSize:8, letterSpacing:'0.22em', color:`hsla(${hue},42%,60%,0.75)`, textTransform:'uppercase', marginBottom:5 }}>
+                  {ph.name} · {ph.time}
+                </div>
+                <p style={{ fontFamily:SERIF, fontStyle:'italic', fontSize:14, color:MUTED, lineHeight:1.7 }}>{ph.desc}</p>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
+// ── TAB BAR ───────────────────────────────────────────────────────────────
+function TabBar({ active='SPACE' }) {
+  return (
+    <div style={{ height:50, background:'rgba(2,2,8,0.97)', borderTop:`1px solid rgba(255,255,255,0.06)`, display:'flex', alignItems:'center', justifyContent:'space-around', padding:'0 6px', flexShrink:0 }}>
+      {[['MAP','◉'],['FIELD','⊙'],['ORACLE','◌'],['SPACE','◎'],['LAB','⊡']].map(([label,icon]) => (
+        <div key={label} style={{ display:'flex', flexDirection:'column', alignItems:'center', gap:3, opacity:label===active?1:0.30 }}>
+          <span style={{ fontFamily:MONO, fontSize:12, color: label===active?TEXT:MUTED, lineHeight:1 }}>{icon}</span>
+          <span style={{ fontFamily:MONO, fontSize:7, letterSpacing:'0.14em', color:label===active?'rgba(245,226,214,0.7)':SUBTLE }}>{label}</span>
+        </div>
+      ))}
+    </div>
+  );
+}
+
+// ── AKASH APP ORCHESTRATOR ────────────────────────────────────────────────
+function AkashApp({ initView='selection', initSession=null, initIntent=null, showTiers=true }) {
+  const [view,    setView]    = useState(initView);
+  const [intent,  setIntent]  = useState(initIntent);
+  const [session, setSession] = useState(initSession ? SESSIONS[initSession] : null);
+  const [duration,setDuration]= useState(10);
+
+  const selectIntent = (int) => {
+    setIntent(int);
+    if (int.sessions.length === 1) {
+      setSession(SESSIONS[int.sessions[0]]);
+      setView('detail');
+    } else {
+      setView('sub_select');
+    }
+  };
+
+  const selectSession = (s) => { setSession(s); setView('detail'); };
+
+  const beginSession = (s, dur) => {
+    setSession(s); setDuration(dur);
+    if (s.safety === 'screened') { setView('gate'); }
+    else { setView('immersed'); }
+  };
+
+  const endSession = (completed) => {
+    setView(completed ? 'reading' : 'selection');
+  };
+
+  return (
+    <div style={{ width:'100%', height:'100%', position:'relative', overflow:'hidden', background:BG }}>
+      {view === 'selection'  && <IntentionGrid onSelect={selectIntent} />}
+      {view === 'sub_select' && <SubSelection intent={intent} onSelect={selectSession} onBack={() => setView('selection')} />}
+      {view === 'detail'     && <SessionDetail session={session} onBegin={beginSession} onBack={() => setView(intent?.sessions?.length>1?'sub_select':'selection')} onReadMore={() => setView('reading')} showTiers={showTiers} />}
+      {view === 'gate'       && <ScreenedGate session={session} onProceed={() => setView('immersed')} onChooseOther={() => setView('selection')} />}
+      {view === 'immersed'   && <ImmersedScreen session={session} duration={duration} onEnd={endSession} onOpenReading={() => setView('reading')} />}
+      {view === 'reading'    && <ReadingSpace session={session} onBack={() => setView('detail')} showTiers={showTiers} />}
+    </div>
+  );
+}
+
+// ── ROOT ──────────────────────────────────────────────────────────────────
+const TWEAK_DEFAULTS = /*EDITMODE-BEGIN*/{ "showTiers": true }/*EDITMODE-END*/;
+
+function Root() {
+  const [t, setTweak] = useTweaks(TWEAK_DEFAULTS);
+
+  return (
+    <DesignCanvas title="Bindu Akash — Design Brief 01">
+
+      <DCSection id="akash" title="Akash — The Breath Space" subtitle="Intention front door · Session detail · Reading Space">
+
+        <DCArtboard id="selection" label="Front door — intention grid" width={393} height={780}>
+          <AkashApp initView="selection" showTiers={t.showTiers} />
+        </DCArtboard>
+
+        <DCArtboard id="detail-ground" label="Session detail — Come Home (Grounding)" width={393} height={780}>
+          <AkashApp initView="detail" initSession={101} showTiers={t.showTiers} />
+        </DCArtboard>
+
+        <DCArtboard id="gate-stoke" label="Screened gate — The Stoke (Activation)" width={393} height={780}>
+          <AkashApp initView="gate" initSession={105} showTiers={t.showTiers} />
+        </DCArtboard>
+
+        <DCArtboard id="immersed-hum" label="Immersed — The Hum (Opening · humming cue)" width={393} height={780}>
+          <AkashApp initView="immersed" initSession={103} showTiers={t.showTiers} />
+        </DCArtboard>
+
+        <DCArtboard id="reading-come-home" label="Reading Space — Come Home · WORDS tab" width={393} height={780}>
+          <AkashApp initView="reading" initSession={101} showTiers={t.showTiers} />
+        </DCArtboard>
+
+        <DCArtboard id="reading-frequency" label="Reading Space — Come Home · FREQUENCY tab (honesty tiers)" width={393} height={780}>
+          <ReadingSpaceStandalone session={SESSIONS[101]} tab="FREQUENCY" showTiers={t.showTiers} />
+        </DCArtboard>
+
+        <DCArtboard id="sub-select" label="Sub-selection — Opening (2 sessions)" width={393} height={780}>
+          <AkashApp initView="sub_select" initIntent={INTENTIONS.find(i => i.id === 'open')} showTiers={t.showTiers} />
+        </DCArtboard>
+
+      </DCSection>
+
+      <TweaksPanel>
+        <TweakSection label="Knowledge layer">
+          <TweakToggle label="Show honesty tiers [S][T][C]" id="showTiers" value={t.showTiers} onChange={v => setTweak('showTiers', v)} />
+        </TweakSection>
+        <TweakSection label="Notes">
+          <div style={{ fontFamily:'Georgia,serif', fontStyle:'italic', fontSize:11, color:'rgba(41,38,27,0.6)', lineHeight:1.6 }}>
+            Five screens: intention grid, session detail, screened gate (The Stoke), immersed breath circle, and the Reading Space. The Reading Space (FREQUENCY tab) shows the full honesty tier system in context.
+          </div>
+        </TweakSection>
+      </TweaksPanel>
+
+    </DesignCanvas>
+  );
+}
+
+// Standalone wrapper for ReadingSpace at a specific tab (for artboard preview)
+function ReadingSpaceStandalone({ session, tab: initTab, showTiers }) {
+  const [tab, setTab] = React.useState(initTab);
+  const s = session;
+  const hue = s.hue;
+  const accent = `hsl(${hue},52%,68%)`;
+  const reading = getReading(s.id);
+  const TABS = ['WORDS','FREQUENCY','LALITA','PHASES'];
+  return (
+    <div style={{ width:'100%', height:'100%', background:BG, display:'flex', flexDirection:'column' }}>
+      <div style={{ position:'absolute', inset:0, pointerEvents:'none', background:`radial-gradient(ellipse at 50% 20%, hsla(${hue},32%,8%,0.18) 0%, transparent 50%)` }} />
+      <div style={{ padding:'52px 24px 0', position:'relative' }}>
+        <span style={{ fontFamily:MONO, fontSize:9, color:SUBTLE, letterSpacing:'0.18em' }}>← {s.name.toUpperCase()}</span>
+        <div style={{ fontFamily:SERIF, fontStyle:'italic', fontSize:14, color:`hsla(${hue},45%,72%,0.8)`, lineHeight:1.6, marginTop:14, marginBottom:18 }}>"{s.recognition}"</div>
+      </div>
+      <div style={{ display:'flex', padding:'0 24px', borderBottom:`1px solid ${BORDER}`, flexShrink:0, position:'relative' }}>
+        {TABS.map(t => (
+          <button key={t} onClick={() => setTab(t)} style={{ flex:1, padding:'12px 0', background:'transparent', border:'none', cursor:'pointer', fontFamily:MONO, fontSize:9, letterSpacing:'0.18em', textTransform:'uppercase', color:tab===t?TEXT:SUBTLE, position:'relative' }}>
+            {t}{tab===t && <div style={{ position:'absolute', bottom:0, left:'50%', transform:'translateX(-50%)', width:'60%', height:1, background:accent }} />}
+          </button>
+        ))}
+      </div>
+      <div style={{ flex:1, overflowY:'auto', padding:'24px 24px 32px' }}>
+        {tab === 'FREQUENCY' && reading.frequency.split('\n\n').map((para, i) => {
+          const isTier = para.startsWith('[SCIENCE]') || para.startsWith('[TRADITION]');
+          return (
+            <div key={i} style={{ marginBottom:18 }}>
+              {isTier ? (
+                <div style={{ padding:'10px 14px', borderLeft:`1px solid ${BORDER}`, background:'rgba(255,255,255,0.02)', borderRadius:'0 6px 6px 0' }}>
+                  {showTiers && <span style={{ fontFamily:MONO, fontSize:7.5, letterSpacing:'0.18em', color:SUBTLE, display:'block', marginBottom:5 }}>{para.split(']')[0].slice(1)}</span>}
+                  <p style={{ fontFamily:SERIF, fontStyle:'italic', fontSize:13, color:FAINT, lineHeight:1.65 }}>{para.split('] ')[1]}</p>
+                </div>
+              ) : (
+                <p style={{ fontFamily:SERIF, fontStyle:'italic', fontSize:14.5, color:MUTED, lineHeight:1.75 }}>{para}</p>
+              )}
+            </div>
+          );
+        })}
+        {tab !== 'FREQUENCY' && <p style={{ fontFamily:SERIF, fontStyle:'italic', fontSize:14, color:MUTED, lineHeight:1.75 }}>Switch to FREQUENCY tab to see the honesty tier system in context.</p>}
+        {showTiers && tab==='FREQUENCY' && (
+          <div style={{ marginTop:20, paddingTop:16, borderTop:`1px solid ${BORDER}`, display:'flex', flexDirection:'column', gap:8 }}>
+            {Object.entries(TIER_META).map(([k,m]) => (
+              <div key={k} style={{ display:'flex', alignItems:'center', gap:8 }}>
+                <HonestyBadge tier={k} />
+                <span style={{ fontFamily:SERIF, fontStyle:'italic', fontSize:10, color:FAINT }}>{m.label.toLowerCase()} — {k==='S'?'documented physiology':k==='T'?'contemplative tradition':'modern, unverified'}</span>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
+ReactDOM.createRoot(document.getElementById('root')).render(<Root />);
+</script>
+</body>
+</html>
