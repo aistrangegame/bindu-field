@@ -93,6 +93,19 @@ The `Bindu Field/` source directory is auto-included as a `PBXFileSystemSynchron
 | App Sandbox + Hardened Runtime | Enabled |
 | Test target | `Bindu Field Tests` — scaffold only, no real tests |
 
+### Xcode Cloud / CI
+
+`Secrets.swift` (the Airtable PAT) is **gitignored**, so a clean CI checkout
+can't compile `AirtableService` — the token is missing (`Cannot find 'Secrets'
+in scope`). It's regenerated at build time by **`ci_scripts/ci_post_clone.sh`**
+(Xcode Cloud auto-runs it after clone), which writes `Bindu Field/Secrets.swift`
+from the **`AIRTABLE_PAT`** environment variable. That variable must be set as a
+**Secret** in the Xcode Cloud workflow (Workflow → Environment → Environment
+Variables); without it the script fails fast with a clear message. The
+`PBXFileSystemSynchronizedRootGroup` auto-includes the generated file in the
+target. The Claude API key is **not** a build-time secret — the user enters it
+at runtime into the Keychain.
+
 ---
 
 ## Tabs
