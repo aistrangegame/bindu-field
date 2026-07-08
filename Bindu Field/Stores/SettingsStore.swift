@@ -9,6 +9,7 @@ final class SettingsStore {
     private let gainKey = "binduSettings.gain"
     private let durationKey = "binduSettings.defaultDuration"
     private let vizModeKey = "binduSettings.vizMode"
+    private let themeModeKey = "binduSettings.themeMode"
 
     var gain: Float {
         didSet {
@@ -41,6 +42,37 @@ final class SettingsStore {
         }
     }
 
+    /// App appearance. `"system"` (default) follows the device, `"light"`
+    /// forces the warm-paper light theme, `"dark"` forces the void theme.
+    /// Consumed by `RootView` to inject `\.binduTheme` + set
+    /// `.preferredColorScheme`. The immersive Canvas scenes pin `void`
+    /// regardless — see `Theme.swift`.
+    var themeMode: String {
+        didSet {
+            UserDefaults.standard.set(themeMode, forKey: themeModeKey)
+        }
+    }
+
+    /// The palette to inject app-wide for a given system color scheme.
+    /// `"system"` resolves against the device's current scheme.
+    func activeTheme(for systemScheme: ColorScheme) -> Theme {
+        switch themeMode {
+        case "light": return ThemeData.light
+        case "dark":  return ThemeData.void
+        default:      return systemScheme == .light ? ThemeData.light : ThemeData.void
+        }
+    }
+
+    /// The `.preferredColorScheme` to apply — `nil` for `"system"` so the OS
+    /// decides (and status-bar / system chrome follow along).
+    var preferredColorScheme: ColorScheme? {
+        switch themeMode {
+        case "light": return .light
+        case "dark":  return .dark
+        default:      return nil
+        }
+    }
+
     private init() {
         let storedGain = UserDefaults.standard.object(forKey: gainKey) as? Float
         self.gain = storedGain ?? 0.04
@@ -50,5 +82,8 @@ final class SettingsStore {
 
         let storedVizMode = UserDefaults.standard.string(forKey: vizModeKey)
         self.vizMode = storedVizMode ?? "ensemble"
+
+        let storedThemeMode = UserDefaults.standard.string(forKey: themeModeKey)
+        self.themeMode = storedThemeMode ?? "system"
     }
 }

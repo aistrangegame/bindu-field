@@ -182,7 +182,9 @@ struct PlayerView: View {
             presentIntegration()
         }
         .fullScreenCover(isPresented: $showingLoop) {
+            // The Loop ceremony is glow-on-void — keep it dark in Light mode.
             LoopHostView()
+                .environment(\.binduTheme, ThemeData.void)
         }
     }
 
@@ -274,9 +276,9 @@ struct PlayerView: View {
 
                 if let rs = track.recognitionStatement, !rs.isEmpty {
                     Text("\u{201C}\(rs)\u{201D}")
-                        .font(.system(size: 13, design: .serif))
+                        .font(.system(size: 14, design: .serif))
                         .italic()
-                        .foregroundColor(theme.text.opacity(0.32))
+                        .foregroundColor(theme.text.opacity(0.52))
                         .multilineTextAlignment(.center)
                         .lineSpacing(4)
                         .padding(.horizontal, 38)
@@ -397,17 +399,27 @@ struct PlayerView: View {
     private func modeTapZone(in geo: GeometryProxy) -> some View {
         switch mode {
         case .field:
-            Color.clear
-                .contentShape(Rectangle())
-                .onTapGesture { enterControl() }
-                .gesture(
-                    DragGesture(minimumDistance: 40)
-                        .onEnded { value in
-                            if value.translation.height > 60 && mode == .field {
-                                store.closePlayer()
+            // Top-region-only tap zone (the visualizer area). The FIELD
+            // content — verb / recognition / BEGIN THE LOOP / scrubber —
+            // begins at 0.59 * height (see `fieldContent`), so constraining
+            // this zone to the upper ~56% leaves that content tappable.
+            // Previously this was full-screen and swallowed the BEGIN THE
+            // LOOP button, making the Consciousness Loop unreachable.
+            VStack(spacing: 0) {
+                Color.clear
+                    .frame(height: geo.size.height * 0.56)
+                    .contentShape(Rectangle())
+                    .onTapGesture { enterControl() }
+                    .gesture(
+                        DragGesture(minimumDistance: 40)
+                            .onEnded { value in
+                                if value.translation.height > 60 && mode == .field {
+                                    store.closePlayer()
+                                }
                             }
-                        }
-                )
+                    )
+                Spacer(minLength: 0)
+            }
         case .control:
             VStack(spacing: 0) {
                 Color.clear

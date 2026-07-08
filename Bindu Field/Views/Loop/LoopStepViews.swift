@@ -119,8 +119,8 @@ struct PreRollStepView: View {
                     .padding(.bottom, 60)
 
                 Text("tap to enter")
-                    .font(.system(size: 8, weight: .light, design: .serif).italic())
-                    .foregroundStyle(Color(hex: "#F5E2D6").opacity(showTap ? 0.32 : 0))
+                    .font(.system(size: 9.5, weight: .light, design: .serif).italic())
+                    .foregroundStyle(Color(hex: "#F5E2D6").opacity(showTap ? 0.55 : 0))
                     .padding(.bottom, 48)
             }
             .animation(.easeIn(duration: 1.5), value: showTap)
@@ -168,10 +168,10 @@ struct SeedStepView: View {
             VStack {
                 Spacer()
                 Text("tap to offer")
-                    .font(.system(size: 7.5, weight: .light))
-                    .tracking(3.0)
+                    .font(.system(size: 9.5, weight: .light))
+                    .tracking(2.5)
                     .textCase(.uppercase)
-                    .foregroundStyle(Color(hex: "#F5E2D6").opacity(phase >= 2 ? 0.30 : 0))
+                    .foregroundStyle(Color(hex: "#F5E2D6").opacity(phase >= 2 ? 0.55 : 0))
                     .padding(.bottom, 80)
                     .animation(.easeOut(duration: 2.0), value: phase)
             }
@@ -317,10 +317,10 @@ struct DanceStepView: View {
             VStack {
                 Spacer()
                 Text("tap to continue")
-                    .font(.system(size: 7, weight: .light))
-                    .tracking(3.0)
+                    .font(.system(size: 9.5, weight: .light))
+                    .tracking(2.5)
                     .textCase(.uppercase)
-                    .foregroundStyle(Color(hex: "#F5E2D6").opacity(hasFlashed ? 0.30 : 0))
+                    .foregroundStyle(Color(hex: "#F5E2D6").opacity(hasFlashed ? 0.55 : 0))
                     .animation(.easeOut(duration: 1.2), value: hasFlashed)
                     .padding(.bottom, 80)
             }
@@ -468,11 +468,11 @@ struct FruitStepView: View {
             VStack {
                 Spacer()
                 Text("tap to continue")
-                    .font(.system(size: 7.5, weight: .light))
-                    .tracking(3.0)
+                    .font(.system(size: 9.5, weight: .light))
+                    .tracking(2.5)
                     .textCase(.uppercase)
                     .foregroundStyle(
-                        Color(hex: "#F5E2D6").opacity(visibleLines >= paragraphs.count ? 0.30 : 0)
+                        Color(hex: "#F5E2D6").opacity(visibleLines >= paragraphs.count ? 0.55 : 0)
                     )
                     .animation(.easeOut(duration: 2.0), value: visibleLines)
                     .padding(.bottom, 80)

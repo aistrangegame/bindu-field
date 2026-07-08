@@ -232,12 +232,12 @@ private struct IdleContent: View {
             VStack {
                 Spacer()
                 Text("THE ORACLE")
-                    .font(.system(size: 7, weight: .light))
-                    .tracking(5.0)
+                    .font(.system(size: 9, weight: .light))
+                    .tracking(3.5)
                     .textCase(.uppercase)
                     .foregroundStyle(
                         Color(hex: "#F5E2D6")
-                            .opacity(showAffordance ? 0.35 : 0)
+                            .opacity(showAffordance ? 0.50 : 0)
                     )
                 Spacer()
             }
@@ -247,10 +247,10 @@ private struct IdleContent: View {
             VStack {
                 Spacer()
                 Text("◌")
-                    .font(.system(size: 9))
+                    .font(.system(size: 12))
                     .foregroundStyle(
                         Color(hex: "#F5E2D6")
-                            .opacity(showAffordance ? 0.28 : 0)
+                            .opacity(showAffordance ? 0.45 : 0)
                     )
                     .padding(.bottom, 92)
             }

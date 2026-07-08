@@ -24,6 +24,7 @@ struct RitualRunningView: View {
                     audioSource: .ritual
                 )
                 .id(currentIndex)  // force fresh state on each step transition
+                .environment(\.binduTheme, ThemeData.void)  // immersed scene stays dark
                 .transition(.opacity)
             }
         }

@@ -272,7 +272,7 @@ struct BreathReadingSpaceView: View {
         }
         .background(
             RoundedRectangle(cornerRadius: 6)
-                .fill(Color.white.opacity(0.02))
+                .fill(theme.surface)
         )
     }
 

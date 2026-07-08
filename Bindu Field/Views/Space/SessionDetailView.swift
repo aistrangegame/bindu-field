@@ -272,7 +272,7 @@ struct SessionDetailView: View {
                                 Capsule()
                                     .fill(duration == m
                                           ? Color(hue: hue / 360, saturation: 0.38, brightness: 0.14).opacity(0.85)
-                                          : Color.white.opacity(0.025))
+                                          : theme.surface)
                                     .overlay(
                                         Capsule().stroke(
                                             duration == m ? accent.opacity(0.50) : theme.border,

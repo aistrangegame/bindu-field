@@ -69,6 +69,13 @@ struct Track: Codable, Hashable {
     /// sheet · LALITA tab. `nil` when not yet written.
     let lalitasPerspective: String?
 
+    /// Per-track mirror words flashed during the Consciousness Loop's Dance
+    /// step. Authored in Airtable (`Mirror Words` column, comma/newline
+    /// separated), parsed to `[String]` by `AirtableService`. Empty when not
+    /// authored — the Loop then falls back to the Track-27 hardcoded set or
+    /// its universal default. See `ConsciousnessLoopCoordinator`.
+    let mirrorWords: [String]
+
     /// Explicit `CodingKeys` so the custom decoder below can resolve them
     /// from outside the primary declaration. Synthesized keys are private
     /// and not accessible from extensions.
@@ -78,6 +85,7 @@ struct Track: Codable, Hashable {
         case recognitionStatement
         case lyricalWordsReading, frequencyReading, videoPulseReading
         case lalitasPerspective
+        case mirrorWords
     }
 }
 
@@ -111,5 +119,8 @@ extension Track {
         frequencyReading = try c.decodeIfPresent(String.self, forKey: .frequencyReading) ?? ""
         videoPulseReading = try c.decodeIfPresent(String.self, forKey: .videoPulseReading) ?? ""
         lalitasPerspective = try c.decodeIfPresent(String.self, forKey: .lalitasPerspective)
+        // Defaults to `[]` for older `binduCatalog.v1` caches that pre-date
+        // the mirror-words field, mirroring the reading-field pattern above.
+        mirrorWords = try c.decodeIfPresent([String].self, forKey: .mirrorWords) ?? []
     }
 }

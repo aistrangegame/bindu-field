@@ -142,7 +142,7 @@ struct ScreenedGateView: View {
             HStack(spacing: 14) {
                 ZStack {
                     Circle()
-                        .stroke(isOn ? accent : Color.white.opacity(0.2), lineWidth: 1)
+                        .stroke(isOn ? accent : theme.text.opacity(0.2), lineWidth: 1)
                         .frame(width: 18, height: 18)
                         .background(
                             Circle()
@@ -165,7 +165,7 @@ struct ScreenedGateView: View {
                 RoundedRectangle(cornerRadius: 10)
                     .fill(isOn
                           ? Color(hue: hue / 360, saturation: 0.30, brightness: 0.12).opacity(0.7)
-                          : Color.white.opacity(0.025))
+                          : theme.surface)
                     .overlay(
                         RoundedRectangle(cornerRadius: 10)
                             .stroke(isOn ? Color(hue: hue / 360, saturation: 0.35, brightness: 0.32).opacity(0.55)

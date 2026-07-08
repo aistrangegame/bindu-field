@@ -40,13 +40,13 @@ struct MapView: View {
                 // Title block — anchored top, very subtle.
                 VStack(spacing: 6) {
                     Text("THE MAP")
-                        .font(.system(size: 8, weight: .light))
-                        .tracking(5.0)
+                        .font(.system(size: 9, weight: .light))
+                        .tracking(3.5)
                         .textCase(.uppercase)
-                        .foregroundStyle(theme.text.opacity(0.35))
+                        .foregroundStyle(theme.text.opacity(0.55))
                     Text("a body has thirty-three doors")
-                        .font(.system(size: 11, weight: .light, design: .serif).italic())
-                        .foregroundStyle(theme.text.opacity(0.45))
+                        .font(.system(size: 12, weight: .light, design: .serif).italic())
+                        .foregroundStyle(theme.text.opacity(0.62))
                 }
                 .padding(.top, 18)
             }

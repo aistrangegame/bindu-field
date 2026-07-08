@@ -67,12 +67,14 @@ struct SpaceView: View {
 
             case .immersed:
                 if let session {
+                    // Immersed breath ring is glow-on-void — stays dark.
                     BreathImmersedView(
                         session: session,
                         durationMinutes: duration,
                         onEnd: { _ in stage = .intentions },
                         onOpenReading: { stage = .reading }
                     )
+                    .environment(\.binduTheme, ThemeData.void)
                 }
 
             case .reading:

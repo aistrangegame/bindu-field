@@ -123,11 +123,23 @@ final class AirtableService {
                 lyricalWordsReading: f.lyricalWordsReading ?? "",
                 frequencyReading: f.frequencyReading ?? "",
                 videoPulseReading: f.videoPulseReading ?? "",
-                lalitasPerspective: f.lalitasPerspective
+                lalitasPerspective: f.lalitasPerspective,
+                mirrorWords: Self.parseMirrorWords(f.mirrorWords)
             )
         }
 
         return tracks.sorted { $0.id < $1.id }
+    }
+
+    /// Split an authored `Mirror Words` cell into an ordered word list.
+    /// Author-friendly: accepts commas and/or newlines as separators, trims
+    /// whitespace, and drops empties. `nil`/blank → `[]`.
+    private static func parseMirrorWords(_ raw: String?) -> [String] {
+        guard let raw else { return [] }
+        return raw
+            .split(whereSeparator: { $0 == "," || $0.isNewline })
+            .map { $0.trimmingCharacters(in: .whitespaces) }
+            .filter { !$0.isEmpty }
     }
 
     // MARK: - Breath sessions
@@ -350,6 +362,7 @@ private nonisolated struct AirtableFields: Decodable {
     let frequencyReading: String?
     let videoPulseReading: String?
     let lalitasPerspective: String?
+    let mirrorWords: String?
 
     enum CodingKeys: String, CodingKey {
         case trackID = "Track ID"
@@ -370,5 +383,6 @@ private nonisolated struct AirtableFields: Decodable {
         case frequencyReading = "Frequency Reading"
         case videoPulseReading = "Video Pulse Reading"
         case lalitasPerspective = "Lalita's Perspective"
+        case mirrorWords = "Mirror Words"
     }
 }

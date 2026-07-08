@@ -4,8 +4,14 @@ struct RootView: View {
     @State private var nav = NavigationStore.shared
     @State private var store = PlayerStore.shared
     @State private var session = AudioSessionCoordinator.shared
+    @State private var settings = SettingsStore.shared
+    @Environment(\.colorScheme) private var systemScheme
     @State private var showBirthSequence: Bool = !UserDefaults.standard.bool(forKey: "binduFirstLaunch.seen")
     @State private var showHeadphonesTip: Bool = !UserDefaults.standard.bool(forKey: "binduFirstLaunch.tipSeen")
+
+    /// The palette injected app-wide. The immersive Canvas tabs re-pin
+    /// `void` below so they stay dark even when the user chooses Light.
+    private var theme: Theme { settings.activeTheme(for: systemScheme) }
 
     var body: some View {
         ZStack {
@@ -15,7 +21,11 @@ struct RootView: View {
             ZStack(alignment: .bottom) {
             TabView(selection: $nav.selectedTab) {
                 // MAP — the front door of the app. Tag 0.
+                // Immersive Canvas tabs (Map tree, Field constellation, Lab
+                // instrument, Oracle void) pin `void` — they render glow-on-
+                // void art that stays dark in Light mode by design.
                 MapView()
+                    .environment(\.binduTheme, ThemeData.void)
                     .tabItem {
                         Label { Text("Map") } icon: {
                             BinduTabIconImage(tab: .map, active: nav.selectedTab == 0)
@@ -23,22 +33,26 @@ struct RootView: View {
                     }
                     .tag(0)
                 FieldView()
+                    .environment(\.binduTheme, ThemeData.void)
                     .tabItem {
                         Label { Text("Field") } icon: {
                             BinduTabIconImage(tab: .field, active: nav.selectedTab == 1)
                         }
                     }
                     .tag(1)
-                OracleView()
+                // Lab sits in the primary tab bar (ahead of Oracle) — the
+                // user reaches for the frequency lab far more than the
+                // Oracle. Tags are unchanged (Lab stays 5, Oracle stays 2);
+                // only the array *order* decides which tabs iOS shows before
+                // the More overflow. Primary 4: Map · Field · Lab · AKASH.
+                LabView()
+                    .environment(\.binduTheme, ThemeData.void)
                     .tabItem {
-                        Label { Text("Oracle") } icon: {
-                            BinduTabIconImage(tab: .oracle, active: nav.selectedTab == 2)
+                        Label { Text("Lab") } icon: {
+                            BinduTabIconImage(tab: .lab, active: nav.selectedTab == 5)
                         }
                     }
-                    .tag(2)
-                // Primary 5 finishes here: Space (renamed AKASH in the
-                // tabItem label) → Archive. iOS auto-collapses tabs 5–7
-                // into the More menu.
+                    .tag(5)
                 SpaceView()
                     .tabItem {
                         Label { Text("AKASH") } icon: {
@@ -53,13 +67,17 @@ struct RootView: View {
                         }
                     }
                     .tag(4)
-                LabView()
+                // Oracle is now in the More overflow. The Field central-Bindu
+                // long-press still selects it (tag 2) — via a NavigationStack
+                // push through More.
+                OracleView()
+                    .environment(\.binduTheme, ThemeData.void)
                     .tabItem {
-                        Label { Text("Lab") } icon: {
-                            BinduTabIconImage(tab: .lab, active: nav.selectedTab == 5)
+                        Label { Text("Oracle") } icon: {
+                            BinduTabIconImage(tab: .oracle, active: nav.selectedTab == 2)
                         }
                     }
-                    .tag(5)
+                    .tag(2)
                 RitualView()
                     .tabItem {
                         Label { Text("Ritual") } icon: {
@@ -75,11 +93,13 @@ struct RootView: View {
                     }
                     .tag(7)
             }
-            .preferredColorScheme(.dark)
-            .tint(ThemeData.void.accent)
+            .tint(theme.accent)
             .fullScreenCover(isPresented: $store.isPresentingPlayer) {
                 if let track = store.currentTrack {
+                    // The Player is a fully immersive glow-on-void scene —
+                    // pin `void` so it stays dark in Light mode.
                     PlayerView(track: track)
+                        .environment(\.binduTheme, ThemeData.void)
                 }
             }
 
@@ -136,6 +156,10 @@ struct RootView: View {
         }
         .animation(.easeInOut(duration: 0.4), value: showBirthSequence)
         .animation(.easeInOut(duration: 0.4), value: showHeadphonesTip)
+        // App-wide theme + appearance from the user's setting. Immersive
+        // tabs / covers re-pin `void` above so they stay dark in Light mode.
+        .environment(\.binduTheme, theme)
+        .preferredColorScheme(settings.preferredColorScheme)
     }
 }
 

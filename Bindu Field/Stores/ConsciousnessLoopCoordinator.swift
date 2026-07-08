@@ -100,11 +100,18 @@ final class ConsciousnessLoopCoordinator {
     // MARK: — Per-track content
 
     private static func mirrorWordsForTrack(_ track: Track) -> [String] {
+        // 1. Airtable-authored words win (the authorable source).
+        if !track.mirrorWords.isEmpty {
+            return track.mirrorWords
+        }
+        // 2. Hardcoded score fallback — keeps Track 27 correct even if its
+        //    Airtable cell is blank or the catalog is offline.
         if let score = Score.forTrack(id: track.id),
            let words = score.mirrorWords,
            !words.isEmpty {
             return words
         }
+        // 3. Universal default.
         return defaultMirrorWords
     }
 

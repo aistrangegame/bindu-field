@@ -104,6 +104,38 @@ struct SettingsView: View {
                             }
                         }
 
+                        // Appearance
+                        SettingsSection(title: "appearance") {
+                            VStack(alignment: .leading, spacing: 12) {
+                                Text("Theme")
+                                    .font(.system(size: 13, design: .serif))
+                                    .italic()
+                                    .foregroundColor(theme.text)
+
+                                HStack(spacing: 8) {
+                                    ThemeModeChip(
+                                        label: "System",
+                                        isSelected: settings.themeMode == "system",
+                                        action: { settings.themeMode = "system" }
+                                    )
+                                    ThemeModeChip(
+                                        label: "Light",
+                                        isSelected: settings.themeMode == "light",
+                                        action: { settings.themeMode = "light" }
+                                    )
+                                    ThemeModeChip(
+                                        label: "Dark",
+                                        isSelected: settings.themeMode == "dark",
+                                        action: { settings.themeMode = "dark" }
+                                    )
+                                }
+
+                                Text("Light applies to reading surfaces — Settings, Archive, AKASH detail, Letter. The constellation, Player, and Loop stay dark by design.")
+                                    .font(.system(size: 11))
+                                    .foregroundColor(theme.subtle)
+                            }
+                        }
+
                         // Session
                         SettingsSection(title: "session") {
                             VStack(alignment: .leading, spacing: 12) {
@@ -407,6 +439,32 @@ private struct DurationChip: View {
 }
 
 private struct VizModeChip: View {
+    let label: String
+    let isSelected: Bool
+    let action: () -> Void
+    @Environment(\.binduTheme) private var theme
+
+    var body: some View {
+        Button(action: action) {
+            Text(label)
+                .font(.system(size: 12, design: .serif))
+                .italic()
+                .foregroundColor(isSelected ? theme.bg : theme.muted)
+                .frame(maxWidth: .infinity)
+                .padding(.vertical, 8)
+                .background(
+                    Capsule()
+                        .fill(isSelected ? theme.text : Color.clear)
+                        .overlay(Capsule().stroke(theme.muted.opacity(0.3), lineWidth: isSelected ? 0 : 1))
+                )
+        }
+        .buttonStyle(.plain)
+    }
+}
+
+/// Three-way appearance chip (System / Light / Dark). Same shape as
+/// `VizModeChip`; kept separate for label clarity.
+private struct ThemeModeChip: View {
     let label: String
     let isSelected: Bool
     let action: () -> Void
