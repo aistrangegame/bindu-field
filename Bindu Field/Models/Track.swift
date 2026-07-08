@@ -76,6 +76,12 @@ struct Track: Codable, Hashable {
     /// its universal default. See `ConsciousnessLoopCoordinator`.
     let mirrorWords: [String]
 
+    /// The Airtable record id ("rec…") for this catalog row, when known.
+    /// Set at fetch time by `AirtableService`; persisted in the cache.
+    /// Enables linked-record writes back to the catalog (App Activity →
+    /// Link to Field). `nil` for older caches that pre-date this field.
+    let recordID: String?
+
     /// Explicit `CodingKeys` so the custom decoder below can resolve them
     /// from outside the primary declaration. Synthesized keys are private
     /// and not accessible from extensions.
@@ -86,6 +92,7 @@ struct Track: Codable, Hashable {
         case lyricalWordsReading, frequencyReading, videoPulseReading
         case lalitasPerspective
         case mirrorWords
+        case recordID
     }
 }
 
@@ -122,5 +129,6 @@ extension Track {
         // Defaults to `[]` for older `binduCatalog.v1` caches that pre-date
         // the mirror-words field, mirroring the reading-field pattern above.
         mirrorWords = try c.decodeIfPresent([String].self, forKey: .mirrorWords) ?? []
+        recordID = try c.decodeIfPresent(String.self, forKey: .recordID)
     }
 }

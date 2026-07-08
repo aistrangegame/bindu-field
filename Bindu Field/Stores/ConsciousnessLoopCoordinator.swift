@@ -46,6 +46,10 @@ final class ConsciousnessLoopCoordinator {
     private(set) var fruitParagraphs: [String] = []
     var offeredWord: String = ""
 
+    /// Fire-once guard for the "Ceremony Sealed" App Activity write, so a
+    /// sealed loop logs exactly one row. Reset on begin / cancel.
+    private var didLogSeal = false
+
     /// Default mirror words used when a track has no authored `Score`
     /// or its score sets `mirrorWords = nil`. Five short verbs that the
     /// dance can flash for any element. Tuned to feel universal.
@@ -61,6 +65,7 @@ final class ConsciousnessLoopCoordinator {
         self.mirrorWords = Self.mirrorWordsForTrack(track)
         self.fruitParagraphs = []
         self.offeredWord = ""
+        self.didLogSeal = false
         self.state = .preRoll
     }
 
@@ -69,6 +74,7 @@ final class ConsciousnessLoopCoordinator {
         track = nil
         offeredWord = ""
         fruitParagraphs = []
+        didLogSeal = false
     }
 
     func advance() {
@@ -92,8 +98,30 @@ final class ConsciousnessLoopCoordinator {
         case .dance:    state = .reveal
         case .reveal:   state = .fruit
         case .fruit:    state = .lalita
-        case .lalita:   state = .done
+        case .lalita:
+            state = .done
+            // The ceremony is sealed — Field's one write to the shared
+            // App Activity ledger. Fire-and-forget; never blocks the Loop.
+            logCeremonySealed()
         case .done:     break
+        }
+    }
+
+    /// Log a "Ceremony Sealed" App Activity row for the track this loop ran
+    /// over. Links back to the catalog record when the rec id is known.
+    private func logCeremonySealed() {
+        guard !didLogSeal, let track else { return }
+        didLogSeal = true
+        let activityName = "\(track.verb) — \(track.song)"
+        let detail = "Sealed the Loop over '\(track.verb)' — \(track.song) · \(track.artist)"
+        let links = track.recordID.map { [$0] } ?? []
+        Task {
+            await AirtableService.shared.logAppActivity(
+                activityName: activityName,
+                activityType: "Ceremony Sealed",
+                detail: detail,
+                linkFieldRecordIDs: links
+            )
         }
     }
 

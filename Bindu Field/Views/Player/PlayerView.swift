@@ -403,8 +403,9 @@ struct PlayerView: View {
             // content — verb / recognition / BEGIN THE LOOP / scrubber —
             // begins at 0.59 * height (see `fieldContent`), so constraining
             // this zone to the upper ~56% leaves that content tappable.
-            // Previously this was full-screen and swallowed the BEGIN THE
-            // LOOP button, making the Consciousness Loop unreachable.
+            // A full-screen zone here swallowed the BEGIN THE LOOP button,
+            // making the Consciousness Loop (and its "Ceremony Sealed" write)
+            // unreachable.
             VStack(spacing: 0) {
                 Color.clear
                     .frame(height: geo.size.height * 0.56)

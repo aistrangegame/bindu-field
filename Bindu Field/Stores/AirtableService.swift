@@ -1,4 +1,5 @@
 import Foundation
+import os
 
 enum AirtableError: LocalizedError {
     case noToken
@@ -24,6 +25,12 @@ final class AirtableService {
 
     private let baseURL = "https://api.airtable.com/v0/app248ZTWhYJlvQj2/tblv3WvMZ90Sfhun6"
     private let pageSize = 100
+
+    /// Cross-app "App Activity" ledger — same base, different table. Field's
+    /// only write target.
+    private let appActivityURL = "https://api.airtable.com/v0/app248ZTWhYJlvQj2/tblJlBeiHnqGpYrL7"
+
+    private static let log = Logger(subsystem: "com.bindufield", category: "airtable")
 
     private init() {}
 
@@ -124,7 +131,8 @@ final class AirtableService {
                 frequencyReading: f.frequencyReading ?? "",
                 videoPulseReading: f.videoPulseReading ?? "",
                 lalitasPerspective: f.lalitasPerspective,
-                mirrorWords: Self.parseMirrorWords(f.mirrorWords)
+                mirrorWords: Self.parseMirrorWords(f.mirrorWords),
+                recordID: record.id
             )
         }
 
@@ -244,6 +252,67 @@ final class AirtableService {
         return sessions.sorted { $0.id < $1.id }
     }
 
+    // MARK: - App Activity (write)
+    //
+    // Field's first and only write path. Logs a threshold-crossing moment
+    // to the shared cross-app "App Activity" ledger. Fire-and-forget:
+    // failures are logged, never surfaced — telemetry must not intrude on
+    // the ceremony. Requires the PAT to carry `data.records:write` on the
+    // base; a 4xx is logged and swallowed.
+
+    /// Create one App Activity record. `linkFieldRecordIDs` are catalog
+    /// record ids ("rec…") for the "Link to Field" linked field — pass the
+    /// track's `recordID`; omit when unknown so the write still succeeds
+    /// unlinked. `activityName` / `detail` are already-composed display copy.
+    func logAppActivity(
+        activityName: String,
+        activityType: String,
+        detail: String,
+        linkFieldRecordIDs: [String] = []
+    ) async {
+        let token = Secrets.airtableToken
+        guard isPlausibleToken(token) else { return }
+        guard let url = URL(string: appActivityURL) else { return }
+
+        var fields: [String: Any] = [
+            "Activity Name": activityName,
+            "Source App": "Field",
+            "Activity Type": activityType,
+            "Detail": detail,
+            "Activity Date": Self.isoDay(Date()),
+        ]
+        if !linkFieldRecordIDs.isEmpty {
+            fields["Link to Field"] = linkFieldRecordIDs
+        }
+        let body: [String: Any] = ["fields": fields, "typecast": true]
+
+        var request = URLRequest(url: url)
+        request.httpMethod = "POST"
+        request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
+        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        request.httpBody = try? JSONSerialization.data(withJSONObject: body)
+
+        do {
+            let (data, response) = try await URLSession.shared.data(for: request)
+            guard let http = response as? HTTPURLResponse else { return }
+            if !(200..<300).contains(http.statusCode) {
+                let msg = String(data: data, encoding: .utf8) ?? ""
+                Self.log.error("App Activity write failed: HTTP \(http.statusCode, privacy: .public) \(msg, privacy: .public)")
+            } else {
+                Self.log.info("App Activity logged: \(activityType, privacy: .public)")
+            }
+        } catch {
+            Self.log.error("App Activity write error: \(error.localizedDescription, privacy: .public)")
+        }
+    }
+
+    private static func isoDay(_ date: Date) -> String {
+        let f = DateFormatter()
+        f.locale = Locale(identifier: "en_US_POSIX")
+        f.dateFormat = "yyyy-MM-dd"
+        return f.string(from: date)
+    }
+
     // MARK: - Helpers
 
     /// B17: reject obvious placeholders and shape-fail values. A real
@@ -276,6 +345,10 @@ private nonisolated struct AirtableResponse: Decodable {
 }
 
 private nonisolated struct AirtableRecord: Decodable {
+    /// Airtable's top-level record id ("rec…"). Captured so Field can set
+    /// linked-record fields (e.g. App Activity → Link to Field) that point
+    /// back at a catalog track. Threaded onto `Track.recordID`.
+    let id: String
     let fields: AirtableFields
 }
 
