@@ -1,14 +1,16 @@
 # Design tokens
 
-## Palette — `ThemeData.void` (the only theme today; `Theme` is a `struct`, alternate palettes can be added without renaming the type)
+## Palette — `ThemeData.void` (the canonical dark theme) + `ThemeData.light`
+
+Two palettes ship since `b9c2918`: the dark `void` below and a warm-paper `light` (`Theme` is a `struct`; `id == "light"` exposes `isLight`). `SettingsStore.themeMode` (`"system"`/`"light"`/`"dark"`) picks via `activeTheme(for:)`; `RootView` injects it into `\.binduTheme` and sets `preferredColorScheme`. **Immersive Canvas scenes (PlayerView vocabularies, breath/ritual immersed views) are pinned to `ThemeData.void` regardless of theme** so the element worlds stay dark. The token table below documents `void`; `light` mirrors its opacity structure with `surface`/`border` becoming dark-on-light.
 
 | Token | Value (sRGB) | Notes |
 |---|---|---|
 | `bg` | `#020208` (very near-black with a hint of blue) | base background; `PlayerView` overrides with `vocab.bg` (per-element near-black) |
 | `bg2` | `#05050F` | rarely used today — slight elevation |
 | `text` | `#F5E2D6` (warm off-white, the "Bindu cream") | all primary text, button fill |
-| `muted` | `text @ 0.55` | secondary text, button strokes |
-| `subtle` | `text @ 0.28` | labels, tiny captions, hint copy |
+| `muted` | `text @ 0.68` | secondary text, button strokes (raised from 0.55 in the `b9c2918` contrast pass) |
+| `subtle` | `text @ 0.40` | labels, tiny captions, hint copy (raised from 0.28 in the `b9c2918` contrast pass) |
 | `accent` | `#D46453` (warm coral-red) | the Bindu red — selection, slider tint, active toggles, "Begin" buttons |
 | `gold` | `#C4A862` (defined but rarely surfaced) | available for ceremonial accent |
 | `border` | `white @ 0.08` | rarely used directly |

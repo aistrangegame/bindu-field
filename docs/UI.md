@@ -6,7 +6,7 @@ Full per-tab behavior, the Player modal three-mode architecture, the Map, the Co
 
 ## Tabs (full)
 
-`RootView.swift` — `TabView` over `NavigationStore.selectedTab` (tags 0–7). Programmatic switch via the store (e.g. long-press the central Bindu in Field → tab 2 Oracle). **iOS auto-collapses tabs 5–7 (Lab, Ritual, Letter) into the More menu** because the primary array exceeds 5.
+`RootView.swift` — `TabView` over `NavigationStore.selectedTab` (tags 0–7). Programmatic switch via the store (e.g. long-press the central Bindu in Field → tag 2 Oracle). Tags are stable; the **visible order changed in `b9c2918`** — the `TabView` now lists Map(0) · Field(1) · Lab(5) · AKASH(3) · Archive(4) · Oracle(2) · Ritual(6) · Letter(7), so iOS shows **primary 4 = Map · Field · Lab · AKASH** and collapses **Archive · Oracle · Ritual · Letter into the More menu** (Lab was promoted into the primary bar; Oracle demoted into More — the Field central-Bindu long-press still reaches Oracle through More).
 
 Tab glyphs are custom 28×28 SwiftUI Canvas drawings (`Views/Components/BinduTabIcons.swift`) — concentric geometry, sparse strokes, no fills beyond a central dot. They replace the SF Symbols used pre-Session-B. The same `BinduTabIcon.Tab` enum covers all 8 tabs; cream color travels through `BinduTabIcon.color`, active state = full opacity, inactive = 0.40.
 
@@ -34,7 +34,7 @@ The background is no longer pure void: `PlayerView.background` reads `ElementVoc
 - Top status-bar gradient: always-on 88pt fade (theme.bg @ 0.80 → clear) for legibility over vocabulary layers that reach the top.
 - Bottom viz→bg gradient: FIELD-mode-only fade at 48% of screen height, 86pt tall (clear → theme.bg) — softens the visualizer's lower edge into the background where the verb floats.
 - Field content overlay: 62pt ultraLight serif italic verb in element color with element-color glow shadow, song · artist subtitle, optional recognition statement in curly quotes — text block anchored via `.padding(.top, geo.size.height * 0.59)` so the verb floats over the dissolving lower edge.
-- **BEGIN THE LOOP** capsule sits below the recognition statement (11pt tracked label, element-color stroke). Opens the 7-step Consciousness Loop as a `fullScreenCover` over the player; music continues underneath.
+- **BEGIN THE LOOP** capsule sits below the recognition statement (11pt tracked label, element-color stroke). Opens the 7-step Consciousness Loop as a `fullScreenCover` over the player; music continues underneath. (`b9c2918` fixed a FIELD tap-zone bug where the full-screen enter-CONTROL tap region was swallowing this capsule's taps — it is now reachable.)
 - Slim "flowing" scrubber pinned to the screen bottom (read-only, 2pt, percent + label).
 - Tap anywhere on the background → CONTROL. **Swipe down > 60pt on the FIELD background → `store.closePlayer()`** (the swipe-to-minimize is the only top-bar-less gesture path back out).
 
@@ -93,7 +93,7 @@ A bounded ritual presented as a `fullScreenCover` over the PlayerView. Music con
 | 1 · Pre-Roll | `PreRollStepView` | A 5.5s breath ring at the element hue. After one full inhale → exhale cycle a "tap to enter" affordance fades in. |
 | 2 · Seed | `SeedStepView` | "What word has been waiting in you?" rendered in serif italic. Tap to advance. |
 | 3 · Offering | `OfferingStepView` | A blank field for the user to type one word. Bound to `coord.offeredWord`. Tap submit to lock. |
-| 4 · Dance | `DanceStepView` | Flashes mirror words sequentially — uses `Score.mirrorWords` if the track has an authored score, otherwise the coordinator's 5-word default `["return", "listen", "open", "soften", "trust"]`. |
+| 4 · Dance | `DanceStepView` | Flashes mirror words sequentially. Precedence (since `b9c2918`): per-track `Track.mirrorWords` (Airtable `Mirror Words` column) → `Score.mirrorWords` (authored Score, Track 27 only) → the coordinator's 5-word default `["return", "listen", "open", "soften", "trust"]`. |
 | 5 · Reveal | `RevealStepView` | The user's offered word displayed large, in element color. Tap to advance. |
 | 6 · Fruit | `FruitStepView` | Three paragraphs derived from `track.lyricalWordsReading` (split on blank lines, prefix-3) or generated defaults that name the offered word. |
 | 7 · Lalita | `LalitaStepView` | A single closing line — `track.lalitasPerspective` or fallback "I see you. You have always been here." Tap close to end. |

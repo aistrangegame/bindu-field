@@ -2,9 +2,9 @@
 
 iOS / SwiftUI app. Binaural-beat instrument layered on a catalogue of music tracks, with a 33-chakra Map (front door), a constellation Field, a 7-step Consciousness Loop, breath-driven AKASH sessions, a four-state Oracle (Claude API) track recommender, Sound Letters, a freeform Lab, and a Ritual sequencer.
 
-Single Xcode target, dark-mode-only, ultraLight serif type, void/black palette. **No SPM dependencies — Accelerate.framework only.** Catalogue loaded dynamically from Airtable; audio MP3s stream from a static aistrangegame.com host with a 200 MB LRU disk cache. Oracle calls api.anthropic.com directly with a key the user pastes into Settings.
+Single Xcode target, dark-first (with an optional warm-paper light theme — see `SettingsStore.themeMode`; immersive Canvas scenes stay void regardless), ultraLight serif type, void/black palette. **No SPM dependencies — Accelerate.framework only.** Catalogue loaded dynamically from Airtable; audio MP3s stream from a static aistrangegame.com host with a 200 MB LRU disk cache. Oracle calls api.anthropic.com directly with a key the user pastes into Settings. As of `e30c913` the app also performs its first Airtable *write* — an "App Activity" ledger row on Consciousness-Loop seal (uses the embedded PAT in `Secrets.swift`).
 
-Project root: `/Users/ashrey/Bindu Field/`. Currently on `feat/stabilize`, ahead of `origin/feat/stabilize`, not pushed, not merged to main. Build clean, zero warnings, zero errors. Last audited 2026-05-27.
+Project root: `/Users/ashrey/Bindu Field/`. Currently on `main`, clean, up to date with `origin/main` (HEAD `5338bfb`). Build documented clean (zero warnings/errors) at the 2026-05-27 audit; not re-compiled at the 2026-08-29 doc/content re-audit.
 
 ---
 
@@ -110,7 +110,7 @@ at runtime into the Keychain.
 
 ## Tabs
 
-`RootView.swift` — `TabView` over `NavigationStore.selectedTab` (tags 0–7). **iOS auto-collapses tabs 5–7 (Lab, Ritual, Letter) into the More menu** because the primary array exceeds 5. Full per-tab behavior in `docs/UI.md`.
+`RootView.swift` — `TabView` over `NavigationStore.selectedTab` (tags 0–7). Tags are stable, but the **visible order changed in `b9c2918`**: the `TabView` now lists Map(0) · Field(1) · Lab(5) · AKASH(3) · Archive(4) · Oracle(2) · Ritual(6) · Letter(7), so iOS shows **primary 4 = Map · Field · Lab · AKASH** and collapses **Archive · Oracle · Ritual · Letter into the More menu** (Lab was promoted into the primary bar; Oracle was demoted into More — the Field central-Bindu long-press still routes to Oracle through More). Full per-tab behavior in `docs/UI.md`.
 
 | Tag | Tab | One-line |
 |---|---|---|
@@ -147,7 +147,7 @@ Non-`@Observable` singletons: `BinauralEngine.shared`, `BinauralListener.shared`
 | Breath sessions cache | UserDefaults | `binduBreathSessions.v1` + `.lastRefreshedAt` |
 | Track audio cache | Caches | `Caches/BinduTracks/track-{id}.mp3` (200 MB LRU) |
 | Chakra journey (Map dance log) | UserDefaults | `binduJourney.v1` |
-| Settings | UserDefaults | `binduSettings.gain`, `binduSettings.defaultDuration`, `binduSettings.vizMode` |
+| Settings | UserDefaults | `binduSettings.gain`, `binduSettings.defaultDuration`, `binduSettings.vizMode`, `binduSettings.themeMode` (`"system"` default · `"light"` · `"dark"`) |
 | First-launch flags | UserDefaults | `binduFirstLaunch.seen`, `binduFirstLaunch.tipSeen`, `binduFirstLaunch.oracleHintSeen` |
 | Claude API key | Keychain | service `com.bindufield.apikeys` · account `claude_api_key` · `kSecAttrAccessibleAfterFirstUnlockThisDeviceOnly` |
 | Airtable PAT | Code | `Secrets.swift` (gitignored; template at `Secrets.swift.template`) |
