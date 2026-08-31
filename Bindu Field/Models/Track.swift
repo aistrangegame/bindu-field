@@ -76,6 +76,14 @@ struct Track: Codable, Hashable {
     /// its universal default. See `ConsciousnessLoopCoordinator`.
     let mirrorWords: [String]
 
+    /// Per-track phase labels — the composed arc of the song, authored in
+    /// Airtable (`Phase Labels` column) in the web-player object-array
+    /// format `[{t, name, sub}, …]`. Surfaced in the Player READING sheet's
+    /// PHASES tab via `SongPhaseParser`. `nil` when not authored (older
+    /// caches, or tracks whose arc hasn't been composed). Breath sessions
+    /// carry the same column but in a paragraph format decoded separately.
+    let phaseLabels: String?
+
     /// The Airtable record id ("rec…") for this catalog row, when known.
     /// Set at fetch time by `AirtableService`; persisted in the cache.
     /// Enables linked-record writes back to the catalog (App Activity →
@@ -92,6 +100,7 @@ struct Track: Codable, Hashable {
         case lyricalWordsReading, frequencyReading, videoPulseReading
         case lalitasPerspective
         case mirrorWords
+        case phaseLabels
         case recordID
     }
 }
@@ -129,6 +138,7 @@ extension Track {
         // Defaults to `[]` for older `binduCatalog.v1` caches that pre-date
         // the mirror-words field, mirroring the reading-field pattern above.
         mirrorWords = try c.decodeIfPresent([String].self, forKey: .mirrorWords) ?? []
+        phaseLabels = try c.decodeIfPresent(String.self, forKey: .phaseLabels)
         recordID = try c.decodeIfPresent(String.self, forKey: .recordID)
     }
 }
