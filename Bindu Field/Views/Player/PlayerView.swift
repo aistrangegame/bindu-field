@@ -869,6 +869,8 @@ struct PlayerView: View {
                                 Text(tab.rawValue)
                                     .font(.system(size: 9, weight: .regular))
                                     .tracking(1.8)
+                                    .lineLimit(1)
+                                    .minimumScaleFactor(0.8)
                                     .foregroundColor(readingTab == tab ? theme.text : theme.subtle)
                                 Rectangle()
                                     .fill(readingTab == tab ? elementColor : Color.clear)
