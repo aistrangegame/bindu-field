@@ -132,6 +132,7 @@ final class AirtableService {
                 videoPulseReading: f.videoPulseReading ?? "",
                 lalitasPerspective: f.lalitasPerspective,
                 mirrorWords: Self.parseMirrorWords(f.mirrorWords),
+                phaseLabels: f.phaseLabels,
                 recordID: record.id
             )
         }
@@ -436,6 +437,7 @@ private nonisolated struct AirtableFields: Decodable {
     let videoPulseReading: String?
     let lalitasPerspective: String?
     let mirrorWords: String?
+    let phaseLabels: String?
 
     enum CodingKeys: String, CodingKey {
         case trackID = "Track ID"
@@ -457,5 +459,6 @@ private nonisolated struct AirtableFields: Decodable {
         case videoPulseReading = "Video Pulse Reading"
         case lalitasPerspective = "Lalita's Perspective"
         case mirrorWords = "Mirror Words"
+        case phaseLabels = "Phase Labels"
     }
 }

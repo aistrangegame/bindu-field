@@ -54,6 +54,7 @@ struct PlayerView: View {
         case frequency = "FREQUENCY"
         case video = "VIDEO"
         case lalita = "LALITA"
+        case phases = "PHASES"
         var id: String { rawValue }
     }
 
@@ -868,6 +869,8 @@ struct PlayerView: View {
                                 Text(tab.rawValue)
                                     .font(.system(size: 9, weight: .regular))
                                     .tracking(1.8)
+                                    .lineLimit(1)
+                                    .minimumScaleFactor(0.8)
                                     .foregroundColor(readingTab == tab ? theme.text : theme.subtle)
                                 Rectangle()
                                     .fill(readingTab == tab ? elementColor : Color.clear)
@@ -898,6 +901,8 @@ struct PlayerView: View {
                             videoContent
                         case .lalita:
                             lalitaContent
+                        case .phases:
+                            phasesContent
                         }
                     }
                     .padding(.horizontal, 28)
@@ -999,6 +1004,18 @@ struct PlayerView: View {
             }
             .frame(maxWidth: .infinity, alignment: .leading)
         }
+    }
+
+    // PHASES — the composed arc of the song. Reads `track.phaseLabels`
+    // (Airtable `Phase Labels`, web-player object-array format) through
+    // `SongPhaseParser`. Graceful stub when a track carries no arc.
+    @ViewBuilder
+    private var phasesContent: some View {
+        SongPhaseReadingView(
+            phaseLabels: track.phaseLabels,
+            accent: elementColor,
+            theme: theme
+        )
     }
 
     // MARK: - Binaural pill (status indicator, anchored top)
